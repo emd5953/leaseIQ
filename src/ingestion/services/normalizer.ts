@@ -113,7 +113,7 @@ export class DataNormalizer {
     });
     
     // Remove duplicates
-    return [...new Set(normalized)];
+    return Array.from(new Set(normalized));
   }
 
   /**

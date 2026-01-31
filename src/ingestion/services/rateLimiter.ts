@@ -53,7 +53,8 @@ export class RateLimiter {
    * Stop all rate limiters
    */
   stopAll(): void {
-    for (const limiter of this.limiters.values()) {
+    const limiters = Array.from(this.limiters.values());
+    for (const limiter of limiters) {
       limiter.stop();
     }
     this.limiters.clear();
