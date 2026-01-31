@@ -6,7 +6,12 @@ async function startServer() {
   try {
     // Connect to MongoDB
     console.log('Connecting to MongoDB...');
-    await mongoose.connect(config.mongodb.uri);
+    await mongoose.connect(config.mongodb.uri, {
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+      tls: true,
+      tlsAllowInvalidCertificates: true, // Workaround for Node.js 22 SSL issues
+    });
     console.log('✓ MongoDB connected');
 
     // Create Express app

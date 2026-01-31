@@ -9,9 +9,14 @@
     "test:watch": "vitest",
     "test:connection": "tsx test-connection.ts",
     "dev": "tsx src/server.ts",
-    "start": "node dist/server.js",
+    "start": "node docs/scripts/start-fullstack.js",
+    "start:backend": "tsx src/server.ts",
+    "start:frontend": "node docs/scripts/start-frontend.js",
+    "server": "node dist/server.js",
     "alerts": "tsx src/jobs/alert-cron.ts",
-    "scrape": "tsx src/ingestion/example.ts"
+    "scraping": "tsx src/jobs/scraping-cron.ts",
+    "scrape": "tsx src/ingestion/example.ts",
+    "demo": "tsx example-usage.ts"
   },
   "keywords": [
     "rental",

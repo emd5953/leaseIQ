@@ -71,7 +71,7 @@ export class ResearchService {
       
       const result = await firecrawl.scrape(searchUrl, {
         formats: ['markdown'],
-      });
+      }) as any;
 
       if (result.success && result.markdown) {
         // Extract relevant review snippets (first 500 chars)
@@ -93,7 +93,7 @@ export class ResearchService {
       
       const result = await firecrawl.scrape(searchUrl, {
         formats: ['markdown'],
-      });
+      }) as any;
 
       if (result.success && result.markdown) {
         const violations = result.markdown.substring(0, 500);

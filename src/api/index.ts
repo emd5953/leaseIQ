@@ -4,6 +4,7 @@ import searchRoutes from './routes/search.routes';
 import alertsRoutes from './routes/alerts.routes';
 import researchRoutes from './routes/research.routes';
 import leaseRoutes from './routes/lease.routes';
+import webhookRoutes from './routes/webhook.routes';
 
 export function createApp(): Express {
   const app = express();
@@ -23,6 +24,7 @@ export function createApp(): Express {
   app.use('/api/alerts', alertsRoutes);
   app.use('/api/research', researchRoutes);
   app.use('/api/lease', leaseRoutes);
+  app.use('/api/webhook', webhookRoutes);
 
   // 404 handler
   app.use((req, res) => {

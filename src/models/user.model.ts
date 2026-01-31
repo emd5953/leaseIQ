@@ -25,7 +25,7 @@ const userSchema = new Schema<IUser>({
     index: true,
     validate: {
       validator: function(v: string) {
-        return v && v.trim().length > 0;
+        return !!(v && v.trim().length > 0);
       },
       message: 'Supabase ID cannot be empty or whitespace'
     }

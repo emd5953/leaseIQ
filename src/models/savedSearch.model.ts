@@ -68,7 +68,7 @@ const savedSearchSchema = new Schema<ISavedSearch>({
     maxlength: [100, 'Search name cannot exceed 100 characters'],
     validate: {
       validator: function(v: string) {
-        return v && v.trim().length > 0;
+        return !!(v && v.trim().length > 0);
       },
       message: 'Search name cannot be empty or whitespace'
     }
@@ -251,9 +251,9 @@ savedSearchSchema.index({ alertsEnabled: 1, lastAlertSentAt: 1 });
 
 // Pre-save hook to initialize lastAlertSentAt when alertsEnabled is true
 savedSearchSchema.pre('save', function(next) {
-  // Initialize lastAlertSentAt to createdAt when alerts are enabled on creation
+  // Initialize lastAlertSentAt to current time when alerts are enabled on creation
   if (this.isNew && this.alertsEnabled && !this.lastAlertSentAt) {
-    this.lastAlertSentAt = this.createdAt || new Date();
+    this.lastAlertSentAt = new Date();
   }
   
   next();

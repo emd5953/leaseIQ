@@ -66,7 +66,6 @@ export class AlertService {
               savedSearchId: search._id as Types.ObjectId,
               sentAt: new Date(),
               listingIds: newListings.map((l) => l._id as Types.ObjectId),
-              listingCount: newListings.length,
               alertMethod: (search.alertMethod === 'both' ? 'email' : search.alertMethod) as 'email' | 'in-app',
               deliveryStatus: 'sent',
             });
@@ -82,7 +81,6 @@ export class AlertService {
               savedSearchId: search._id as Types.ObjectId,
               sentAt: new Date(),
               listingIds: newListings.map((l) => l._id as Types.ObjectId),
-              listingCount: newListings.length,
               alertMethod: (search.alertMethod === 'both' ? 'email' : search.alertMethod) as 'email' | 'in-app',
               deliveryStatus: 'failed',
             });
@@ -136,7 +134,6 @@ export class AlertService {
           savedSearchId: new Types.ObjectId(savedSearchId),
           sentAt: new Date(),
           listingIds: listings.map((l) => l._id as Types.ObjectId),
-          listingCount: listings.length,
           alertMethod: (search.alertMethod === 'both' ? 'email' : search.alertMethod) as 'email' | 'in-app',
           deliveryStatus: 'sent',
         });
