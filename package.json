@@ -7,7 +7,11 @@
     "build": "tsc",
     "test": "vitest --run",
     "test:watch": "vitest",
-    "test:connection": "tsx test-connection.ts"
+    "test:connection": "tsx test-connection.ts",
+    "dev": "tsx src/server.ts",
+    "start": "node dist/server.js",
+    "alerts": "tsx src/jobs/alert-cron.ts",
+    "scrape": "tsx src/ingestion/example.ts"
   },
   "keywords": [
     "rental",
@@ -25,12 +29,16 @@
     "dotenv": "^16.3.1",
     "express": "^5.2.1",
     "mongoose": "^8.0.0",
+    "node-cron": "^4.2.1",
     "openai": "^6.17.0",
     "resend": "^6.9.1",
     "uuid": "^13.0.0"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
     "@types/node": "^20.10.0",
+    "@types/node-cron": "^3.0.11",
     "@types/uuid": "^10.0.0",
     "fast-check": "^4.5.3",
     "mongodb-memory-server": "^9.1.0",
