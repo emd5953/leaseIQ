@@ -45,8 +45,8 @@ export class ZillowScraper extends AbstractListingScraper {
   }
 
   protected buildSearchUrl(config: ScrapeConfig): string {
-    // Use a simple working Zillow rental search URL
-    return 'https://www.zillow.com/homes/for_rent/';
+    // NYC-focused Zillow rental search
+    return 'https://www.zillow.com/new-york-ny/rentals/';
   }
 
   protected extractListings(data: any): any[] {

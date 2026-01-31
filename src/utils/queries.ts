@@ -59,14 +59,16 @@ export interface PaginatedResult<T> {
  * @returns MongoDB filter query object
  */
 export function buildListingQuery(criteria: SearchCriteria): FilterQuery<IListing> {
-  const query: FilterQuery<IListing> = {};
+  const query: any = {};
 
   // Price range filter
   if (criteria.minPrice !== null && criteria.minPrice !== undefined) {
-    query.price = { ...query.price, $gte: criteria.minPrice };
+    if (!query['price.amount']) query['price.amount'] = {};
+    query['price.amount'].$gte = criteria.minPrice;
   }
   if (criteria.maxPrice !== null && criteria.maxPrice !== undefined) {
-    query.price = { ...query.price, $lte: criteria.maxPrice };
+    if (!query['price.amount']) query['price.amount'] = {};
+    query['price.amount'].$lte = criteria.maxPrice;
   }
 
   // Bedroom range filter

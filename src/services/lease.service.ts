@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import { config } from '../config';
 import { EmailService } from './email.service';
+import { ReductoService } from './reducto.service';
 
 const openai = new OpenAI({
   baseURL: config.openrouter.baseUrl,
@@ -20,12 +21,12 @@ export interface LeaseAnalysis {
     term?: string;
     fees?: string;
   };
+  fullText?: string;
 }
 
 export class LeaseService {
   /**
    * Analyze lease text and extract key information
-   * Note: In production, you'd use Reducto API to parse PDF first
    */
   static async analyzeLease(leaseText: string): Promise<LeaseAnalysis> {
     try {
@@ -79,12 +80,89 @@ Respond in JSON format:
   }
 
   /**
-   * Parse PDF lease using Reducto (placeholder - implement when Reducto API key is available)
+   * Parse PDF lease using Reducto API
    */
-  static async parseLeasePDF(pdfBuffer: Buffer): Promise<string> {
-    // TODO: Implement Reducto API integration
-    // For now, return placeholder
-    throw new Error('PDF parsing not yet implemented. Please provide lease text directly.');
+  static async parseLeasePDF(pdfBuffer: Buffer, fileName?: string): Promise<string> {
+    try {
+      const reducto = new ReductoService();
+      
+      if (!reducto.isConfigured()) {
+        throw new Error('Reducto API key not configured');
+      }
+
+      const result = await reducto.parseLeasePDF({
+        file: pdfBuffer,
+        fileName: fileName || 'lease.pdf',
+      });
+
+      if (!result.success || !result.text) {
+        throw new Error(result.error || 'Failed to parse PDF');
+      }
+
+      return result.text;
+    } catch (error) {
+      console.error('PDF parsing error:', error);
+      throw new Error(
+        error instanceof Error 
+          ? error.message 
+          : 'Failed to parse PDF. Please try again or provide lease text directly.'
+      );
+    }
+  }
+
+  /**
+   * Parse PDF lease from URL using Reducto API
+   */
+  static async parseLeasePDFFromURL(url: string): Promise<string> {
+    try {
+      const reducto = new ReductoService();
+      
+      if (!reducto.isConfigured()) {
+        throw new Error('Reducto API key not configured');
+      }
+
+      const result = await reducto.parseLeasePDF({ url });
+
+      if (!result.success || !result.text) {
+        throw new Error(result.error || 'Failed to parse PDF');
+      }
+
+      return result.text;
+    } catch (error) {
+      console.error('PDF parsing error:', error);
+      throw new Error(
+        error instanceof Error 
+          ? error.message 
+          : 'Failed to parse PDF from URL. Please try again.'
+      );
+    }
+  }
+
+  /**
+   * Complete workflow: Parse PDF and analyze lease
+   */
+  static async analyzeLeasePDF(
+    pdfBuffer: Buffer,
+    fileName?: string
+  ): Promise<LeaseAnalysis> {
+    const leaseText = await this.parseLeasePDF(pdfBuffer, fileName);
+    const analysis = await this.analyzeLease(leaseText);
+    return {
+      ...analysis,
+      fullText: leaseText,
+    };
+  }
+
+  /**
+   * Complete workflow: Parse PDF from URL and analyze lease
+   */
+  static async analyzeLeasePDFFromURL(url: string): Promise<LeaseAnalysis> {
+    const leaseText = await this.parseLeasePDFFromURL(url);
+    const analysis = await this.analyzeLease(leaseText);
+    return {
+      ...analysis,
+      fullText: leaseText,
+    };
   }
 
   /**

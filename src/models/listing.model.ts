@@ -29,7 +29,11 @@ export interface IListing extends Document {
   };
   
   // Pricing and availability
-  price: number;                    // Monthly rent in USD
+  price: {
+    amount: number;
+    currency: string;
+    period: 'monthly' | 'weekly' | 'daily';
+  };
   availableDate: Date | null;       // Move-in date
   
   // Property details
@@ -56,7 +60,13 @@ export interface IListing extends Document {
   };
   
   // Source tracking
-  sources: IListingSource[];
+  sources: Array<{
+    source: string;
+    sourceUrl: string;
+    sourceId: string;
+    firstSeenAt: Date;
+    lastSeenAt: Date;
+  }>;
   
   // Metadata
   createdAt: Date;                  // First ingestion timestamp
@@ -122,13 +132,24 @@ const listingSchema = new Schema<IListing>({
   },
   
   price: {
-    type: Number,
-    required: [true, 'Price is required'],
-    validate: {
-      validator: function(v: number) {
-        return v > 0;
-      },
-      message: 'Price must be a positive number'
+    amount: {
+      type: Number,
+      required: [true, 'Price amount is required'],
+      validate: {
+        validator: function(v: number) {
+          return v > 0;
+        },
+        message: 'Price must be a positive number'
+      }
+    },
+    currency: {
+      type: String,
+      default: 'USD'
+    },
+    period: {
+      type: String,
+      enum: ['monthly', 'weekly', 'daily'],
+      default: 'monthly'
     }
   },
   
@@ -210,7 +231,7 @@ const listingSchema = new Schema<IListing>({
   
   sources: {
     type: [{
-      sourceName: {
+      source: {
         type: String,
         required: [true, 'Source name is required']
       },
@@ -222,15 +243,20 @@ const listingSchema = new Schema<IListing>({
         type: String,
         required: [true, 'Source URL is required']
       },
-      scrapedAt: {
+      firstSeenAt: {
         type: Date,
-        required: [true, 'Scraped at timestamp is required'],
+        required: [true, 'First seen timestamp is required'],
+        default: Date.now
+      },
+      lastSeenAt: {
+        type: Date,
+        required: [true, 'Last seen timestamp is required'],
         default: Date.now
       }
     }],
     required: [true, 'At least one source is required'],
     validate: {
-      validator: function(v: IListingSource[]) {
+      validator: function(v: any[]) {
         return Array.isArray(v) && v.length > 0;
       },
       message: 'Sources array cannot be empty'

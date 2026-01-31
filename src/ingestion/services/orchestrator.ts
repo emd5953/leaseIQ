@@ -114,77 +114,23 @@ export class ScrapingOrchestrator {
     let duplicatesDetected = 0;
     let errorsEncountered = 0;
 
-    // Process each source
-    for (const source of sources) {
-      const sourceStart = Date.now();
-      let sourceListings = 0;
-      let sourceErrors = 0;
+    // Process sources in parallel (max 3 at a time to avoid rate limits)
+    const PARALLEL_SOURCES = 3;
+    for (let i = 0; i < sources.length; i += PARALLEL_SOURCES) {
+      const batch = sources.slice(i, i + PARALLEL_SOURCES);
+      const batchResults = await Promise.all(
+        batch.map(source => this.processSingleSource(source))
+      );
 
-      try {
-        await this.rateLimiter.acquire('firecrawl');
-
-        const scraper = this.scrapers.get(source);
-        if (!scraper) {
-          console.error(`[Orchestrator] No scraper found for source: ${source}`);
-          continue;
+      for (const result of batchResults) {
+        if (result) {
+          sourceResults.push(result);
+          totalListingsScraped += result.listingsScraped;
+          newListingsAdded += result.newAdded || 0;
+          duplicatesDetected += result.duplicates || 0;
+          errorsEncountered += result.errors;
         }
-
-        // Scrape listings
-        const rawListings = await scraper.scrape({} as ScrapeConfig);
-        sourceListings = rawListings.length;
-
-        // Process each listing
-        for (const rawListing of rawListings) {
-          try {
-            // Parse
-            const parsed = await this.parser.parse(rawListing);
-            if (!parsed) {
-              sourceErrors++;
-              continue;
-            }
-
-            // Normalize
-            const normalized = await this.normalizer.normalize(parsed);
-
-            // Geocode
-            await this.rateLimiter.acquire('geocoding');
-            const coordinates = await this.geocoder.geocode(normalized.address.fullAddress);
-
-            // Deduplicate
-            const duplicateId = await this.deduplicator.findDuplicate(normalized);
-            if (duplicateId) {
-              await this.deduplicator.mergeListing(duplicateId, normalized);
-              duplicatesDetected++;
-            } else {
-              await this.storage.insertListing(normalized, coordinates);
-              newListingsAdded++;
-            }
-          } catch (error) {
-            sourceErrors++;
-            await this.errorHandler.handleError(error as Error, {
-              operation: 'process_listing',
-              source,
-            });
-          }
-        }
-      } catch (error) {
-        sourceErrors++;
-        await this.errorHandler.handleError(error as Error, {
-          operation: 'scrape_source',
-          source,
-        });
       }
-
-      const sourceDuration = Date.now() - sourceStart;
-      sourceResults.push({
-        source,
-        listingsScraped: sourceListings,
-        errors: sourceErrors,
-        duration: sourceDuration,
-      });
-
-      totalListingsScraped += sourceListings;
-      errorsEncountered += sourceErrors;
     }
 
     const endTime = new Date();
@@ -225,6 +171,169 @@ export class ScrapingOrchestrator {
     });
 
     return result;
+  }
+
+  /**
+   * Process a single source with parallel listing processing
+   */
+  private async processSingleSource(source: ListingSource): Promise<SourceResult & { newAdded?: number; duplicates?: number }> {
+    const sourceStart = Date.now();
+    let sourceListings = 0;
+    let sourceErrors = 0;
+    let newAdded = 0;
+    let duplicates = 0;
+
+    try {
+      await this.rateLimiter.acquire('firecrawl');
+
+      const scraper = this.scrapers.get(source);
+      if (!scraper) {
+        console.error(`[Orchestrator] No scraper found for source: ${source}`);
+        return {
+          source,
+          listingsScraped: 0,
+          errors: 1,
+          duration: Date.now() - sourceStart,
+        };
+      }
+
+      // Get NYC-specific URLs for this source
+      const urls = this.getNYCUrlsForSource(source);
+      
+      // Scrape all URLs for this source
+      const allRawListings = [];
+      for (const url of urls) {
+        const rawListings = await scraper.scrape({ url } as ScrapeConfig);
+        allRawListings.push(...rawListings);
+      }
+      
+      sourceListings = allRawListings.length;
+
+      // Process listings in parallel batches (10 at a time)
+      const BATCH_SIZE = 10;
+      for (let i = 0; i < allRawListings.length; i += BATCH_SIZE) {
+        const batch = allRawListings.slice(i, i + BATCH_SIZE);
+        const results = await Promise.allSettled(
+          batch.map(rawListing => this.processListing(rawListing, source))
+        );
+
+        for (const result of results) {
+          if (result.status === 'fulfilled') {
+            if (result.value === 'new') newAdded++;
+            else if (result.value === 'duplicate') duplicates++;
+          } else {
+            sourceErrors++;
+          }
+        }
+      }
+    } catch (error) {
+      sourceErrors++;
+      await this.errorHandler.handleError(error as Error, {
+        operation: 'scrape_source',
+        source,
+      });
+    }
+
+    const sourceDuration = Date.now() - sourceStart;
+    return {
+      source,
+      listingsScraped: sourceListings,
+      errors: sourceErrors,
+      duration: sourceDuration,
+      newAdded,
+      duplicates,
+    };
+  }
+
+  /**
+   * Get NYC-specific URLs for each source to maximize listings
+   */
+  private getNYCUrlsForSource(source: ListingSource): string[] {
+    const urls: Record<ListingSource, string[]> = {
+      [ListingSource.STREETEASY]: [
+        'https://streeteasy.com/for-rent/nyc',
+      ],
+      [ListingSource.ZILLOW]: [
+        'https://www.zillow.com/new-york-ny/rentals/',
+        'https://www.zillow.com/brooklyn-new-york-ny/rentals/',
+        'https://www.zillow.com/queens-new-york-ny/rentals/',
+      ],
+      [ListingSource.APARTMENTS_COM]: [
+        'https://www.apartments.com/new-york-ny/',
+        'https://www.apartments.com/brooklyn-ny/',
+        'https://www.apartments.com/queens-ny/',
+      ],
+      [ListingSource.TRULIA]: [
+        'https://www.trulia.com/for_rent/New_York,NY/',
+      ],
+      [ListingSource.REALTOR]: [
+        'https://www.realtor.com/apartments/New-York_NY',
+      ],
+      [ListingSource.ZUMPER]: [
+        'https://www.zumper.com/apartments-for-rent/new-york-ny',
+      ],
+      [ListingSource.RENTHOP]: [
+        'https://www.renthop.com/search/nyc',
+      ],
+      [ListingSource.RENT_COM]: [
+        'https://www.rent.com/new-york/apartments',
+      ],
+      [ListingSource.HOTPADS]: [
+        'https://hotpads.com/new-york-ny/apartments-for-rent',
+      ],
+      [ListingSource.APARTMENT_GUIDE]: [
+        'https://www.apartmentguide.com/apartments/New-York/New-York/',
+      ],
+      [ListingSource.RENTALS_COM]: [
+        'https://www.rentals.com/New-York/New-York/',
+      ],
+      [ListingSource.APARTMENT_LIST]: [
+        'https://www.apartmentlist.com/ny/new-york',
+      ],
+      [ListingSource.PADMAPPER]: [
+        'https://www.padmapper.com/apartments/new-york-ny',
+      ],
+      [ListingSource.CRAIGSLIST]: [],
+      [ListingSource.FACEBOOK]: [],
+    };
+
+    return urls[source] || [];
+  }
+
+  /**
+   * Process a single listing
+   */
+  private async processListing(rawListing: any, source: ListingSource): Promise<'new' | 'duplicate' | 'error'> {
+    try {
+      // Parse
+      const parsed = await this.parser.parse(rawListing);
+      if (!parsed) {
+        return 'error';
+      }
+
+      // Normalize
+      const normalized = await this.normalizer.normalize(parsed);
+
+      // Geocode (with rate limiting)
+      await this.rateLimiter.acquire('geocoding');
+      const coordinates = await this.geocoder.geocode(normalized.address.fullAddress);
+
+      // Deduplicate
+      const duplicateId = await this.deduplicator.findDuplicate(normalized);
+      if (duplicateId) {
+        await this.deduplicator.mergeListing(duplicateId, normalized);
+        return 'duplicate';
+      } else {
+        await this.storage.insertListing(normalized, coordinates);
+        return 'new';
+      }
+    } catch (error) {
+      await this.errorHandler.handleError(error as Error, {
+        operation: 'process_listing',
+        source,
+      });
+      return 'error';
+    }
   }
 
   /**

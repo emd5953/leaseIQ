@@ -97,7 +97,7 @@ export class FirecrawlClient {
           'Content-Type': 'application/json',
           'Content-Length': Buffer.byteLength(payload),
         },
-        timeout: 60000,
+        timeout: 120000, // 2 minutes timeout
       };
 
       const req = https.request(options, (res) => {

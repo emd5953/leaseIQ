@@ -53,15 +53,15 @@ const AddressSchema = new Schema<Address>({
   },
   city: {
     type: String,
-    required: true,
+    default: null,
   },
   state: {
     type: String,
-    required: true,
+    default: null,
   },
   zipCode: {
     type: String,
-    required: true,
+    default: null,
   },
   fullAddress: {
     type: String,

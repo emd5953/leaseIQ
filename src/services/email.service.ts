@@ -72,6 +72,18 @@ export class EmailService {
     });
   }
 
+  static async sendCombinedAnalysis(
+    userEmail: string,
+    analysis: any
+  ): Promise<{ success: boolean; messageId?: string; error?: string }> {
+    const html = this.generateCombinedAnalysisEmail(analysis);
+    return this.send({
+      to: userEmail,
+      subject: `🏠 Complete Property Analysis - Lease & Floor Plan`,
+      html,
+    });
+  }
+
   private static generateAlertEmail(listings: any[], searchName: string): string {
     const listingCards = listings
       .map(
@@ -212,6 +224,139 @@ export class EmailService {
           
           <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb; text-align: center; color: #6b7280; font-size: 14px;">
             <p>Analysis powered by LeaseIQ</p>
+          </div>
+        </body>
+      </html>
+    `;
+  }
+
+  private static generateCombinedAnalysisEmail(analysis: any): string {
+    const { lease, floorPlan, overallAssessment } = analysis;
+
+    // Match score color
+    const scoreColor = 
+      overallAssessment.matchScore >= 80 ? '#059669' :
+      overallAssessment.matchScore >= 60 ? '#f59e0b' : '#dc2626';
+
+    // Floor plan layout
+    const floorPlanSection = floorPlan ? `
+      <div style="margin-bottom: 24px;">
+        <h3 style="color: #111827;">🏠 Floor Plan Analysis</h3>
+        <div style="background: #f9fafb; padding: 16px; border-radius: 8px;">
+          <p style="margin: 4px 0;"><strong>Layout:</strong> ${floorPlan.layout.bedrooms} Bed, ${floorPlan.layout.bathrooms} Bath${floorPlan.layout.estimatedSquareFeet ? `, ~${floorPlan.layout.estimatedSquareFeet} sqft` : ''}</p>
+          <p style="margin: 4px 0;"><strong>Space Efficiency:</strong> <span style="color: ${scoreColor};">${floorPlan.spaceEfficiency}</span></p>
+          <p style="margin: 8px 0 4px 0;"><strong>Summary:</strong></p>
+          <p style="color: #374151; margin: 4px 0;">${floorPlan.summary}</p>
+        </div>
+
+        ${floorPlan.features.length > 0 ? `
+        <div style="margin-top: 12px;">
+          <p style="margin: 4px 0;"><strong>Features:</strong></p>
+          <ul style="margin: 4px 0; padding-left: 20px; color: #374151;">
+            ${floorPlan.features.map((f: string) => `<li>${f}</li>`).join('')}
+          </ul>
+        </div>
+        ` : ''}
+
+        ${floorPlan.pros.length > 0 ? `
+        <div style="margin-top: 12px; background: #f0fdf4; padding: 12px; border-radius: 6px; border-left: 4px solid #059669;">
+          <p style="margin: 0 0 4px 0; color: #059669;"><strong>✓ Advantages:</strong></p>
+          <ul style="margin: 4px 0; padding-left: 20px; color: #065f46;">
+            ${floorPlan.pros.map((p: string) => `<li>${p}</li>`).join('')}
+          </ul>
+        </div>
+        ` : ''}
+
+        ${floorPlan.cons.length > 0 ? `
+        <div style="margin-top: 12px; background: #fef2f2; padding: 12px; border-radius: 6px; border-left: 4px solid #dc2626;">
+          <p style="margin: 0 0 4px 0; color: #dc2626;"><strong>⚠ Concerns:</strong></p>
+          <ul style="margin: 4px 0; padding-left: 20px; color: #991b1b;">
+            ${floorPlan.cons.map((c: string) => `<li>${c}</li>`).join('')}
+          </ul>
+        </div>
+        ` : ''}
+      </div>
+    ` : '';
+
+    // Lease section
+    const leaseSection = lease ? `
+      <div style="margin-bottom: 24px;">
+        <h3 style="color: #111827;">📄 Lease Analysis</h3>
+        <div style="background: #f9fafb; padding: 16px; border-radius: 8px;">
+          <p style="color: #374151;">${lease.summary}</p>
+        </div>
+
+        <div style="margin-top: 12px;">
+          <p style="margin: 4px 0;"><strong>Key Terms:</strong></p>
+          <div style="background: #f9fafb; padding: 12px; border-radius: 6px;">
+            <p style="margin: 4px 0;"><strong>Monthly Rent:</strong> ${lease.keyTerms.rent || 'N/A'}</p>
+            <p style="margin: 4px 0;"><strong>Security Deposit:</strong> ${lease.keyTerms.deposit || 'N/A'}</p>
+            <p style="margin: 4px 0;"><strong>Lease Term:</strong> ${lease.keyTerms.term || 'N/A'}</p>
+            <p style="margin: 4px 0;"><strong>Move-in Fees:</strong> ${lease.keyTerms.fees || 'N/A'}</p>
+          </div>
+        </div>
+
+        ${lease.redFlags.length > 0 ? `
+        <div style="margin-top: 12px; background: #fef2f2; padding: 12px; border-radius: 6px; border-left: 4px solid #dc2626;">
+          <p style="margin: 0 0 4px 0; color: #dc2626;"><strong>⚠️ Red Flags:</strong></p>
+          <ul style="margin: 4px 0; padding-left: 20px; color: #991b1b;">
+            ${lease.redFlags.map((flag: string) => `<li>${flag}</li>`).join('')}
+          </ul>
+        </div>
+        ` : '<div style="background: #f0fdf4; padding: 12px; border-radius: 6px; border-left: 4px solid #059669; margin-top: 12px;"><p style="color: #059669; margin: 0;">✓ No major red flags detected</p></div>'}
+      </div>
+    ` : '';
+
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #111827; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 32px;">
+            <h1 style="color: #2563eb; margin: 0;">LeaseIQ Complete Analysis</h1>
+            <p style="color: #6b7280; margin: 8px 0;">Your comprehensive property report</p>
+          </div>
+
+          <!-- Overall Assessment -->
+          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 24px; border-radius: 12px; margin-bottom: 24px; text-align: center;">
+            <h2 style="margin: 0 0 8px 0; font-size: 24px;">Overall Match Score</h2>
+            <div style="font-size: 48px; font-weight: bold; margin: 8px 0;">${overallAssessment.matchScore}/100</div>
+            <p style="margin: 8px 0; opacity: 0.9;">${overallAssessment.summary}</p>
+          </div>
+
+          ${floorPlanSection}
+          ${leaseSection}
+
+          <!-- Recommendations -->
+          ${overallAssessment.recommendations.length > 0 ? `
+          <div style="margin-bottom: 24px;">
+            <h3 style="color: #111827;">💡 Recommendations</h3>
+            <div style="background: #eff6ff; padding: 16px; border-radius: 8px; border-left: 4px solid #2563eb;">
+              <ul style="margin: 0; padding-left: 20px; color: #1e40af;">
+                ${overallAssessment.recommendations.map((rec: string) => `<li style="margin: 4px 0;">${rec}</li>`).join('')}
+              </ul>
+            </div>
+          </div>
+          ` : ''}
+
+          <!-- Concerns -->
+          ${overallAssessment.concerns.length > 0 ? `
+          <div style="margin-bottom: 24px;">
+            <h3 style="color: #111827;">⚠️ Things to Consider</h3>
+            <div style="background: #fef2f2; padding: 16px; border-radius: 8px; border-left: 4px solid #dc2626;">
+              <ul style="margin: 0; padding-left: 20px; color: #991b1b;">
+                ${overallAssessment.concerns.map((concern: string) => `<li style="margin: 4px 0;">${concern}</li>`).join('')}
+              </ul>
+            </div>
+          </div>
+          ` : ''}
+
+          <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb; text-align: center; color: #6b7280; font-size: 14px;">
+            <p>Analysis powered by LeaseIQ</p>
+            <p style="margin-top: 8px;">Make informed decisions with confidence</p>
           </div>
         </body>
       </html>
