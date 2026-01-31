@@ -19,9 +19,9 @@ export interface IListing extends Document {
   address: {
     street: string;
     unit: string | null;
-    city: string;
-    state: string;
-    zipCode: string;
+    city: string | null;
+    state: string | null;
+    zipCode: string | null;
     coordinates: {
       type: string;
       coordinates: [number, number]; // [longitude, latitude] in GeoJSON format
@@ -86,15 +86,15 @@ const listingSchema = new Schema<IListing>({
     },
     city: {
       type: String,
-      required: [true, 'City is required']
+      default: null
     },
     state: {
       type: String,
-      required: [true, 'State is required']
+      default: null
     },
     zipCode: {
       type: String,
-      required: [true, 'Zip code is required']
+      default: null
     },
     coordinates: {
       type: {

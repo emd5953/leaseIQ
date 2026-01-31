@@ -2,12 +2,11 @@ import { AbstractListingScraper } from './base.scraper';
 import { ListingSource, ScrapeConfig } from '../types';
 
 /**
- * Scraper for Apartments.com listings
- * Apartments.com is a national apartment rental platform
+ * Scraper for Rent.com listings
  */
-export class ApartmentsScraper extends AbstractListingScraper {
+export class RentComScraper extends AbstractListingScraper {
   getSource(): ListingSource {
-    return ListingSource.APARTMENTS_COM;
+    return ListingSource.RENT_COM;
   }
 
   protected getJsonSchema(): any {
@@ -27,14 +26,8 @@ export class ApartmentsScraper extends AbstractListingScraper {
               bathrooms: { type: 'number' },
               squareFeet: { type: 'number' },
               description: { type: 'string' },
-              images: {
-                type: 'array',
-                items: { type: 'string' },
-              },
-              amenities: {
-                type: 'array',
-                items: { type: 'string' },
-              },
+              images: { type: 'array', items: { type: 'string' } },
+              amenities: { type: 'array', items: { type: 'string' } },
               petPolicy: { type: 'string' },
               brokerFee: { type: 'string' },
             },
@@ -45,14 +38,11 @@ export class ApartmentsScraper extends AbstractListingScraper {
   }
 
   protected buildSearchUrl(config: ScrapeConfig): string {
-    // Use working Apartments.com search URL
-    return 'https://www.apartments.com/new-york-ny/';
+    return 'https://www.rent.com/new-york/';
   }
 
   protected extractListings(data: any): any[] {
-    if (!data || !data.listings) {
-      return [];
-    }
+    if (!data || !data.listings) return [];
     return Array.isArray(data.listings) ? data.listings : [];
   }
 }

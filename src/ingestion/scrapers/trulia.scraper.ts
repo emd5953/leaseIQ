@@ -2,12 +2,12 @@ import { AbstractListingScraper } from './base.scraper';
 import { ListingSource, ScrapeConfig } from '../types';
 
 /**
- * Scraper for Apartments.com listings
- * Apartments.com is a national apartment rental platform
+ * Scraper for Trulia listings
+ * Trulia is a national real estate platform owned by Zillow
  */
-export class ApartmentsScraper extends AbstractListingScraper {
+export class TruliaScraper extends AbstractListingScraper {
   getSource(): ListingSource {
-    return ListingSource.APARTMENTS_COM;
+    return ListingSource.TRULIA;
   }
 
   protected getJsonSchema(): any {
@@ -45,8 +45,7 @@ export class ApartmentsScraper extends AbstractListingScraper {
   }
 
   protected buildSearchUrl(config: ScrapeConfig): string {
-    // Use working Apartments.com search URL
-    return 'https://www.apartments.com/new-york-ny/';
+    return 'https://www.trulia.com/for_rent/New_York,NY/';
   }
 
   protected extractListings(data: any): any[] {

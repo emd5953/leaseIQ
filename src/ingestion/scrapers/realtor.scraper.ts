@@ -2,12 +2,12 @@ import { AbstractListingScraper } from './base.scraper';
 import { ListingSource, ScrapeConfig } from '../types';
 
 /**
- * Scraper for Apartments.com listings
- * Apartments.com is a national apartment rental platform
+ * Scraper for Realtor.com listings
+ * Realtor.com is a national real estate platform
  */
-export class ApartmentsScraper extends AbstractListingScraper {
+export class RealtorScraper extends AbstractListingScraper {
   getSource(): ListingSource {
-    return ListingSource.APARTMENTS_COM;
+    return ListingSource.REALTOR;
   }
 
   protected getJsonSchema(): any {
@@ -45,8 +45,7 @@ export class ApartmentsScraper extends AbstractListingScraper {
   }
 
   protected buildSearchUrl(config: ScrapeConfig): string {
-    // Use working Apartments.com search URL
-    return 'https://www.apartments.com/new-york-ny/';
+    return 'https://www.realtor.com/apartments/New-York_NY';
   }
 
   protected extractListings(data: any): any[] {

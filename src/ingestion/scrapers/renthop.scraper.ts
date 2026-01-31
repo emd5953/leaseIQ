@@ -2,12 +2,12 @@ import { AbstractListingScraper } from './base.scraper';
 import { ListingSource, ScrapeConfig } from '../types';
 
 /**
- * Scraper for Apartments.com listings
- * Apartments.com is a national apartment rental platform
+ * Scraper for RentHop listings
+ * RentHop is a NYC-focused apartment rental platform
  */
-export class ApartmentsScraper extends AbstractListingScraper {
+export class RentHopScraper extends AbstractListingScraper {
   getSource(): ListingSource {
-    return ListingSource.APARTMENTS_COM;
+    return ListingSource.RENTHOP;
   }
 
   protected getJsonSchema(): any {
@@ -45,8 +45,7 @@ export class ApartmentsScraper extends AbstractListingScraper {
   }
 
   protected buildSearchUrl(config: ScrapeConfig): string {
-    // Use working Apartments.com search URL
-    return 'https://www.apartments.com/new-york-ny/';
+    return 'https://www.renthop.com/search/nyc';
   }
 
   protected extractListings(data: any): any[] {

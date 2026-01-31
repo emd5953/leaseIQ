@@ -2,12 +2,12 @@ import { AbstractListingScraper } from './base.scraper';
 import { ListingSource, ScrapeConfig } from '../types';
 
 /**
- * Scraper for Apartments.com listings
- * Apartments.com is a national apartment rental platform
+ * Scraper for Zumper listings
+ * Zumper is a national apartment rental platform
  */
-export class ApartmentsScraper extends AbstractListingScraper {
+export class ZumperScraper extends AbstractListingScraper {
   getSource(): ListingSource {
-    return ListingSource.APARTMENTS_COM;
+    return ListingSource.ZUMPER;
   }
 
   protected getJsonSchema(): any {
@@ -45,8 +45,7 @@ export class ApartmentsScraper extends AbstractListingScraper {
   }
 
   protected buildSearchUrl(config: ScrapeConfig): string {
-    // Use working Apartments.com search URL
-    return 'https://www.apartments.com/new-york-ny/';
+    return 'https://www.zumper.com/apartments-for-rent/new-york-ny';
   }
 
   protected extractListings(data: any): any[] {

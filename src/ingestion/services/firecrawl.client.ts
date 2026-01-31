@@ -1,4 +1,4 @@
-import FirecrawlApp from '@mendable/firecrawl-js';
+import https from 'https';
 import { config } from '../config';
 
 export interface FirecrawlScrapeOptions {
@@ -24,18 +24,20 @@ export interface FirecrawlBatchScrapeOptions {
 }
 
 /**
- * Wrapper around the Firecrawl API client
+ * Wrapper around the Firecrawl API
  * Handles authentication, request formatting, and error handling
  */
 export class FirecrawlClient {
-  private client: FirecrawlApp;
+  private apiKey: string;
+  private apiUrl: string;
 
   constructor(apiKey?: string) {
-    const key = apiKey || config.firecrawl.apiKey;
-    if (!key) {
+    this.apiKey = apiKey || config.firecrawl.apiKey;
+    this.apiUrl = config.firecrawl.apiUrl || 'https://api.firecrawl.dev/v1';
+    
+    if (!this.apiKey) {
       throw new Error('Firecrawl API key is required');
     }
-    this.client = new FirecrawlApp({ apiKey: key });
   }
 
   /**
@@ -43,36 +45,83 @@ export class FirecrawlClient {
    */
   async scrape(options: FirecrawlScrapeOptions): Promise<FirecrawlScrapeResult> {
     try {
-      const scrapeOptions: any = {
-        formats: options.formats || ['extract'],
+      const payload: any = {
+        url: options.url,
+        formats: ['extract'],
       };
 
+      // Add extraction schema if provided
       if (options.jsonOptions) {
-        scrapeOptions.extract = {
+        payload.extract = {
           schema: options.jsonOptions.schema,
         };
       }
 
-      const response = await this.client.scrape(options.url, scrapeOptions);
+      const response = await this.makeRequest('/scrape', payload);
 
-      // Check if response has the expected structure
-      if (!response || typeof response !== 'object') {
+      if (response.success && response.data) {
         return {
-          success: false,
-          error: 'Invalid response from Firecrawl',
+          success: true,
+          data: response.data.extract || response.data,
         };
       }
 
       return {
-        success: true,
-        data: response,
+        success: false,
+        error: 'Failed to scrape',
       };
     } catch (error) {
+      console.error('[FirecrawlClient] Scrape error:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
+  }
+
+  /**
+   * Make HTTP request to Firecrawl API
+   */
+  private makeRequest(endpoint: string, data: any): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const payload = JSON.stringify(data);
+      const url = new URL(this.apiUrl + endpoint);
+
+      const options = {
+        hostname: url.hostname,
+        port: 443,
+        path: url.pathname,
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(payload),
+        },
+        timeout: 60000,
+      };
+
+      const req = https.request(options, (res) => {
+        let body = '';
+        res.on('data', (chunk) => body += chunk);
+        res.on('end', () => {
+          try {
+            const result = JSON.parse(body);
+            resolve(result);
+          } catch (e) {
+            reject(new Error(`Invalid JSON response: ${body.substring(0, 200)}`));
+          }
+        });
+      });
+
+      req.on('error', reject);
+      req.on('timeout', () => {
+        req.destroy();
+        reject(new Error('Request timeout'));
+      });
+
+      req.write(payload);
+      req.end();
+    });
   }
 
   /**
@@ -97,6 +146,6 @@ export class FirecrawlClient {
    * Check if the client is properly configured
    */
   isConfigured(): boolean {
-    return !!config.firecrawl.apiKey;
+    return !!this.apiKey;
   }
 }

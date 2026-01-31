@@ -45,30 +45,8 @@ export class ZillowScraper extends AbstractListingScraper {
   }
 
   protected buildSearchUrl(config: ScrapeConfig): string {
-    const baseUrl = 'https://www.zillow.com';
-    const location = config.location || 'new-york-ny';
-    
-    // Build URL with query parameters
-    const params = new URLSearchParams();
-    params.append('searchQueryState', JSON.stringify({
-      pagination: {},
-      usersSearchTerm: location,
-      mapBounds: {},
-      isMapVisible: false,
-      filterState: {
-        isForSaleByAgent: { value: false },
-        isForSaleByOwner: { value: false },
-        isNewConstruction: { value: false },
-        isForSaleForeclosure: { value: false },
-        isComingSoon: { value: false },
-        isAuction: { value: false },
-        isPreMarketForeclosure: { value: false },
-        isPreMarketPreForeclosure: { value: false },
-        isForRent: { value: true },
-      },
-    }));
-    
-    return `${baseUrl}/${location}/rentals/?${params.toString()}`;
+    // Use a simple working Zillow rental search URL
+    return 'https://www.zillow.com/homes/for_rent/';
   }
 
   protected extractListings(data: any): any[] {

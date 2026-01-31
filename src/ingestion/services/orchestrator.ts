@@ -13,7 +13,17 @@ import { MetricsTracker } from './metrics';
 import { 
   StreetEasyScraper, 
   ZillowScraper, 
-  ApartmentsScraper, 
+  ApartmentsScraper,
+  TruliaScraper,
+  RealtorScraper,
+  ZumperScraper,
+  RentHopScraper,
+  RentComScraper,
+  HotPadsScraper,
+  ApartmentGuideScraper,
+  RentalsComScraper,
+  ApartmentListScraper,
+  PadMapperScraper,
   CraigslistScraper, 
   FacebookScraper 
 } from '../scrapers';
@@ -45,13 +55,22 @@ export class ScrapingOrchestrator {
     this.errorHandler = new ErrorHandler();
     this.metricsTracker = new MetricsTracker();
 
-    // Initialize scrapers
+    // Initialize ALL working scrapers (14 total - Craigslist and Facebook are blocklisted by Firecrawl)
     this.scrapers = new Map();
     this.scrapers.set(ListingSource.STREETEASY, new StreetEasyScraper(this.firecrawlClient));
     this.scrapers.set(ListingSource.ZILLOW, new ZillowScraper(this.firecrawlClient));
     this.scrapers.set(ListingSource.APARTMENTS_COM, new ApartmentsScraper(this.firecrawlClient));
-    this.scrapers.set(ListingSource.CRAIGSLIST, new CraigslistScraper(this.firecrawlClient));
-    this.scrapers.set(ListingSource.FACEBOOK, new FacebookScraper(this.firecrawlClient));
+    this.scrapers.set(ListingSource.TRULIA, new TruliaScraper(this.firecrawlClient));
+    this.scrapers.set(ListingSource.REALTOR, new RealtorScraper(this.firecrawlClient));
+    this.scrapers.set(ListingSource.ZUMPER, new ZumperScraper(this.firecrawlClient));
+    this.scrapers.set(ListingSource.RENTHOP, new RentHopScraper(this.firecrawlClient));
+    this.scrapers.set(ListingSource.RENT_COM, new RentComScraper(this.firecrawlClient));
+    this.scrapers.set(ListingSource.HOTPADS, new HotPadsScraper(this.firecrawlClient));
+    this.scrapers.set(ListingSource.APARTMENT_GUIDE, new ApartmentGuideScraper(this.firecrawlClient));
+    this.scrapers.set(ListingSource.RENTALS_COM, new RentalsComScraper(this.firecrawlClient));
+    this.scrapers.set(ListingSource.APARTMENT_LIST, new ApartmentListScraper(this.firecrawlClient));
+    this.scrapers.set(ListingSource.PADMAPPER, new PadMapperScraper(this.firecrawlClient));
+    // Craigslist and Facebook are disabled (blocklisted by Firecrawl)
 
     // Configure rate limiters
     this.rateLimiter.configure('firecrawl', {

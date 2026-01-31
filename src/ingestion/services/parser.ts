@@ -25,6 +25,16 @@ export class DataParser {
       [ListingSource.STREETEASY]: this.parseStreetEasy.bind(this),
       [ListingSource.ZILLOW]: this.parseZillow.bind(this),
       [ListingSource.APARTMENTS_COM]: this.parseApartments.bind(this),
+      [ListingSource.TRULIA]: this.parseTrulia.bind(this),
+      [ListingSource.REALTOR]: this.parseRealtor.bind(this),
+      [ListingSource.ZUMPER]: this.parseZumper.bind(this),
+      [ListingSource.RENTHOP]: this.parseRenthop.bind(this),
+      [ListingSource.RENT_COM]: this.parseRentcom.bind(this),
+      [ListingSource.HOTPADS]: this.parseHotpads.bind(this),
+      [ListingSource.APARTMENT_GUIDE]: this.parseApartmentguide.bind(this),
+      [ListingSource.RENTALS_COM]: this.parseRentalscom.bind(this),
+      [ListingSource.APARTMENT_LIST]: this.parseApartmentlist.bind(this),
+      [ListingSource.PADMAPPER]: this.parsePadmapper.bind(this),
       [ListingSource.CRAIGSLIST]: this.parseCraigslist.bind(this),
       [ListingSource.FACEBOOK]: this.parseFacebook.bind(this),
     };
@@ -135,6 +145,256 @@ export class DataParser {
    * Parse Facebook Marketplace listing
    */
   private parseFacebook(raw: RawListing): ParsedListing | null {
+    const data = raw.rawData;
+    if (!data.address && !data.price) return null;
+
+    return {
+      source: raw.source,
+      sourceUrl: raw.sourceUrl,
+      sourceId: raw.sourceId,
+      address: this.extractString(data.address),
+      price: this.extractNumber(data.price),
+      bedrooms: this.extractNumber(data.bedrooms),
+      bathrooms: this.extractNumber(data.bathrooms),
+      squareFeet: this.extractNumber(data.squareFeet),
+      description: this.extractString(data.description),
+      images: this.extractArray(data.images),
+      amenities: this.extractArray(data.amenities),
+      petPolicy: this.extractString(data.petPolicy),
+      brokerFee: this.extractString(data.brokerFee),
+      scrapedAt: raw.scrapedAt,
+    };
+  }
+
+  /**
+   * Parse Trulia listing
+   */
+  private parseTrulia(raw: RawListing): ParsedListing | null {
+    const data = raw.rawData;
+    if (!data.address && !data.price) return null;
+
+    return {
+      source: raw.source,
+      sourceUrl: raw.sourceUrl,
+      sourceId: raw.sourceId,
+      address: this.extractString(data.address),
+      price: this.extractNumber(data.price),
+      bedrooms: this.extractNumber(data.bedrooms),
+      bathrooms: this.extractNumber(data.bathrooms),
+      squareFeet: this.extractNumber(data.squareFeet),
+      description: this.extractString(data.description),
+      images: this.extractArray(data.images),
+      amenities: this.extractArray(data.amenities),
+      petPolicy: this.extractString(data.petPolicy),
+      brokerFee: this.extractString(data.brokerFee),
+      scrapedAt: raw.scrapedAt,
+    };
+  }
+
+  /**
+   * Parse Realtor.com listing
+   */
+  private parseRealtor(raw: RawListing): ParsedListing | null {
+    const data = raw.rawData;
+    if (!data.address && !data.price) return null;
+
+    return {
+      source: raw.source,
+      sourceUrl: raw.sourceUrl,
+      sourceId: raw.sourceId,
+      address: this.extractString(data.address),
+      price: this.extractNumber(data.price),
+      bedrooms: this.extractNumber(data.bedrooms),
+      bathrooms: this.extractNumber(data.bathrooms),
+      squareFeet: this.extractNumber(data.squareFeet),
+      description: this.extractString(data.description),
+      images: this.extractArray(data.images),
+      amenities: this.extractArray(data.amenities),
+      petPolicy: this.extractString(data.petPolicy),
+      brokerFee: this.extractString(data.brokerFee),
+      scrapedAt: raw.scrapedAt,
+    };
+  }
+
+  /**
+   * Parse Zumper listing
+   */
+  private parseZumper(raw: RawListing): ParsedListing | null {
+    const data = raw.rawData;
+    if (!data.address && !data.price) return null;
+
+    return {
+      source: raw.source,
+      sourceUrl: raw.sourceUrl,
+      sourceId: raw.sourceId,
+      address: this.extractString(data.address),
+      price: this.extractNumber(data.price),
+      bedrooms: this.extractNumber(data.bedrooms),
+      bathrooms: this.extractNumber(data.bathrooms),
+      squareFeet: this.extractNumber(data.squareFeet),
+      description: this.extractString(data.description),
+      images: this.extractArray(data.images),
+      amenities: this.extractArray(data.amenities),
+      petPolicy: this.extractString(data.petPolicy),
+      brokerFee: this.extractString(data.brokerFee),
+      scrapedAt: raw.scrapedAt,
+    };
+  }
+
+  /**
+   * Parse RentHop listing
+   */
+  private parseRenthop(raw: RawListing): ParsedListing | null {
+    const data = raw.rawData;
+    if (!data.address && !data.price) return null;
+
+    return {
+      source: raw.source,
+      sourceUrl: raw.sourceUrl,
+      sourceId: raw.sourceId,
+      address: this.extractString(data.address),
+      price: this.extractNumber(data.price),
+      bedrooms: this.extractNumber(data.bedrooms),
+      bathrooms: this.extractNumber(data.bathrooms),
+      squareFeet: this.extractNumber(data.squareFeet),
+      description: this.extractString(data.description),
+      images: this.extractArray(data.images),
+      amenities: this.extractArray(data.amenities),
+      petPolicy: this.extractString(data.petPolicy),
+      brokerFee: this.extractString(data.brokerFee),
+      scrapedAt: raw.scrapedAt,
+    };
+  }
+
+  /**
+   * Parse Rent.com listing
+   */
+  private parseRentcom(raw: RawListing): ParsedListing | null {
+    const data = raw.rawData;
+    if (!data.address && !data.price) return null;
+
+    return {
+      source: raw.source,
+      sourceUrl: raw.sourceUrl,
+      sourceId: raw.sourceId,
+      address: this.extractString(data.address),
+      price: this.extractNumber(data.price),
+      bedrooms: this.extractNumber(data.bedrooms),
+      bathrooms: this.extractNumber(data.bathrooms),
+      squareFeet: this.extractNumber(data.squareFeet),
+      description: this.extractString(data.description),
+      images: this.extractArray(data.images),
+      amenities: this.extractArray(data.amenities),
+      petPolicy: this.extractString(data.petPolicy),
+      brokerFee: this.extractString(data.brokerFee),
+      scrapedAt: raw.scrapedAt,
+    };
+  }
+
+  /**
+   * Parse HotPads listing
+   */
+  private parseHotpads(raw: RawListing): ParsedListing | null {
+    const data = raw.rawData;
+    if (!data.address && !data.price) return null;
+
+    return {
+      source: raw.source,
+      sourceUrl: raw.sourceUrl,
+      sourceId: raw.sourceId,
+      address: this.extractString(data.address),
+      price: this.extractNumber(data.price),
+      bedrooms: this.extractNumber(data.bedrooms),
+      bathrooms: this.extractNumber(data.bathrooms),
+      squareFeet: this.extractNumber(data.squareFeet),
+      description: this.extractString(data.description),
+      images: this.extractArray(data.images),
+      amenities: this.extractArray(data.amenities),
+      petPolicy: this.extractString(data.petPolicy),
+      brokerFee: this.extractString(data.brokerFee),
+      scrapedAt: raw.scrapedAt,
+    };
+  }
+
+  /**
+   * Parse ApartmentGuide listing
+   */
+  private parseApartmentguide(raw: RawListing): ParsedListing | null {
+    const data = raw.rawData;
+    if (!data.address && !data.price) return null;
+
+    return {
+      source: raw.source,
+      sourceUrl: raw.sourceUrl,
+      sourceId: raw.sourceId,
+      address: this.extractString(data.address),
+      price: this.extractNumber(data.price),
+      bedrooms: this.extractNumber(data.bedrooms),
+      bathrooms: this.extractNumber(data.bathrooms),
+      squareFeet: this.extractNumber(data.squareFeet),
+      description: this.extractString(data.description),
+      images: this.extractArray(data.images),
+      amenities: this.extractArray(data.amenities),
+      petPolicy: this.extractString(data.petPolicy),
+      brokerFee: this.extractString(data.brokerFee),
+      scrapedAt: raw.scrapedAt,
+    };
+  }
+
+  /**
+   * Parse Rentals.com listing
+   */
+  private parseRentalscom(raw: RawListing): ParsedListing | null {
+    const data = raw.rawData;
+    if (!data.address && !data.price) return null;
+
+    return {
+      source: raw.source,
+      sourceUrl: raw.sourceUrl,
+      sourceId: raw.sourceId,
+      address: this.extractString(data.address),
+      price: this.extractNumber(data.price),
+      bedrooms: this.extractNumber(data.bedrooms),
+      bathrooms: this.extractNumber(data.bathrooms),
+      squareFeet: this.extractNumber(data.squareFeet),
+      description: this.extractString(data.description),
+      images: this.extractArray(data.images),
+      amenities: this.extractArray(data.amenities),
+      petPolicy: this.extractString(data.petPolicy),
+      brokerFee: this.extractString(data.brokerFee),
+      scrapedAt: raw.scrapedAt,
+    };
+  }
+
+  /**
+   * Parse ApartmentList listing
+   */
+  private parseApartmentlist(raw: RawListing): ParsedListing | null {
+    const data = raw.rawData;
+    if (!data.address && !data.price) return null;
+
+    return {
+      source: raw.source,
+      sourceUrl: raw.sourceUrl,
+      sourceId: raw.sourceId,
+      address: this.extractString(data.address),
+      price: this.extractNumber(data.price),
+      bedrooms: this.extractNumber(data.bedrooms),
+      bathrooms: this.extractNumber(data.bathrooms),
+      squareFeet: this.extractNumber(data.squareFeet),
+      description: this.extractString(data.description),
+      images: this.extractArray(data.images),
+      amenities: this.extractArray(data.amenities),
+      petPolicy: this.extractString(data.petPolicy),
+      brokerFee: this.extractString(data.brokerFee),
+      scrapedAt: raw.scrapedAt,
+    };
+  }
+
+  /**
+   * Parse PadMapper listing
+   */
+  private parsePadmapper(raw: RawListing): ParsedListing | null {
     const data = raw.rawData;
     if (!data.address && !data.price) return null;
 

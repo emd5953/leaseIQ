@@ -45,17 +45,8 @@ export class StreetEasyScraper extends AbstractListingScraper {
   }
 
   protected buildSearchUrl(config: ScrapeConfig): string {
-    const baseUrl = 'https://streeteasy.com/for-rent';
-    const location = config.location || 'nyc';
-    
-    // Build URL with query parameters
-    const params = new URLSearchParams();
-    if (config.params?.minPrice) params.append('price_min', config.params.minPrice);
-    if (config.params?.maxPrice) params.append('price_max', config.params.maxPrice);
-    if (config.params?.bedrooms) params.append('beds', config.params.bedrooms);
-    
-    const queryString = params.toString();
-    return queryString ? `${baseUrl}/${location}?${queryString}` : `${baseUrl}/${location}`;
+    // Use working StreetEasy rental search URL
+    return 'https://streeteasy.com/for-rent/nyc';
   }
 
   protected extractListings(data: any): any[] {
