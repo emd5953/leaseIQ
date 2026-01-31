@@ -58,13 +58,13 @@ describe('Listing Model Property Tests', () => {
     sourceName: fc.constantFrom('StreetEasy', 'Zillow', 'Apartments.com', 'Craigslist', 'Facebook'),
     sourceId: fc.uuid(),
     sourceUrl: fc.webUrl(),
-    scrapedAt: fc.date()
+    scrapedAt: fc.date().filter(d => !isNaN(d.getTime()))
   });
 
   const listingArb = fc.record({
     address: addressArb,
     price: fc.double({ min: 1, max: 50000, noNaN: true }),
-    availableDate: fc.option(fc.date(), { nil: null }),
+    availableDate: fc.option(fc.date().filter(d => !isNaN(d.getTime())), { nil: null }),
     bedrooms: fc.integer({ min: 0, max: 10 }),
     bathrooms: fc.double({ min: 0.5, max: 10, noNaN: true }),
     squareFootage: fc.option(fc.integer({ min: 100, max: 10000 }), { nil: null }),
