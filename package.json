@@ -1,0 +1,26 @@
+{
+  "name": "leaseiq",
+  "version": "1.0.0",
+  "description": "LeaseIQ rental platform database layer",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest --run",
+    "test:watch": "vitest",
+    "test:connection": "tsx test-connection.ts"
+  },
+  "keywords": ["rental", "apartment", "database"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "mongoose": "^8.0.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0",
+    "mongodb-memory-server": "^9.1.0",
+    "tsx": "^4.7.0"
+  }
+}
