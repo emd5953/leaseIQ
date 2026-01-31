@@ -1,5 +1,5 @@
 import dotenv from 'dotenv';
-import { initializeConnection, closeConnection, isMongoConnected } from './src/db/connection';
+import { initializeConnection, closeConnection, isMongoConnected } from '../src/db/connection';
 
 // Load environment variables
 dotenv.config();
