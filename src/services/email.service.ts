@@ -106,6 +106,33 @@ export class EmailService {
     });
   }
 
+  static async sendFloorPlanAnalysis(
+    userEmail: string,
+    analysis: {
+      layout: { bedrooms: number; bathrooms: number; totalRooms: number; estimatedSquareFeet?: number };
+      features: string[];
+      pros: string[];
+      cons: string[];
+      spaceEfficiency: string;
+      summary: string;
+      recommendations: string[];
+    }
+  ): Promise<{ success: boolean; messageId?: string; error?: string }> {
+    const html = this.generateFloorPlanEmail(analysis);
+    return this.send({
+      to: userEmail,
+      subject: `🏠 Floor Plan Analysis Complete`,
+      html,
+    });
+  }
+    const html = this.generateCombinedAnalysisEmail(analysis);
+    return this.send({
+      to: userEmail,
+      subject: `🏠 Complete Property Analysis - Lease & Floor Plan`,
+      html,
+    });
+  }
+
   private static generateAlertEmail(listings: any[], searchName: string): string {
     const listingCards = listings
       .map(
@@ -581,6 +608,116 @@ export class EmailService {
           <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb; text-align: center; color: #6b7280; font-size: 14px;">
             <p>Analysis powered by LeaseIQ</p>
             <p style="margin-top: 8px;">Make informed decisions with confidence</p>
+          </div>
+        </body>
+      </html>
+    `;
+  }
+
+  private static generateFloorPlanEmail(analysis: any): string {
+    const efficiencyColor = 
+      analysis.spaceEfficiency === 'Excellent' ? '#059669' :
+      analysis.spaceEfficiency === 'Good' ? '#2563eb' :
+      analysis.spaceEfficiency === 'Fair' ? '#f59e0b' : '#dc2626';
+
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #111827; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 32px;">
+            <h1 style="color: #2563eb; margin: 0;">LeaseIQ Floor Plan Analysis</h1>
+            <p style="color: #6b7280; margin: 8px 0;">Your detailed layout assessment</p>
+          </div>
+
+          <!-- Layout Overview -->
+          <div style="background: #f9fafb; padding: 24px; border-radius: 12px; margin-bottom: 24px; text-align: center;">
+            <div style="display: inline-block; margin: 0 16px;">
+              <div style="font-size: 32px; font-weight: bold; color: #2563eb;">${analysis.layout.bedrooms}</div>
+              <div style="font-size: 14px; color: #6b7280;">Bedrooms</div>
+            </div>
+            <div style="display: inline-block; margin: 0 16px;">
+              <div style="font-size: 32px; font-weight: bold; color: #2563eb;">${analysis.layout.bathrooms}</div>
+              <div style="font-size: 14px; color: #6b7280;">Bathrooms</div>
+            </div>
+            <div style="display: inline-block; margin: 0 16px;">
+              <div style="font-size: 32px; font-weight: bold; color: #2563eb;">${analysis.layout.totalRooms}</div>
+              <div style="font-size: 14px; color: #6b7280;">Total Rooms</div>
+            </div>
+            ${analysis.layout.estimatedSquareFeet ? `
+            <div style="display: inline-block; margin: 0 16px;">
+              <div style="font-size: 32px; font-weight: bold; color: #2563eb;">${analysis.layout.estimatedSquareFeet}</div>
+              <div style="font-size: 14px; color: #6b7280;">Est. Sq Ft</div>
+            </div>
+            ` : ''}
+          </div>
+
+          <!-- Space Efficiency -->
+          <div style="text-align: center; margin-bottom: 24px;">
+            <span style="display: inline-block; padding: 8px 24px; background: ${efficiencyColor}15; color: ${efficiencyColor}; font-weight: 600; border-radius: 20px; border: 2px solid ${efficiencyColor};">
+              Space Efficiency: ${analysis.spaceEfficiency}
+            </span>
+          </div>
+
+          <!-- Summary -->
+          <div style="margin-bottom: 24px;">
+            <h3 style="color: #111827;">📋 Summary</h3>
+            <p style="color: #374151;">${analysis.summary}</p>
+          </div>
+
+          <!-- Features -->
+          ${analysis.features.length > 0 ? `
+          <div style="margin-bottom: 24px;">
+            <h3 style="color: #111827;">✨ Features</h3>
+            <div style="background: #f9fafb; padding: 16px; border-radius: 8px;">
+              <ul style="margin: 0; padding-left: 20px; color: #374151;">
+                ${analysis.features.map((f: string) => `<li style="margin: 4px 0;">${f}</li>`).join('')}
+              </ul>
+            </div>
+          </div>
+          ` : ''}
+
+          <!-- Pros -->
+          ${analysis.pros.length > 0 ? `
+          <div style="margin-bottom: 24px;">
+            <h3 style="color: #059669;">✓ Advantages</h3>
+            <div style="background: #f0fdf4; padding: 16px; border-radius: 8px; border-left: 4px solid #059669;">
+              <ul style="margin: 0; padding-left: 20px; color: #065f46;">
+                ${analysis.pros.map((p: string) => `<li style="margin: 4px 0;">${p}</li>`).join('')}
+              </ul>
+            </div>
+          </div>
+          ` : ''}
+
+          <!-- Cons -->
+          ${analysis.cons.length > 0 ? `
+          <div style="margin-bottom: 24px;">
+            <h3 style="color: #dc2626;">⚠ Concerns</h3>
+            <div style="background: #fef2f2; padding: 16px; border-radius: 8px; border-left: 4px solid #dc2626;">
+              <ul style="margin: 0; padding-left: 20px; color: #991b1b;">
+                ${analysis.cons.map((c: string) => `<li style="margin: 4px 0;">${c}</li>`).join('')}
+              </ul>
+            </div>
+          </div>
+          ` : ''}
+
+          <!-- Recommendations -->
+          ${analysis.recommendations.length > 0 ? `
+          <div style="margin-bottom: 24px;">
+            <h3 style="color: #111827;">💡 Recommendations</h3>
+            <div style="background: #eff6ff; padding: 16px; border-radius: 8px; border-left: 4px solid #2563eb;">
+              <ul style="margin: 0; padding-left: 20px; color: #1e40af;">
+                ${analysis.recommendations.map((r: string) => `<li style="margin: 4px 0;">${r}</li>`).join('')}
+              </ul>
+            </div>
+          </div>
+          ` : ''}
+
+          <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb; text-align: center; color: #6b7280; font-size: 14px;">
+            <p>Analysis powered by LeaseIQ</p>
           </div>
         </body>
       </html>

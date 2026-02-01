@@ -42,7 +42,7 @@ export default function Navigation() {
               href="/lease-analyzer" 
               className="text-foreground hover:text-primary transition-colors duration-300"
             >
-              Lease Analyzer
+              Property Analyzer
             </Link>
             <Link
               href="/dashboard"
@@ -93,7 +93,7 @@ export default function Navigation() {
               className="block text-lg text-foreground hover:text-primary transition-colors duration-300"
               onClick={() => setMobileMenuOpen(false)}
             >
-              Lease Analyzer
+              Property Analyzer
             </Link>
             <Link
               href="/dashboard"

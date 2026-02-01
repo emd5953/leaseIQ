@@ -4,8 +4,10 @@ import searchRoutes from './routes/search.routes';
 import alertsRoutes from './routes/alerts.routes';
 import researchRoutes from './routes/research.routes';
 import leaseRoutes from './routes/lease.routes';
+import floorplanRoutes from './routes/floorplan.routes';
 import webhookRoutes from './routes/webhook.routes';
 import imageProxyRoutes from './routes/image-proxy';
+import propertyAnalysisRoutes from './routes/property-analysis.routes';
 
 export function createApp(): Express {
   const app = express();
@@ -25,8 +27,10 @@ export function createApp(): Express {
   app.use('/api/alerts', alertsRoutes);
   app.use('/api/research', researchRoutes);
   app.use('/api/lease', leaseRoutes);
+  app.use('/api/floorplan', floorplanRoutes);
   app.use('/api/webhook', webhookRoutes);
   app.use('/api/image-proxy', imageProxyRoutes);
+  app.use('/api/property', propertyAnalysisRoutes);
 
   // 404 handler
   app.use((req, res) => {

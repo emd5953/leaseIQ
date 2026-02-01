@@ -6,7 +6,8 @@ import Footer from '@/components/Footer'
 import { 
   FileText, Upload, AlertTriangle, CheckCircle, Mail, X, 
   DollarSign, Calendar, Shield, Home, Clock, AlertCircle,
-  ThumbsUp, ThumbsDown, Minus, Scale, Key, FileWarning
+  ThumbsUp, ThumbsDown, Minus, Scale, Key, FileWarning,
+  Image, LayoutGrid, Star, Maximize, Lightbulb
 } from 'lucide-react'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
@@ -26,10 +27,14 @@ export default function LeaseAnalyzerPage() {
   const [analysis, setAnalysis] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
+  const [floorPlanFile, setFloorPlanFile] = useState<File | null>(null)
+  const [floorPlanPreview, setFloorPlanPreview] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [isDraggingFloorPlan, setIsDraggingFloorPlan] = useState(false)
   const [progress, setProgress] = useState(0)
   const [currentStep, setCurrentStep] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const floorPlanInputRef = useRef<HTMLInputElement>(null)
 
   const handleFileSelect = (file: File) => {
     const allowed = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
@@ -43,6 +48,28 @@ export default function LeaseAnalyzerPage() {
     }
     setUploadedFile(file)
     setError(null)
+  }
+
+  const handleFloorPlanSelect = (file: File) => {
+    const allowed = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif']
+    if (!allowed.includes(file.type)) {
+      setError('Please upload an image file (PNG, JPEG, WebP, or GIF)')
+      return
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setError('File size must be under 10MB')
+      return
+    }
+    setFloorPlanFile(file)
+    setFloorPlanPreview(URL.createObjectURL(file))
+    setError(null)
+  }
+
+  const clearFloorPlan = () => {
+    if (floorPlanPreview) URL.revokeObjectURL(floorPlanPreview)
+    setFloorPlanFile(null)
+    setFloorPlanPreview(null)
+    if (floorPlanInputRef.current) floorPlanInputRef.current.value = ''
   }
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -63,8 +90,8 @@ export default function LeaseAnalyzerPage() {
   }, [])
 
   const handleAnalyze = async () => {
-    if (!uploadedFile) {
-      setError('Please upload a lease document')
+    if (!uploadedFile && !floorPlanFile) {
+      setError('Please upload a lease document or floor plan image')
       return
     }
 
@@ -87,10 +114,22 @@ export default function LeaseAnalyzerPage() {
       }, 2000)
 
       const formData = new FormData()
-      formData.append('file', uploadedFile)
+      if (uploadedFile) formData.append('lease', uploadedFile)
+      if (floorPlanFile) formData.append('floorplan', floorPlanFile)
       if (email) formData.append('email', email)
+      formData.append('sendEmail', email ? 'true' : 'false')
 
-      const response = await fetch(`${API_URL}/api/lease/upload`, {
+      // Choose endpoint based on what's uploaded
+      let endpoint = `${API_URL}/api/property/analyze`
+      if (uploadedFile && !floorPlanFile) {
+        endpoint = `${API_URL}/api/lease/upload`
+        formData.delete('lease')
+        formData.append('file', uploadedFile)
+      } else if (!uploadedFile && floorPlanFile) {
+        endpoint = `${API_URL}/api/property/analyze-floorplan-only`
+      }
+
+      const response = await fetch(endpoint, {
         method: 'POST',
         body: formData,
       })
@@ -109,9 +148,9 @@ export default function LeaseAnalyzerPage() {
       
       // Small delay to show 100% before showing results
       await new Promise(resolve => setTimeout(resolve, 500))
-      setAnalysis(data.analysis)
+      setAnalysis(data.analysis || data)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to analyze lease')
+      setError(err instanceof Error ? err.message : 'Failed to analyze')
     } finally {
       setLoading(false)
       setProgress(0)
@@ -172,10 +211,10 @@ export default function LeaseAnalyzerPage() {
           {/* Header */}
           <div className="text-center mb-12">
             <h1 className="text-4xl md:text-6xl font-serif font-bold text-foreground mb-4">
-              Analyze your <span className="italic">lease</span>
+              Analyze your <span className="italic">property</span>
             </h1>
             <p className="text-lg text-foreground/70 max-w-2xl mx-auto">
-              Upload your lease and get AI-powered analysis highlighting red flags, unfair clauses, and key terms in plain English.
+              Upload your lease and floor plan for AI-powered analysis. Get red flags, layout insights, and a match score.
             </p>
           </div>
 
@@ -186,7 +225,7 @@ export default function LeaseAnalyzerPage() {
                 {/* File Upload Zone */}
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-2">
-                    Upload Lease Document
+                    Lease Document (optional)
                   </label>
                   <div
                     onDrop={handleDrop}
@@ -221,12 +260,76 @@ export default function LeaseAnalyzerPage() {
                       </div>
                     ) : (
                       <>
-                        <Upload size={32} className="mx-auto text-foreground/40 mb-3" strokeWidth={1.5} />
+                        <FileText size={32} className="mx-auto text-foreground/40 mb-3" strokeWidth={1.5} />
                         <p className="text-foreground/70 mb-1">
                           Drag and drop your lease here, or click to browse
                         </p>
                         <p className="text-sm text-foreground/50">
                           PDF or DOCX, up to 10MB
+                        </p>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Floor Plan Upload Zone */}
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Floor Plan Image (optional)
+                  </label>
+                  <div
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      setIsDraggingFloorPlan(false)
+                      const file = e.dataTransfer.files[0]
+                      if (file) handleFloorPlanSelect(file)
+                    }}
+                    onDragOver={(e) => { e.preventDefault(); setIsDraggingFloorPlan(true) }}
+                    onDragLeave={(e) => { e.preventDefault(); setIsDraggingFloorPlan(false) }}
+                    onClick={() => floorPlanInputRef.current?.click()}
+                    className={`relative border-2 border-dashed rounded-3xl p-8 text-center cursor-pointer transition-all duration-300 ${
+                      isDraggingFloorPlan
+                        ? 'border-blue-500 bg-blue-500/5'
+                        : floorPlanFile
+                        ? 'border-blue-500/50 bg-blue-500/5'
+                        : 'border-border hover:border-blue-500/50 hover:bg-card-alt'
+                    }`}
+                  >
+                    <input
+                      ref={floorPlanInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+                      onChange={(e) => e.target.files?.[0] && handleFloorPlanSelect(e.target.files[0])}
+                      className="hidden"
+                    />
+                    {floorPlanFile ? (
+                      <div className="flex flex-col items-center gap-3">
+                        {floorPlanPreview && (
+                          <img 
+                            src={floorPlanPreview} 
+                            alt="Floor plan preview" 
+                            className="max-h-32 rounded-xl border border-border"
+                          />
+                        )}
+                        <div className="flex items-center gap-3">
+                          <Image size={20} className="text-blue-500" strokeWidth={1.5} />
+                          <span className="text-foreground font-medium">{floorPlanFile.name}</span>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); clearFloorPlan() }}
+                            className="p-1 hover:bg-foreground/10 rounded-full transition-colors"
+                          >
+                            <X size={18} className="text-foreground/60" />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <Image size={32} className="mx-auto text-foreground/40 mb-3" strokeWidth={1.5} />
+                        <p className="text-foreground/70 mb-1">
+                          Drag and drop your floor plan here, or click to browse
+                        </p>
+                        <p className="text-sm text-foreground/50">
+                          PNG, JPEG, WebP, or GIF, up to 10MB
                         </p>
                       </>
                     )}
@@ -252,11 +355,11 @@ export default function LeaseAnalyzerPage() {
 
                 <button
                   onClick={handleAnalyze}
-                  disabled={loading || !uploadedFile}
+                  disabled={loading || (!uploadedFile && !floorPlanFile)}
                   className="w-full px-8 py-4 bg-foreground text-background rounded-full text-sm tracking-widest uppercase hover:bg-opacity-90 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   <Upload size={18} strokeWidth={1.5} />
-                  {loading ? 'Analyzing...' : 'Upload & Analyze'}
+                  {loading ? 'Analyzing...' : uploadedFile && floorPlanFile ? 'Analyze Both' : 'Analyze'}
                 </button>
 
                 {/* Progress Indicator */}
@@ -328,8 +431,209 @@ export default function LeaseAnalyzerPage() {
                     {JSON.stringify(analysis, null, 2)}
                   </pre>
                 </div>
-              </details>              {/* Overall Rating Hero Card */}
-              {(() => {
+              </details>
+
+              {/* Combined Analysis Match Score */}
+              {analysis.overallAssessment && (
+                <div className="bg-gradient-to-br from-primary/20 to-blue-500/20 rounded-3xl p-8 border-2 border-primary/30">
+                  <div className="flex flex-col md:flex-row items-center gap-6">
+                    <div className="relative">
+                      <div className="w-32 h-32 rounded-full bg-white flex items-center justify-center shadow-lg">
+                        <div className="text-center">
+                          <span className="text-4xl font-bold text-primary">{analysis.overallAssessment.matchScore}</span>
+                          <span className="text-lg text-foreground/60">/100</span>
+                        </div>
+                      </div>
+                      <Star size={24} className="absolute -top-1 -right-1 text-amber-500 fill-amber-500" />
+                    </div>
+                    <div className="flex-1 text-center md:text-left">
+                      <h2 className="text-2xl md:text-3xl font-serif font-bold text-foreground mb-3">
+                        Property Match Score
+                      </h2>
+                      <p className="text-foreground/80 text-lg leading-relaxed">
+                        {analysis.overallAssessment.summary}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {/* Combined Recommendations */}
+                  {analysis.overallAssessment.recommendations && analysis.overallAssessment.recommendations.length > 0 && (
+                    <div className="mt-6 pt-6 border-t border-primary/20">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Lightbulb size={18} className="text-primary" />
+                        <span className="font-semibold text-foreground">Key Recommendations</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {analysis.overallAssessment.recommendations.map((rec: string, i: number) => (
+                          <span key={i} className="px-3 py-1.5 bg-white/50 rounded-full text-sm text-foreground/80">
+                            {rec}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Combined Concerns */}
+                  {analysis.overallAssessment.concerns && analysis.overallAssessment.concerns.length > 0 && (
+                    <div className="mt-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <AlertTriangle size={18} className="text-amber-600" />
+                        <span className="font-semibold text-foreground">Things to Consider</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {analysis.overallAssessment.concerns.map((concern: string, i: number) => (
+                          <span key={i} className="px-3 py-1.5 bg-amber-100/50 rounded-full text-sm text-amber-800">
+                            {concern}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Floor Plan Analysis Results */}
+              {(analysis.floorPlan || analysis.layout) && (
+                <div className="bg-blue-50 rounded-3xl p-8 border-2 border-blue-200">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="p-3 bg-blue-100 rounded-2xl">
+                      <LayoutGrid size={28} className="text-blue-600" strokeWidth={1.5} />
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-serif font-bold text-foreground">
+                        Floor Plan Analysis
+                      </h3>
+                      <p className="text-foreground/60">AI-powered layout insights</p>
+                    </div>
+                  </div>
+                  
+                  {/* Layout Stats */}
+                  {(analysis.floorPlan?.layout || analysis.layout) && (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                      {(() => {
+                        const layout = analysis.floorPlan?.layout || analysis.layout
+                        return (
+                          <>
+                            <div className="bg-white rounded-xl p-4 text-center">
+                              <p className="text-3xl font-bold text-blue-600">{layout.bedrooms}</p>
+                              <p className="text-sm text-foreground/60">Bedrooms</p>
+                            </div>
+                            <div className="bg-white rounded-xl p-4 text-center">
+                              <p className="text-3xl font-bold text-blue-600">{layout.bathrooms}</p>
+                              <p className="text-sm text-foreground/60">Bathrooms</p>
+                            </div>
+                            <div className="bg-white rounded-xl p-4 text-center">
+                              <p className="text-3xl font-bold text-blue-600">{layout.totalRooms}</p>
+                              <p className="text-sm text-foreground/60">Total Rooms</p>
+                            </div>
+                            {layout.estimatedSquareFeet && (
+                              <div className="bg-white rounded-xl p-4 text-center">
+                                <p className="text-3xl font-bold text-blue-600">{layout.estimatedSquareFeet}</p>
+                                <p className="text-sm text-foreground/60">Est. Sq Ft</p>
+                              </div>
+                            )}
+                          </>
+                        )
+                      })()}
+                    </div>
+                  )}
+                  
+                  {/* Space Efficiency */}
+                  {(analysis.floorPlan?.spaceEfficiency || analysis.spaceEfficiency) && (
+                    <div className="mb-6">
+                      <div className="flex items-center gap-3">
+                        <Maximize size={18} className="text-blue-600" />
+                        <span className="font-medium text-foreground">Space Efficiency:</span>
+                        <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                          (analysis.floorPlan?.spaceEfficiency || analysis.spaceEfficiency) === 'Excellent' ? 'bg-green-100 text-green-700' :
+                          (analysis.floorPlan?.spaceEfficiency || analysis.spaceEfficiency) === 'Good' ? 'bg-blue-100 text-blue-700' :
+                          (analysis.floorPlan?.spaceEfficiency || analysis.spaceEfficiency) === 'Fair' ? 'bg-amber-100 text-amber-700' :
+                          'bg-red-100 text-red-700'
+                        }`}>
+                          {analysis.floorPlan?.spaceEfficiency || analysis.spaceEfficiency}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Summary */}
+                  {(analysis.floorPlan?.summary || analysis.summary) && !analysis.overallAssessment && (
+                    <p className="text-foreground/80 mb-6 p-4 bg-white rounded-xl">
+                      {analysis.floorPlan?.summary || analysis.summary}
+                    </p>
+                  )}
+                  
+                  {/* Features */}
+                  {((analysis.floorPlan?.features || analysis.features) && (analysis.floorPlan?.features || analysis.features).length > 0) && (
+                    <div className="mb-6">
+                      <h4 className="font-semibold text-foreground mb-3">Features</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {(analysis.floorPlan?.features || analysis.features).map((feature: string, i: number) => (
+                          <span key={i} className="px-3 py-1.5 bg-white rounded-full text-sm text-foreground/80 border border-blue-100">
+                            {feature}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Pros & Cons */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {((analysis.floorPlan?.pros || analysis.pros) && (analysis.floorPlan?.pros || analysis.pros).length > 0) && (
+                      <div className="bg-green-50 rounded-xl p-4 border border-green-200">
+                        <h4 className="font-semibold text-green-700 mb-3 flex items-center gap-2">
+                          <ThumbsUp size={16} /> Pros
+                        </h4>
+                        <ul className="space-y-2">
+                          {(analysis.floorPlan?.pros || analysis.pros).map((pro: string, i: number) => (
+                            <li key={i} className="flex items-start gap-2 text-sm text-green-800">
+                              <CheckCircle size={14} className="flex-shrink-0 mt-0.5" />
+                              {pro}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {((analysis.floorPlan?.cons || analysis.cons) && (analysis.floorPlan?.cons || analysis.cons).length > 0) && (
+                      <div className="bg-red-50 rounded-xl p-4 border border-red-200">
+                        <h4 className="font-semibold text-red-700 mb-3 flex items-center gap-2">
+                          <ThumbsDown size={16} /> Cons
+                        </h4>
+                        <ul className="space-y-2">
+                          {(analysis.floorPlan?.cons || analysis.cons).map((con: string, i: number) => (
+                            <li key={i} className="flex items-start gap-2 text-sm text-red-800">
+                              <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
+                              {con}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Floor Plan Recommendations */}
+                  {((analysis.floorPlan?.recommendations || analysis.recommendations) && (analysis.floorPlan?.recommendations || analysis.recommendations).length > 0) && !analysis.overallAssessment && (
+                    <div className="mt-6 p-4 bg-blue-100/50 rounded-xl">
+                      <h4 className="font-semibold text-blue-700 mb-3 flex items-center gap-2">
+                        <Lightbulb size={16} /> Layout Recommendations
+                      </h4>
+                      <ul className="space-y-2">
+                        {(analysis.floorPlan?.recommendations || analysis.recommendations).map((rec: string, i: number) => (
+                          <li key={i} className="flex items-start gap-2 text-sm text-blue-800">
+                            <span className="flex-shrink-0 w-5 h-5 bg-blue-200 rounded-full flex items-center justify-center text-xs font-semibold">
+                              {i + 1}
+                            </span>
+                            {rec}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Overall Rating Hero Card - Only show for lease-only analysis */}
+              {analysis.overallRating && !analysis.overallAssessment && (() => {
                 const ratingConfig = getRatingConfig(analysis.overallRating)
                 const RatingIcon = ratingConfig.icon
                 return (
@@ -680,10 +984,11 @@ export default function LeaseAnalyzerPage() {
                   setAnalysis(null)
                   setEmail('')
                   clearFile()
+                  clearFloorPlan()
                 }}
                 className="w-full px-8 py-4 bg-transparent text-primary border border-primary rounded-full text-sm tracking-widest uppercase hover:bg-primary hover:text-background transition-all duration-300"
               >
-                Analyze Another Lease
+                Analyze Another Property
               </button>
             </div>
           )}

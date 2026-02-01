@@ -2,7 +2,7 @@
   "name": "leaseiq",
   "version": "1.0.0",
   "description": "LeaseIQ rental platform database layer",
-  "main": "dist/index.js",
+  "main": "dist/server.js",
   "scripts": {
     "build": "tsc",
     "test": "vitest --run",
