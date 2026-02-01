@@ -102,7 +102,8 @@ export function sanitizeBody(req: Request, res: Response, next: NextFunction) {
  */
 export function limitBodySize(maxSizeKB: number = 100) {
   return (req: Request, res: Response, next: NextFunction) => {
-    const contentLength = parseInt(req.headers['content-length'] || '0', 10);
+    const header = req.headers['content-length'];
+    const contentLength = parseInt(Array.isArray(header) ? header[0] : header || '0', 10);
     
     if (contentLength > maxSizeKB * 1024) {
       return res.status(413).json({ error: `Request body too large (max ${maxSizeKB}KB)` });
