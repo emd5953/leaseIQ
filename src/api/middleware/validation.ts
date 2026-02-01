@@ -69,7 +69,8 @@ export function validateUrl(field: string = 'imageUrl') {
  */
 export function validateObjectId(paramName: string = 'id') {
   return (req: Request, res: Response, next: NextFunction) => {
-    const id = req.params[paramName];
+    const param = req.params[paramName];
+    const id = Array.isArray(param) ? param[0] : param;
     
     if (id && !/^[a-fA-F0-9]{24}$/.test(id)) {
       return res.status(400).json({ error: 'Invalid ID format' });
@@ -84,8 +85,7 @@ export function validateObjectId(paramName: string = 'id') {
  */
 export function sanitizeBody(req: Request, res: Response, next: NextFunction) {
   if (req.body && typeof req.body === 'object') {
-    // Remove any fields starting with $ (MongoDB injection prevention)
-    const sanitized: Record<string, any> = {};
+    const sanitized: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(req.body)) {
       if (!key.startsWith('$') && !key.startsWith('__')) {
         sanitized[key] = value;
