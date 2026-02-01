@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import { FloorPlanService } from '../../services/floorplan.service';
 import { EmailService } from '../../services/email.service';
+import { validateEmail, validateUrl } from '../middleware/validation';
 
 const router = Router();
 
@@ -22,7 +23,7 @@ const upload = multer({
  * POST /api/floorplan/analyze
  * Upload and analyze a floor plan image
  */
-router.post('/analyze', upload.single('file'), async (req: Request, res: Response) => {
+router.post('/analyze', upload.single('file'), validateEmail, async (req: Request, res: Response) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
@@ -60,7 +61,7 @@ router.post('/analyze', upload.single('file'), async (req: Request, res: Respons
  * POST /api/floorplan/analyze-url
  * Analyze a floor plan from URL
  */
-router.post('/analyze-url', async (req: Request, res: Response) => {
+router.post('/analyze-url', validateUrl('imageUrl'), validateEmail, async (req: Request, res: Response) => {
   try {
     const { imageUrl, email } = req.body;
 

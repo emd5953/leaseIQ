@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import { LeaseService } from '../../services/lease.service';
+import { validateEmail } from '../middleware/validation';
 
 const router = Router();
 
@@ -52,7 +53,7 @@ router.post('/debug-extract', upload.single('file'), async (req: Request, res: R
  * POST /api/lease/upload
  * Upload and analyze a lease PDF/DOCX
  */
-router.post('/upload', upload.single('file'), async (req: Request, res: Response) => {
+router.post('/upload', upload.single('file'), validateEmail, async (req: Request, res: Response) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });

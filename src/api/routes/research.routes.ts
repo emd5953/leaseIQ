@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { ResearchService } from '../../services/research.service';
 import { SearchService } from '../../services/search.service';
+import { validateEmail, validateObjectId } from '../middleware/validation';
 
 const router = Router();
 
@@ -8,7 +9,7 @@ const router = Router();
  * POST /api/research/:listingId
  * Research a listing and optionally send email
  */
-router.post('/:listingId', async (req: Request, res: Response) => {
+router.post('/:listingId', validateObjectId('listingId'), validateEmail, async (req: Request, res: Response) => {
   try {
     const { email } = req.body;
     
