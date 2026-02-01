@@ -147,9 +147,6 @@ export default function ListingDetail({ listing }: ListingDetailProps) {
     setImageErrors(prev => new Set(prev).add(index))
   }
 
-  // Debug log
-  console.log('Listing images:', listing.images, 'Valid:', validImages, 'Using:', rawImages)
-
   // Safety check: if address is an object, convert it to string
   const addressString = typeof listing.address === 'string' 
     ? listing.address 

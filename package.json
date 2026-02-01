@@ -15,19 +15,17 @@
     "test:resend": "tsx tests/test-resend-email.ts",
     "test:reducto": "tsx tests/test-reducto-pdf.ts",
     "test:workflow": "tsx tests/quick-test.ts",
-    "test:workflow-full": "tsx tests/test-send-reducto-workflow.ts",
+    "test:workflow-full": "tsx tests/quick-test.ts",
     "test:combined": "tsx tests/test-combined-analysis.ts",
     "dev": "tsx src/server.ts",
     "start": "node scripts/start-production.js",
     "start:backend": "tsx src/server.ts",
-    "start:frontend": "node docs/scripts/start-frontend.js",
-    "start:scraper": "node start-scraper.js",
-    "start:fullstack": "node docs/scripts/start-fullstack.js",
+    "start:frontend": "cd frontend && npm run dev",
+    "start:fullstack": "node scripts/start-production.js",
     "server": "node dist/server.js",
     "alerts": "tsx src/jobs/alert-cron.ts",
     "scraping": "tsx src/jobs/scraping-cron.ts",
-    "scrape": "tsx src/ingestion/example.ts",
-    "demo": "tsx example-usage.ts"
+    "scrape": "tsx src/ingestion/example.ts"
   },
   "keywords": [
     "rental",

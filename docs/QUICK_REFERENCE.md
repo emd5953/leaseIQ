@@ -87,9 +87,11 @@ GET  /api/search/:id          # Get by ID
 POST /api/research/:listingId # Research listing
 ```
 
-### Lease
+### Lease & Floor Plan
 ```
-POST /api/lease/analyze       # Analyze lease
+POST /api/lease/analyze              # Analyze lease text
+POST /api/property/analyze           # Combined lease + floor plan
+POST /api/property/analyze-floorplan-only  # Floor plan only
 ```
 
 ### Alerts
@@ -228,11 +230,11 @@ npm run build
 ## 📚 Documentation
 
 - `README.md` - Project overview
-- `FRONTEND_GUIDE.md` - Complete guide
-- `FRONTEND_COMPLETE.md` - Implementation summary
-- `VISUAL_SHOWCASE.md` - Design showcase
-- `frontend/README.md` - Frontend docs
-- `frontend/SETUP.md` - Setup guide
+- `docs/FRONTEND_GUIDE.md` - Frontend guide
+- `docs/RESEND_REDUCTO_GUIDE.md` - Email & PDF parsing
+- `docs/FLOOR_PLAN_ANALYSIS.md` - Floor plan analysis
+- `docs/API.md` - API documentation
+- `docs/QUICKSTART.md` - Quick start guide
 
 ## 🎨 Design Patterns
 
