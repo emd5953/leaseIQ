@@ -8,6 +8,8 @@ import floorplanRoutes from './routes/floorplan.routes';
 import webhookRoutes from './routes/webhook.routes';
 import imageProxyRoutes from './routes/image-proxy';
 import propertyAnalysisRoutes from './routes/property-analysis.routes';
+import authRoutes from './routes/auth.routes';
+import userRoutes from './routes/user.routes';
 import {
   standardLimiter,
   strictLimiter,
@@ -29,6 +31,10 @@ export function createApp(): Express {
   app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
+
+  // Auth routes (standard limiting)
+  app.use('/api/auth', standardLimiter, authRoutes);
+  app.use('/api/user', standardLimiter, userRoutes);
 
   // Routes with rate limiting
   app.use('/api/search', searchLimiter, searchRoutes);

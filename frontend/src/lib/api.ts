@@ -1,5 +1,11 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 
+// Helper to get auth headers
+function getAuthHeaders(): HeadersInit {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('leaseiq_token') : null
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
 export interface SearchFilters {
   minPrice?: number
   maxPrice?: number
@@ -20,6 +26,31 @@ export interface SearchOptions {
   limit?: number
   sortBy?: 'price' | 'bedrooms' | 'createdAt'
   sortOrder?: 'asc' | 'desc'
+}
+
+export interface UserPreferences {
+  minPrice?: number | null
+  maxPrice?: number | null
+  minBedrooms?: number | null
+  maxBedrooms?: number | null
+  minBathrooms?: number | null
+  maxBathrooms?: number | null
+  neighborhoods?: string[]
+  requiredAmenities?: string[]
+  requiresDogsAllowed?: boolean
+  requiresCatsAllowed?: boolean
+  noFeeOnly?: boolean
+  maxListingAgeDays?: number | null
+}
+
+export interface SavedSearch {
+  _id?: string
+  name: string
+  criteria: UserPreferences
+  alertsEnabled: boolean
+  alertFrequency: 'immediate' | 'daily' | 'weekly'
+  alertMethod: 'email' | 'in-app' | 'both'
+  isActive?: boolean
 }
 
 export const api = {
@@ -86,6 +117,107 @@ export const api = {
       method: 'POST',
     })
     if (!response.ok) throw new Error('Failed to send alert')
+    return response.json()
+  },
+
+  // ============ USER ENDPOINTS ============
+
+  async getPreferences(): Promise<UserPreferences> {
+    const response = await fetch(`${API_URL}/api/user/preferences`, {
+      headers: { ...getAuthHeaders() },
+    })
+    if (!response.ok) throw new Error('Failed to get preferences')
+    return response.json()
+  },
+
+  async updatePreferences(preferences: UserPreferences): Promise<UserPreferences> {
+    const response = await fetch(`${API_URL}/api/user/preferences`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify(preferences),
+    })
+    if (!response.ok) throw new Error('Failed to update preferences')
+    return response.json()
+  },
+
+  async getSavedListings() {
+    const response = await fetch(`${API_URL}/api/user/saved-listings`, {
+      headers: { ...getAuthHeaders() },
+    })
+    if (!response.ok) throw new Error('Failed to get saved listings')
+    return response.json()
+  },
+
+  async saveListing(listingId: string, notes?: string) {
+    const response = await fetch(`${API_URL}/api/user/saved-listings/${listingId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify({ notes }),
+    })
+    if (!response.ok) throw new Error('Failed to save listing')
+    return response.json()
+  },
+
+  async unsaveListing(listingId: string) {
+    const response = await fetch(`${API_URL}/api/user/saved-listings/${listingId}`, {
+      method: 'DELETE',
+      headers: { ...getAuthHeaders() },
+    })
+    if (!response.ok) throw new Error('Failed to unsave listing')
+    return response.json()
+  },
+
+  async checkListingSaved(listingId: string): Promise<{ isSaved: boolean }> {
+    const response = await fetch(`${API_URL}/api/user/check-listing/${listingId}`, {
+      headers: { ...getAuthHeaders() },
+    })
+    if (!response.ok) throw new Error('Failed to check listing')
+    return response.json()
+  },
+
+  async getSavedSearches(): Promise<SavedSearch[]> {
+    const response = await fetch(`${API_URL}/api/user/saved-searches`, {
+      headers: { ...getAuthHeaders() },
+    })
+    if (!response.ok) throw new Error('Failed to get saved searches')
+    return response.json()
+  },
+
+  async createSavedSearch(search: SavedSearch): Promise<SavedSearch> {
+    const response = await fetch(`${API_URL}/api/user/saved-searches`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify(search),
+    })
+    if (!response.ok) throw new Error('Failed to create saved search')
+    return response.json()
+  },
+
+  async updateSavedSearch(id: string, search: Partial<SavedSearch>): Promise<SavedSearch> {
+    const response = await fetch(`${API_URL}/api/user/saved-searches/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify(search),
+    })
+    if (!response.ok) throw new Error('Failed to update saved search')
+    return response.json()
+  },
+
+  async deleteSavedSearch(id: string) {
+    const response = await fetch(`${API_URL}/api/user/saved-searches/${id}`, {
+      method: 'DELETE',
+      headers: { ...getAuthHeaders() },
+    })
+    if (!response.ok) throw new Error('Failed to delete saved search')
+    return response.json()
+  },
+
+  async testSavedSearchAlert(id: string) {
+    const response = await fetch(`${API_URL}/api/user/saved-searches/${id}/test-alert`, {
+      method: 'POST',
+      headers: { ...getAuthHeaders() },
+    })
+    if (!response.ok) throw new Error('Failed to send test alert')
     return response.json()
   },
 }

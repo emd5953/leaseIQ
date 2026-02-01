@@ -1,8 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Bed, Bath, Maximize, MapPin, Heart } from 'lucide-react'
+import { useAuth } from '@/contexts/AuthContext'
+import { api } from '@/lib/api'
 
 interface ListingCardProps {
   listing: {
@@ -58,10 +60,46 @@ function isValidImageUrl(url: string | undefined): boolean {
 }
 
 export default function ListingCard({ listing }: ListingCardProps) {
+  const { user } = useAuth()
   const hasValidImage = isValidImageUrl(listing.images?.[0])
   const placeholderImage = getPlaceholderImage(listing._id)
   const [imageUrl, setImageUrl] = useState(hasValidImage ? listing.images[0] : placeholderImage)
   const [imageError, setImageError] = useState(false)
+  const [isSaved, setIsSaved] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+
+  // Check if listing is saved on mount
+  useEffect(() => {
+    if (user && listing._id) {
+      api.checkListingSaved(listing._id)
+        .then(result => setIsSaved(result.isSaved))
+        .catch(() => {})
+    }
+  }, [user, listing._id])
+
+  const handleSaveToggle = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    if (!user) {
+      alert('Please sign in to save listings')
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      if (isSaved) {
+        await api.unsaveListing(listing._id)
+        setIsSaved(false)
+      } else {
+        await api.saveListing(listing._id)
+        setIsSaved(true)
+      }
+    } catch (error) {
+      console.error('Failed to save listing:', error)
+    }
+    setIsSaving(false)
+  }
 
   const handleImageError = () => {
     if (!imageError) {
@@ -107,8 +145,16 @@ export default function ListingCard({ listing }: ListingCardProps) {
           </div>
 
           {/* Favorite Button */}
-          <button className="absolute top-4 right-4 w-10 h-10 bg-card/90 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-card transition-colors duration-300">
-            <Heart size={18} className="text-foreground" strokeWidth={1.5} />
+          <button 
+            onClick={handleSaveToggle}
+            disabled={isSaving}
+            className={`absolute top-4 right-4 w-10 h-10 backdrop-blur-sm rounded-full flex items-center justify-center transition-colors duration-300 ${
+              isSaved 
+                ? 'bg-red-100 text-red-500' 
+                : 'bg-card/90 hover:bg-card text-foreground'
+            }`}
+          >
+            <Heart size={18} strokeWidth={1.5} fill={isSaved ? 'currentColor' : 'none'} />
           </button>
 
           {/* Source Badge */}

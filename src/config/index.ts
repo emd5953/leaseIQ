@@ -23,6 +23,12 @@ export const config = {
   google: {
     geocodingApiKey: process.env.GOOGLE_GEOCODING_API_KEY || '',
     placesApiKey: process.env.GOOGLE_PLACES_API_KEY || '',
+    oauthClientId: process.env.GOOGLE_OAUTH_CLIENT_ID || '',
+    oauthClientSecret: process.env.GOOGLE_OAUTH_CLIENT_SECRET || '',
+  },
+  jwt: {
+    secret: process.env.JWT_SECRET || 'leaseiq-jwt-secret-change-in-production',
+    expiresIn: '7d',
   },
   server: {
     port: parseInt(process.env.PORT || '3001', 10),

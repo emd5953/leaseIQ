@@ -1,13 +1,16 @@
 'use client'
 
 import { useState } from 'react'
-import { SlidersHorizontal } from 'lucide-react'
+import { SlidersHorizontal, Bell } from 'lucide-react'
+import { useAuth } from '@/contexts/AuthContext'
+import { api } from '@/lib/api'
 
 interface SearchFiltersProps {
   onApplyFilters: (filters: any) => void
 }
 
 export default function SearchFilters({ onApplyFilters }: SearchFiltersProps) {
+  const { user } = useAuth()
   const [filters, setFilters] = useState({
     minPrice: '',
     maxPrice: '',
@@ -17,6 +20,9 @@ export default function SearchFilters({ onApplyFilters }: SearchFiltersProps) {
     petsAllowed: false,
     noFee: false,
   })
+  const [showSaveModal, setShowSaveModal] = useState(false)
+  const [searchName, setSearchName] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
 
   const handleClearFilters = () => {
     const clearedFilters = {
@@ -30,6 +36,38 @@ export default function SearchFilters({ onApplyFilters }: SearchFiltersProps) {
     }
     setFilters(clearedFilters)
     onApplyFilters({})
+  }
+
+  const handleSaveSearch = async () => {
+    if (!searchName.trim()) {
+      alert('Please enter a name for this search')
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      await api.createSavedSearch({
+        name: searchName,
+        criteria: {
+          minPrice: filters.minPrice ? Number(filters.minPrice) : null,
+          maxPrice: filters.maxPrice ? Number(filters.maxPrice) : null,
+          minBedrooms: filters.bedrooms ? Number(filters.bedrooms) : null,
+          neighborhoods: filters.neighborhoods,
+          requiresDogsAllowed: filters.petsAllowed,
+          noFeeOnly: filters.noFee,
+        },
+        alertsEnabled: true,
+        alertFrequency: 'daily',
+        alertMethod: 'email',
+      })
+      setShowSaveModal(false)
+      setSearchName('')
+      alert('Search saved! You\'ll receive alerts when new listings match.')
+    } catch (error) {
+      console.error('Failed to save search:', error)
+      alert('Failed to save search. Please try again.')
+    }
+    setIsSaving(false)
   }
 
   const neighborhoods = [
@@ -172,7 +210,52 @@ export default function SearchFilters({ onApplyFilters }: SearchFiltersProps) {
         >
           Clear Filters
         </button>
+
+        {/* Save Search Button */}
+        {user && (
+          <button 
+            onClick={() => setShowSaveModal(true)}
+            className="w-full px-6 py-3 bg-primary/10 text-primary border border-primary/20 rounded-full text-sm tracking-widest uppercase hover:bg-primary/20 transition-all duration-300 flex items-center justify-center gap-2"
+          >
+            <Bell size={16} />
+            Save Search & Get Alerts
+          </button>
+        )}
       </div>
+
+      {/* Save Search Modal */}
+      {showSaveModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-background rounded-xl max-w-md w-full p-6">
+            <h3 className="text-xl font-semibold mb-4">Save This Search</h3>
+            <p className="text-muted-foreground text-sm mb-4">
+              Get email alerts when new listings match your criteria.
+            </p>
+            <input
+              type="text"
+              placeholder="Name your search (e.g., '2BR Brooklyn under $3k')"
+              value={searchName}
+              onChange={(e) => setSearchName(e.target.value)}
+              className="w-full px-4 py-3 border border-border rounded-lg bg-background mb-4"
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowSaveModal(false)}
+                className="flex-1 px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveSearch}
+                disabled={isSaving}
+                className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
+              >
+                {isSaving ? 'Saving...' : 'Save & Enable Alerts'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

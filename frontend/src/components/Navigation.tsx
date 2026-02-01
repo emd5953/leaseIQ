@@ -2,10 +2,31 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Menu, X } from 'lucide-react'
+import { Menu, X, User, LogOut } from 'lucide-react'
+import { useGoogleLogin } from '@react-oauth/google'
+import { useAuth } from '@/contexts/AuthContext'
 
 export default function Navigation() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [isSigningIn, setIsSigningIn] = useState(false)
+  const { user, isLoading, loginWithCode, logout } = useAuth()
+
+  const googleLogin = useGoogleLogin({
+    flow: 'auth-code',
+    onSuccess: async (response) => {
+      setIsSigningIn(true)
+      try {
+        await loginWithCode(response.code)
+      } catch (error) {
+        console.error('Login failed:', error)
+      }
+      setIsSigningIn(false)
+    },
+    onError: () => {
+      console.error('Google login failed')
+      setIsSigningIn(false)
+    },
+  })
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-40 bg-background/80 backdrop-blur-sm border-b border-border">
@@ -44,6 +65,38 @@ export default function Navigation() {
             >
               Property Analyzer
             </Link>
+
+            {/* Auth Section */}
+            {!isLoading && (
+              <>
+                {user ? (
+                  <div className="flex items-center gap-4">
+                    <Link
+                      href="/dashboard"
+                      className="flex items-center gap-2 text-foreground hover:text-primary transition-colors duration-300"
+                    >
+                      <User size={18} />
+                      <span>Dashboard</span>
+                    </Link>
+                    <button
+                      onClick={logout}
+                      className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors duration-300"
+                      title="Sign out"
+                    >
+                      <LogOut size={18} />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => googleLogin()}
+                    disabled={isSigningIn}
+                    className="px-5 py-2.5 bg-foreground text-background rounded-full text-sm tracking-wide hover:bg-foreground/90 transition-all duration-300 disabled:opacity-50"
+                  >
+                    {isSigningIn ? 'Signing in...' : 'Sign In'}
+                  </button>
+                )}
+              </>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -89,6 +142,45 @@ export default function Navigation() {
             >
               Property Analyzer
             </Link>
+
+            {/* Mobile Auth */}
+            {!isLoading && (
+              <div className="pt-4 border-t border-border">
+                {user ? (
+                  <div className="space-y-4">
+                    <Link
+                      href="/dashboard"
+                      className="flex items-center gap-2 text-lg text-foreground hover:text-primary transition-colors duration-300"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <User size={20} />
+                      Dashboard
+                    </Link>
+                    <button
+                      onClick={() => {
+                        logout()
+                        setMobileMenuOpen(false)
+                      }}
+                      className="flex items-center gap-2 text-lg text-muted-foreground hover:text-foreground transition-colors duration-300"
+                    >
+                      <LogOut size={20} />
+                      Sign Out
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => {
+                      googleLogin()
+                      setMobileMenuOpen(false)
+                    }}
+                    disabled={isSigningIn}
+                    className="w-full px-6 py-3 bg-foreground text-background rounded-full text-sm tracking-wide hover:bg-foreground/90 transition-all duration-300 disabled:opacity-50"
+                  >
+                    {isSigningIn ? 'Signing in...' : 'Sign In with Google'}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

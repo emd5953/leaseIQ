@@ -1,8 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Bed, Bath, Maximize, MapPin, Heart, Share2, AlertCircle, CheckCircle, ExternalLink, Dog, Cat, DollarSign, Calendar, Building, Info, Home, Zap, Droplets, Flame, Wifi, Car, FileText, Grid3X3, X, ChevronLeft, ChevronRight, Copy, Check } from 'lucide-react'
 import Link from 'next/link'
+import { useAuth } from '@/contexts/AuthContext'
+import { api } from '@/lib/api'
 
 interface ListingDetailProps {
   listing: any
@@ -87,6 +89,39 @@ export default function ListingDetail({ listing }: ListingDetailProps) {
   const [showFloorPlanModal, setShowFloorPlanModal] = useState(false)
   const [currentFloorPlanIndex, setCurrentFloorPlanIndex] = useState(0)
   const [copied, setCopied] = useState(false)
+  const [isSaved, setIsSaved] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const { user } = useAuth()
+
+  // Check if listing is saved on mount
+  useEffect(() => {
+    if (user && listing._id) {
+      api.checkListingSaved(listing._id)
+        .then(result => setIsSaved(result.isSaved))
+        .catch(() => {})
+    }
+  }, [user, listing._id])
+
+  const handleSaveToggle = async () => {
+    if (!user) {
+      alert('Please sign in to save listings')
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      if (isSaved) {
+        await api.unsaveListing(listing._id)
+        setIsSaved(false)
+      } else {
+        await api.saveListing(listing._id)
+        setIsSaved(true)
+      }
+    } catch (error) {
+      console.error('Failed to save listing:', error)
+    }
+    setIsSaving(false)
+  }
 
   const copyListingId = async () => {
     try {
@@ -203,8 +238,17 @@ export default function ListingDetail({ listing }: ListingDetailProps) {
                 </div>
               </div>
               <div className="flex gap-2">
-                <button className="w-12 h-12 bg-card-alt rounded-full flex items-center justify-center hover:bg-primary/10 transition-colors duration-300">
-                  <Heart size={20} strokeWidth={1.5} />
+                <button 
+                  onClick={handleSaveToggle}
+                  disabled={isSaving}
+                  className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors duration-300 ${
+                    isSaved 
+                      ? 'bg-red-100 text-red-500' 
+                      : 'bg-card-alt hover:bg-primary/10'
+                  }`}
+                  title={isSaved ? 'Remove from saved' : 'Save listing'}
+                >
+                  <Heart size={20} strokeWidth={1.5} fill={isSaved ? 'currentColor' : 'none'} />
                 </button>
                 <button className="w-12 h-12 bg-card-alt rounded-full flex items-center justify-center hover:bg-primary/10 transition-colors duration-300">
                   <Share2 size={20} strokeWidth={1.5} />
