@@ -16,27 +16,34 @@ router.post('/:listingId', async (req: Request, res: Response) => {
       ? req.params.listingId[0] 
       : req.params.listingId;
     
+    console.log(`Research request for listing: ${listingId}`);
+    
     // Get listing
     const listing = await SearchService.getListingById(listingId);
     if (!listing) {
+      console.log(`Listing not found: ${listingId}`);
       return res.status(404).json({ error: 'Listing not found' });
     }
 
+    console.log(`Found listing: ${listing.address}`);
+
     // Perform research
     const research = await ResearchService.researchListing(listing);
+    console.log(`Research completed, summary length: ${research.summary?.length || 0}`);
 
     // Send email if requested
     if (email) {
       const emailResult = await ResearchService.sendResearchReport(email, listing, research);
       if (!emailResult.success) {
-        return res.status(500).json({ error: 'Research completed but email failed', research });
+        console.log(`Email failed: ${emailResult.error}`);
+        return res.json({ research, emailSent: false, emailError: emailResult.error });
       }
     }
 
     res.json({ research, emailSent: !!email });
-  } catch (error) {
-    console.error('Research error:', error);
-    res.status(500).json({ error: 'Research failed' });
+  } catch (error: any) {
+    console.error('Research error:', error?.message || error);
+    res.status(500).json({ error: error?.message || 'Research failed' });
   }
 });
 

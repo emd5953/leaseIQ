@@ -50,12 +50,23 @@ export class EmailService {
   static async sendResearchReport(
     userEmail: string,
     listing: any,
-    research: { landlordReviews?: string; violations?: string; summary: string }
+    research: {
+      summary: string;
+      neighborhood?: {
+        crimeLevel?: string;
+        walkScore?: number;
+        transitScore?: number;
+        nearbyAmenities?: string[];
+      };
+      tips?: string[];
+      resourceLinks?: { name: string; url: string }[];
+    }
   ): Promise<{ success: boolean; messageId?: string; error?: string }> {
     const html = this.generateResearchEmail(listing, research);
+    const address = typeof listing.address === 'string' ? listing.address : listing.address?.street || 'Property';
     return this.send({
       to: userEmail,
-      subject: `🔍 Research Report: ${listing.address.street}`,
+      subject: `🔍 Research Report: ${address}`,
       html,
     });
   }
@@ -144,6 +155,103 @@ export class EmailService {
   }
 
   private static generateResearchEmail(listing: any, research: any): string {
+    const address = typeof listing.address === 'string' 
+      ? listing.address 
+      : `${listing.address?.street || ''}, ${listing.address?.city || ''}, ${listing.address?.state || ''}`;
+
+    const n = research.neighborhood || {};
+
+    // Neighborhood vibe section
+    const vibeHtml = (n.vibe || n.demographics) ? `
+      <div style="background: #f0f9ff; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+        ${n.vibe ? `<p style="color: #374151; margin: 0 0 8px 0;">${n.vibe}</p>` : ''}
+        ${n.demographics ? `<p style="color: #6b7280; margin: 0; font-size: 14px;">👥 ${n.demographics}</p>` : ''}
+      </div>
+    ` : '';
+
+    // Scores section
+    const scoresHtml = `
+      <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px;">
+        ${n.crimeLevel ? `
+          <div style="background: ${n.crimeLevel === 'low' ? '#f0fdf4' : n.crimeLevel === 'medium' ? '#fefce8' : '#fef2f2'}; padding: 12px 16px; border-radius: 8px; text-align: center;">
+            <div style="font-size: 12px; color: #6b7280;">Safety</div>
+            <div style="font-weight: 600; color: ${n.crimeLevel === 'low' ? '#059669' : n.crimeLevel === 'medium' ? '#ca8a04' : '#dc2626'};">
+              ${n.crimeLevel.charAt(0).toUpperCase() + n.crimeLevel.slice(1)} Crime
+            </div>
+          </div>
+        ` : ''}
+        ${n.walkScore ? `
+          <div style="background: #f9fafb; padding: 12px 16px; border-radius: 8px; text-align: center;">
+            <div style="font-size: 12px; color: #6b7280;">Walk</div>
+            <div style="font-weight: 600; color: #111827;">${n.walkScore}</div>
+          </div>
+        ` : ''}
+        ${n.transitScore ? `
+          <div style="background: #f9fafb; padding: 12px 16px; border-radius: 8px; text-align: center;">
+            <div style="font-size: 12px; color: #6b7280;">Transit</div>
+            <div style="font-weight: 600; color: #111827;">${n.transitScore}</div>
+          </div>
+        ` : ''}
+        ${n.bikeScore ? `
+          <div style="background: #f9fafb; padding: 12px 16px; border-radius: 8px; text-align: center;">
+            <div style="font-size: 12px; color: #6b7280;">Bike</div>
+            <div style="font-weight: 600; color: #111827;">${n.bikeScore}</div>
+          </div>
+        ` : ''}
+      </div>
+    `;
+
+    // Crime details
+    const crimeHtml = n.crimeDetails ? `
+      <div style="background: #fef3c7; padding: 12px 16px; border-radius: 8px; border-left: 4px solid #f59e0b; margin-bottom: 16px;">
+        <p style="margin: 0; font-size: 14px; color: #92400e;"><strong>⚠️ Safety Details:</strong> ${n.crimeDetails}</p>
+      </div>
+    ` : '';
+
+    // Culture & Dining
+    const cultureHtml = (n.dining?.length || n.culture?.length || n.nightlife) ? `
+      <div style="margin-bottom: 16px;">
+        <h4 style="color: #111827; margin: 0 0 12px 0;">🎭 Culture & Dining</h4>
+        ${n.dining?.length ? `<p style="margin: 4px 0; color: #374151;"><strong>🍽️ Dining:</strong> ${n.dining.join(', ')}</p>` : ''}
+        ${n.culture?.length ? `<p style="margin: 4px 0; color: #374151;"><strong>🎨 Culture:</strong> ${n.culture.join(', ')}</p>` : ''}
+        ${n.nightlife ? `<p style="margin: 4px 0; color: #374151;"><strong>🌙 Nightlife:</strong> ${n.nightlife}</p>` : ''}
+      </div>
+    ` : '';
+
+    // Parks & Grocery
+    const amenitiesHtml = (n.parks?.length || n.groceryStores?.length) ? `
+      <div style="margin-bottom: 16px;">
+        ${n.parks?.length ? `<p style="margin: 4px 0; color: #374151;"><strong>🌳 Parks:</strong> ${n.parks.join(', ')}</p>` : ''}
+        ${n.groceryStores?.length ? `<p style="margin: 4px 0; color: #374151;"><strong>🛒 Grocery:</strong> ${n.groceryStores.join(', ')}</p>` : ''}
+        ${n.nearbyAmenities?.length ? `<p style="margin: 4px 0; color: #374151;"><strong>📍 Nearby:</strong> ${n.nearbyAmenities.join(', ')}</p>` : ''}
+      </div>
+    ` : '';
+
+    // Tips section
+    const tipsHtml = research.tips?.length > 0 ? `
+      <div style="margin-bottom: 24px;">
+        <h3 style="color: #111827;">💡 Tips for This Rental</h3>
+        <ul style="margin: 0; padding-left: 20px; color: #374151;">
+          ${research.tips.map((tip: string) => `<li style="margin: 8px 0;">${tip}</li>`).join('')}
+        </ul>
+      </div>
+    ` : '';
+
+    // Resource links section
+    const resourcesHtml = research.resourceLinks?.length > 0 ? `
+      <div style="margin-bottom: 24px;">
+        <h3 style="color: #111827;">🔗 Verify This Building</h3>
+        <p style="color: #6b7280; font-size: 14px; margin-bottom: 12px;">Use these official resources to check building history:</p>
+        <div style="background: #eff6ff; padding: 16px; border-radius: 8px;">
+          ${research.resourceLinks.map((link: any) => `
+            <a href="${link.url}" target="_blank" style="display: block; color: #2563eb; text-decoration: none; margin: 8px 0; font-weight: 500;">
+              → ${link.name}
+            </a>
+          `).join('')}
+        </div>
+      </div>
+    ` : '';
+
     return `
       <!DOCTYPE html>
       <html>
@@ -157,32 +265,32 @@ export class EmailService {
           </div>
           
           <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 24px; background: #f9fafb;">
-            <h2 style="margin: 0 0 8px 0;">${listing.address.street}</h2>
-            <p style="color: #6b7280; margin: 0;">${listing.address.neighborhood}, ${listing.address.city}</p>
+            <h2 style="margin: 0 0 8px 0;">${address}</h2>
+            <p style="color: #6b7280; margin: 0;">
+              ${listing.bedrooms === 0 ? 'Studio' : `${listing.bedrooms} Bed`} • 
+              ${listing.bathrooms} Bath • 
+              $${listing.price?.toLocaleString() || 'N/A'}/mo
+            </p>
           </div>
           
           <div style="margin-bottom: 24px;">
-            <h3 style="color: #111827;">Summary</h3>
-            <p style="color: #374151;">${research.summary}</p>
+            <h3 style="color: #111827;">📋 Summary</h3>
+            <p style="color: #374151; line-height: 1.7;">${research.summary}</p>
           </div>
           
-          ${research.landlordReviews ? `
+          ${research.neighborhood ? `
           <div style="margin-bottom: 24px;">
-            <h3 style="color: #111827;">Landlord Reviews</h3>
-            <div style="background: #f9fafb; padding: 16px; border-radius: 8px;">
-              ${research.landlordReviews}
-            </div>
+            <h3 style="color: #111827;">📍 Neighborhood Guide</h3>
+            ${vibeHtml}
+            ${scoresHtml}
+            ${crimeHtml}
+            ${cultureHtml}
+            ${amenitiesHtml}
           </div>
           ` : ''}
           
-          ${research.violations ? `
-          <div style="margin-bottom: 24px;">
-            <h3 style="color: #111827;">Building Violations</h3>
-            <div style="background: #fef2f2; padding: 16px; border-radius: 8px; border-left: 4px solid #dc2626;">
-              ${research.violations}
-            </div>
-          </div>
-          ` : ''}
+          ${tipsHtml}
+          ${resourcesHtml}
           
           <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb; text-align: center; color: #6b7280; font-size: 14px;">
             <p>Research powered by LeaseIQ</p>

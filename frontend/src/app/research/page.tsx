@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Navigation from '@/components/Navigation'
 import Footer from '@/components/Footer'
-import { Shield, AlertTriangle, CheckCircle, Mail, Link, MapPin, Star, Building, Loader2 } from 'lucide-react'
+import { Shield, AlertTriangle, CheckCircle, Mail, Link, MapPin, Star, Loader2, Lightbulb, ExternalLink, Utensils, Music, Trees, ShoppingBag, Users, Bike } from 'lucide-react'
 
 interface LandlordReview {
   source: string;
@@ -20,9 +20,23 @@ interface BuildingViolation {
 
 interface NeighborhoodInfo {
   crimeLevel?: string;
+  crimeDetails?: string;
   walkScore?: number;
   transitScore?: number;
+  bikeScore?: number;
   nearbyAmenities?: string[];
+  dining?: string[];
+  nightlife?: string;
+  culture?: string[];
+  parks?: string[];
+  groceryStores?: string[];
+  vibe?: string;
+  demographics?: string;
+}
+
+interface ResourceLink {
+  name: string;
+  url: string;
 }
 
 interface ResearchData {
@@ -30,11 +44,8 @@ interface ResearchData {
   landlordReviews?: LandlordReview[];
   violations?: BuildingViolation[];
   neighborhood?: NeighborhoodInfo;
-  rawData?: {
-    landlord?: string;
-    violations?: string;
-    neighborhood?: string;
-  };
+  tips?: string[];
+  resourceLinks?: ResourceLink[];
 }
 
 export default function ResearchPage() {
@@ -261,11 +272,28 @@ export default function ResearchPage() {
               {/* Neighborhood Info */}
               {research.neighborhood && (
                 <div className="bg-card rounded-3xl p-8 shadow-soft border border-border">
-                  <h3 className="text-xl font-serif font-bold text-foreground mb-4 flex items-center gap-2">
+                  <h3 className="text-xl font-serif font-bold text-foreground mb-6 flex items-center gap-2">
                     <MapPin size={20} strokeWidth={1.5} />
-                    Neighborhood
+                    Neighborhood Guide
                   </h3>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  
+                  {/* Vibe & Demographics */}
+                  {(research.neighborhood.vibe || research.neighborhood.demographics) && (
+                    <div className="mb-6 p-4 bg-primary/5 rounded-2xl">
+                      {research.neighborhood.vibe && (
+                        <p className="text-foreground/80 mb-2">{research.neighborhood.vibe}</p>
+                      )}
+                      {research.neighborhood.demographics && (
+                        <p className="text-foreground/60 text-sm flex items-center gap-2">
+                          <Users size={14} />
+                          {research.neighborhood.demographics}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Scores Grid */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                     {research.neighborhood.crimeLevel && (
                       <div className="p-4 bg-card-alt rounded-2xl text-center">
                         <p className="text-sm text-foreground/60 mb-1">Safety</p>
@@ -290,10 +318,106 @@ export default function ResearchPage() {
                         <p className="font-semibold text-foreground">{research.neighborhood.transitScore}</p>
                       </div>
                     )}
+                    {research.neighborhood.bikeScore && (
+                      <div className="p-4 bg-card-alt rounded-2xl text-center">
+                        <p className="text-sm text-foreground/60 mb-1">Bike Score</p>
+                        <p className="font-semibold text-foreground flex items-center justify-center gap-1">
+                          <Bike size={14} /> {research.neighborhood.bikeScore}
+                        </p>
+                      </div>
+                    )}
                   </div>
+
+                  {/* Crime Details */}
+                  {research.neighborhood.crimeDetails && (
+                    <div className="mb-6 p-4 bg-amber-50 rounded-2xl border border-amber-200">
+                      <p className="text-sm font-medium text-amber-800 mb-1 flex items-center gap-2">
+                        <AlertTriangle size={14} /> Safety Details
+                      </p>
+                      <p className="text-amber-700 text-sm">{research.neighborhood.crimeDetails}</p>
+                    </div>
+                  )}
+
+                  {/* Culture & Dining */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    {research.neighborhood.dining && research.neighborhood.dining.length > 0 && (
+                      <div className="p-4 bg-card-alt rounded-2xl">
+                        <p className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
+                          <Utensils size={14} className="text-primary" /> Dining
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {research.neighborhood.dining.map((item, i) => (
+                            <span key={i} className="px-2 py-1 bg-white rounded-full text-xs text-foreground/70">
+                              {item}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {research.neighborhood.culture && research.neighborhood.culture.length > 0 && (
+                      <div className="p-4 bg-card-alt rounded-2xl">
+                        <p className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
+                          <Star size={14} className="text-primary" /> Culture
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {research.neighborhood.culture.map((item, i) => (
+                            <span key={i} className="px-2 py-1 bg-white rounded-full text-xs text-foreground/70">
+                              {item}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Nightlife */}
+                  {research.neighborhood.nightlife && (
+                    <div className="mb-4 p-4 bg-card-alt rounded-2xl">
+                      <p className="text-sm font-medium text-foreground mb-1 flex items-center gap-2">
+                        <Music size={14} className="text-primary" /> Nightlife
+                      </p>
+                      <p className="text-foreground/70 text-sm">{research.neighborhood.nightlife}</p>
+                    </div>
+                  )}
+
+                  {/* Parks & Grocery */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {research.neighborhood.parks && research.neighborhood.parks.length > 0 && (
+                      <div className="p-4 bg-green-50 rounded-2xl">
+                        <p className="text-sm font-medium text-green-800 mb-2 flex items-center gap-2">
+                          <Trees size={14} /> Parks & Green Space
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {research.neighborhood.parks.map((item, i) => (
+                            <span key={i} className="px-2 py-1 bg-white rounded-full text-xs text-green-700">
+                              {item}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {research.neighborhood.groceryStores && research.neighborhood.groceryStores.length > 0 && (
+                      <div className="p-4 bg-card-alt rounded-2xl">
+                        <p className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
+                          <ShoppingBag size={14} className="text-primary" /> Grocery
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {research.neighborhood.groceryStores.map((item, i) => (
+                            <span key={i} className="px-2 py-1 bg-white rounded-full text-xs text-foreground/70">
+                              {item}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Other Amenities */}
                   {research.neighborhood.nearbyAmenities && research.neighborhood.nearbyAmenities.length > 0 && (
                     <div className="mt-4">
-                      <p className="text-sm text-foreground/60 mb-2">Nearby Amenities</p>
+                      <p className="text-sm text-foreground/60 mb-2">Other Nearby</p>
                       <div className="flex flex-wrap gap-2">
                         {research.neighborhood.nearbyAmenities.map((amenity, index) => (
                           <span key={index} className="px-3 py-1 bg-primary/10 text-primary text-sm rounded-full">
@@ -303,6 +427,51 @@ export default function ResearchPage() {
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Tips */}
+              {research.tips && research.tips.length > 0 && (
+                <div className="bg-card rounded-3xl p-8 shadow-soft border border-border">
+                  <h3 className="text-xl font-serif font-bold text-foreground mb-4 flex items-center gap-2">
+                    <Lightbulb size={20} strokeWidth={1.5} />
+                    Tips for This Rental
+                  </h3>
+                  <ul className="space-y-3">
+                    {research.tips.map((tip, index) => (
+                      <li key={index} className="flex items-start gap-3">
+                        <CheckCircle size={18} className="text-primary flex-shrink-0 mt-0.5" strokeWidth={1.5} />
+                        <span className="text-foreground/80">{tip}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Resource Links */}
+              {research.resourceLinks && research.resourceLinks.length > 0 && (
+                <div className="bg-primary/5 rounded-3xl p-8 border border-primary/10">
+                  <h3 className="text-xl font-serif font-bold text-foreground mb-4 flex items-center gap-2">
+                    <ExternalLink size={20} strokeWidth={1.5} />
+                    Verify This Building
+                  </h3>
+                  <p className="text-foreground/60 text-sm mb-4">
+                    Use these official resources to check building history, violations, and ownership:
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {research.resourceLinks.map((link, index) => (
+                      <a
+                        key={index}
+                        href={link.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 p-3 bg-white rounded-xl border border-primary/20 hover:border-primary hover:bg-primary/5 transition-all"
+                      >
+                        <ExternalLink size={16} className="text-primary" strokeWidth={1.5} />
+                        <span className="text-foreground font-medium">{link.name}</span>
+                      </a>
+                    ))}
+                  </div>
                 </div>
               )}
 
