@@ -4,7 +4,8 @@
   "description": "LeaseIQ rental platform database layer",
   "main": "dist/server.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && echo 'Build completed successfully'",
+    "prebuild": "echo 'Starting TypeScript compilation...'",
     "test": "vitest --run",
     "test:watch": "vitest",
     "test:connection": "tsx test-connection.ts",

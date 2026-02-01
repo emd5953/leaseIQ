@@ -3,11 +3,13 @@ services:
   - type: web
     name: leaseiq-api
     runtime: node
-    buildCommand: npm install && npm run build
+    buildCommand: npm ci && npm run build && ls -la dist/
     startCommand: node dist/server.js
     envVars:
       - key: NODE_ENV
         value: production
+      - key: NPM_CONFIG_PRODUCTION
+        value: false
       - key: PORT
         value: 10000
       - key: MONGODB_URI
@@ -29,7 +31,7 @@ services:
   - type: cron
     name: leaseiq-alerts
     runtime: node
-    buildCommand: npm install && npm run build
+    buildCommand: npm ci && npm run build
     startCommand: node dist/jobs/alert-cron.js
     schedule: "*/15 * * * *"
     envVars:
@@ -44,7 +46,7 @@ services:
   - type: cron
     name: leaseiq-scraping
     runtime: node
-    buildCommand: npm install && npm run build
+    buildCommand: npm ci && npm run build
     startCommand: node dist/jobs/scraping-cron.js
     schedule: "0 */6 * * *"
     envVars:
