@@ -30,7 +30,7 @@ export interface ReductoParseResult {
  */
 export class ReductoService {
   private apiKey: string;
-  private apiUrl: string = 'https://api.reducto.ai/v1';
+  private apiUrl: string = 'https://platform.reducto.ai';
 
   constructor(apiKey?: string) {
     this.apiKey = apiKey || config.reducto.apiKey;
@@ -65,13 +65,12 @@ export class ReductoService {
    * Parse PDF from buffer (uploaded file)
    */
   private async parseFromBuffer(buffer: Buffer, fileName?: string): Promise<ReductoParseResult> {
+    // First upload the file
     const boundary = `----WebKitFormBoundary${Date.now()}`;
     const name = fileName || 'document.pdf';
     
-    // Build multipart form data
+    // Build multipart form data for upload
     const parts: Buffer[] = [];
-    
-    // Add file part
     parts.push(Buffer.from(
       `--${boundary}\r\n` +
       `Content-Disposition: form-data; name="file"; filename="${name}"\r\n` +
@@ -82,8 +81,25 @@ export class ReductoService {
     
     const payload = Buffer.concat(parts);
 
-    const response = await this.makeRequest('/parse', payload, {
+    // Upload file first
+    const uploadResponse = await this.makeRequest('/upload', payload, {
       'Content-Type': `multipart/form-data; boundary=${boundary}`,
+    });
+
+    if (!uploadResponse || !uploadResponse.file_id) {
+      return {
+        success: false,
+        error: uploadResponse?.error || 'Failed to upload file',
+      };
+    }
+
+    // Then parse the uploaded file
+    const parsePayload = JSON.stringify({
+      document_url: uploadResponse.file_id,
+    });
+
+    const response = await this.makeRequest('/parse', parsePayload, {
+      'Content-Type': 'application/json',
     });
 
     return this.formatResponse(response);
@@ -93,7 +109,7 @@ export class ReductoService {
    * Parse PDF from URL
    */
   private async parseFromURL(url: string): Promise<ReductoParseResult> {
-    const payload = JSON.stringify({ url });
+    const payload = JSON.stringify({ document_url: url });
 
     const response = await this.makeRequest('/parse', payload, {
       'Content-Type': 'application/json',
@@ -109,14 +125,17 @@ export class ReductoService {
     if (!response || response.error) {
       return {
         success: false,
-        error: response?.error || 'Failed to parse document',
+        error: response?.error || response?.detail || 'Failed to parse document',
       };
     }
 
+    // Handle the new API response format
+    const result = response.result || response;
+    const chunks = result.chunks || [];
+    
     // Extract text content from chunks
-    const chunks = response.chunks || [];
     const text = chunks.map((chunk: any) => chunk.content || chunk.text || '').join('\n\n');
-    const markdown = response.markdown || text;
+    const markdown = result.markdown || text;
 
     return {
       success: true,
@@ -124,13 +143,13 @@ export class ReductoService {
       markdown,
       chunks: chunks.map((chunk: any) => ({
         content: chunk.content || chunk.text || '',
-        page: chunk.page,
-        type: chunk.type,
+        page: chunk.blocks?.[0]?.bbox?.page,
+        type: chunk.blocks?.[0]?.type,
       })),
       metadata: {
-        pages: response.pages || chunks.length,
-        title: response.title,
-        author: response.author,
+        pages: response.usage?.num_pages || chunks.length,
+        title: result.title,
+        author: result.author,
       },
     };
   }

@@ -39,9 +39,31 @@ export interface ParsedListing {
   squareFeet: number | null;
   description: string | null;
   images: string[];
+  floorPlanImages: string[];
   amenities: string[];
   petPolicy: string | null;
   brokerFee: string | null;
+  // Additional details
+  buildingType: string | null;
+  yearBuilt: number | null;
+  totalUnits: number | null;
+  parking: string | null;
+  leaseLength: string | null;
+  securityDeposit: number | null;
+  applicationFee: number | null;
+  availableDate: string | null;
+  utilities: {
+    electric: boolean;
+    gas: boolean;
+    water: boolean;
+    internet: boolean;
+    trash: boolean;
+  } | null;
+  laundry: string | null;
+  heating: string | null;
+  cooling: string | null;
+  contactPhone: string | null;
+  contactEmail: string | null;
   scrapedAt: Date;
 }
 
@@ -87,9 +109,31 @@ export interface NormalizedListing {
   squareFeet: number | null;
   description: string | null;
   images: string[];
+  floorPlanImages: string[];
   amenities: string[];
   petPolicy: PetPolicy | null;
   brokerFee: BrokerFee | null;
+  // Additional details
+  buildingType: string | null;
+  yearBuilt: number | null;
+  totalUnits: number | null;
+  parking: string | null;
+  leaseLength: string | null;
+  securityDeposit: number | null;
+  applicationFee: number | null;
+  availableDate: Date | null;
+  utilities: {
+    electric: boolean;
+    gas: boolean;
+    water: boolean;
+    internet: boolean;
+    trash: boolean;
+  };
+  laundry: string | null;
+  heating: string | null;
+  cooling: string | null;
+  contactPhone: string | null;
+  contactEmail: string | null;
   scrapedAt: Date;
 }
 
@@ -165,6 +209,75 @@ export interface SourceMetrics {
   successRate: number;
   averageDuration: number;
 }
+
+/**
+ * Enhanced JSON schema for Firecrawl extraction
+ * Used by all scrapers to extract comprehensive listing data
+ */
+export const LISTING_EXTRACTION_SCHEMA = {
+  type: 'object',
+  properties: {
+    listings: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          listingId: { type: 'string' },
+          listingUrl: { type: 'string' },
+          address: { type: 'string' },
+          price: { type: 'number' },
+          bedrooms: { type: 'number' },
+          bathrooms: { type: 'number' },
+          squareFeet: { type: 'number' },
+          description: { type: 'string' },
+          images: {
+            type: 'array',
+            items: { type: 'string' },
+          },
+          floorPlanImages: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'URLs to floor plan images',
+          },
+          amenities: {
+            type: 'array',
+            items: { type: 'string' },
+          },
+          petPolicy: { type: 'string' },
+          brokerFee: { type: 'string' },
+          // Building details
+          buildingType: { type: 'string', description: 'e.g., Apartment, Condo, Townhouse' },
+          yearBuilt: { type: 'number' },
+          totalUnits: { type: 'number' },
+          parking: { type: 'string', description: 'Parking availability info' },
+          // Lease terms
+          leaseLength: { type: 'string', description: 'e.g., 12 months, flexible' },
+          securityDeposit: { type: 'number' },
+          applicationFee: { type: 'number' },
+          availableDate: { type: 'string' },
+          // Utilities
+          utilities: {
+            type: 'object',
+            properties: {
+              electric: { type: 'boolean', description: 'true if included in rent' },
+              gas: { type: 'boolean' },
+              water: { type: 'boolean' },
+              internet: { type: 'boolean' },
+              trash: { type: 'boolean' },
+            },
+          },
+          // Unit features
+          laundry: { type: 'string', description: 'In-unit, In-building, None' },
+          heating: { type: 'string' },
+          cooling: { type: 'string' },
+          // Contact
+          contactPhone: { type: 'string' },
+          contactEmail: { type: 'string' },
+        },
+      },
+    },
+  },
+};
 
 // Document interfaces for MongoDB storage
 export interface IScrapingJob {

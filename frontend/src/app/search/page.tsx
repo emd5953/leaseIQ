@@ -1,9 +1,20 @@
+'use client'
+
 import Navigation from '@/components/Navigation'
 import Footer from '@/components/Footer'
 import SearchFilters from '@/components/search/SearchFilters'
 import SearchResults from '@/components/search/SearchResults'
+import { useState } from 'react'
 
 export default function SearchPage() {
+  const [filters, setFilters] = useState({})
+  const [triggerSearch, setTriggerSearch] = useState(0)
+
+  const handleApplyFilters = (newFilters: any) => {
+    setFilters(newFilters)
+    setTriggerSearch(prev => prev + 1) // Trigger re-fetch
+  }
+
   return (
     <main className="min-h-screen">
       <Navigation />
@@ -20,10 +31,10 @@ export default function SearchPage() {
           
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
             <aside className="lg:col-span-1">
-              <SearchFilters />
+              <SearchFilters onApplyFilters={handleApplyFilters} />
             </aside>
             <div className="lg:col-span-3">
-              <SearchResults />
+              <SearchResults filters={filters} triggerSearch={triggerSearch} />
             </div>
           </div>
         </div>

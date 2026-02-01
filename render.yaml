@@ -1,0 +1,54 @@
+services:
+  # Main API Backend
+  - type: web
+    name: leaseiq-api
+    runtime: node
+    buildCommand: npm install && npm run build
+    startCommand: npm run server
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: MONGODB_URI
+        sync: false
+      - key: FIRECRAWL_API_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: REDUCTO_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+    healthCheckPath: /health
+    autoDeploy: true
+
+  # Alert Cron Job (runs every 15 minutes)
+  - type: cron
+    name: leaseiq-alerts
+    runtime: node
+    buildCommand: npm install && npm run build
+    startCommand: node dist/jobs/alert-cron.js
+    schedule: "*/15 * * * *"
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+
+  # Scraping Cron Job (runs every 6 hours)
+  - type: cron
+    name: leaseiq-scraping
+    runtime: node
+    buildCommand: npm install && npm run build
+    startCommand: node dist/jobs/scraping-cron.js
+    schedule: "0 */6 * * *"
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false
+      - key: FIRECRAWL_API_KEY
+        sync: false

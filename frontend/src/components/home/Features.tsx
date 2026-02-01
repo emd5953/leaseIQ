@@ -5,7 +5,7 @@ export default function Features() {
     {
       icon: Search,
       title: 'Unified Search',
-      description: 'Search across StreetEasy, Zillow, Apartments.com, Craigslist, and Facebook—all in one place. No more tab juggling.',
+      description: 'Search across 15 platforms: Zillow, StreetEasy, Apartments.com, Trulia, Realtor.com, Craigslist, Facebook, Zumper, HotPads, RentHop, PadMapper, Rent.com, Rentals.com, ApartmentList, and ApartmentGuide—all in one place.',
     },
     {
       icon: Bell,

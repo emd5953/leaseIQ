@@ -1,3 +1,6 @@
+'use client'
+
+import { useState } from 'react'
 import Link from 'next/link'
 import { Bed, Bath, Maximize, MapPin, Heart } from 'lucide-react'
 
@@ -18,8 +21,60 @@ interface ListingCardProps {
   }
 }
 
+// SVG placeholder for listings without images
+function getPlaceholderImage(id: string): string {
+  // Use listing ID to pick a consistent accent color
+  const colors = ['#8B7355', '#6B8E6B', '#7B8BA3', '#A38B7B', '#8B8B6B']
+  const hash = id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
+  const color = colors[hash % colors.length]
+  
+  return `data:image/svg+xml,${encodeURIComponent(`
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" fill="none">
+      <rect width="400" height="300" fill="#f5f5f0"/>
+      <rect x="100" y="80" width="200" height="140" rx="8" fill="${color}" fill-opacity="0.15" stroke="${color}" stroke-width="2"/>
+      <path d="M150 160 L200 120 L250 160" stroke="${color}" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="170" cy="130" r="15" fill="${color}" fill-opacity="0.3"/>
+      <text x="200" y="250" text-anchor="middle" font-family="system-ui, sans-serif" font-size="14" fill="${color}">No Image Available</text>
+    </svg>
+  `)}`
+}
+
+function isValidImageUrl(url: string | undefined): boolean {
+  if (!url) return false
+  // Check if it's a real image URL, not a page URL or placeholder SVG
+  const invalidPatterns = [
+    '/homes/for_rent',
+    '/rentals/',
+    'placeholder',
+    '.svg',
+    '/search',
+  ]
+  return !invalidPatterns.some(pattern => url.toLowerCase().includes(pattern))
+}
+
 export default function ListingCard({ listing }: ListingCardProps) {
-  const imageUrl = listing.images?.[0] || 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=600&q=80'
+  const hasValidImage = isValidImageUrl(listing.images?.[0])
+  const placeholderImage = getPlaceholderImage(listing._id)
+  const [imageUrl, setImageUrl] = useState(hasValidImage ? listing.images[0] : placeholderImage)
+  const [imageError, setImageError] = useState(false)
+
+  const handleImageError = () => {
+    if (!imageError) {
+      setImageError(true)
+      setImageUrl(placeholderImage)
+    }
+  }
+  
+  // Safety check: if address is an object, convert it to string
+  const addressString = typeof listing.address === 'string' 
+    ? listing.address 
+    : [
+        listing.address?.street,
+        listing.address?.unit,
+        listing.address?.city,
+        listing.address?.state,
+        listing.address?.zipCode
+      ].filter(Boolean).join(', ')
 
   return (
     <Link href={`/listing/${listing._id}`}>
@@ -29,6 +84,7 @@ export default function ListingCard({ listing }: ListingCardProps) {
           <img
             src={imageUrl}
             alt={listing.title}
+            onError={handleImageError}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
           />
           
@@ -77,7 +133,7 @@ export default function ListingCard({ listing }: ListingCardProps) {
           {/* Location */}
           <div className="flex items-center gap-2 text-foreground/70">
             <MapPin size={16} strokeWidth={1.5} />
-            <p className="text-sm line-clamp-1">{listing.address}</p>
+            <p className="text-sm line-clamp-1">{addressString}</p>
           </div>
 
           {/* Details */}

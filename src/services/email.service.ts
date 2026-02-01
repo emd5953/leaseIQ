@@ -11,7 +11,7 @@ export interface EmailOptions {
 }
 
 export class EmailService {
-  private static readonly DEFAULT_FROM = 'LeaseIQ <alerts@leaseiq.app>';
+  private static readonly DEFAULT_FROM = 'LeaseIQ <onboarding@resend.dev>';
 
   static async send(options: EmailOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
@@ -62,7 +62,18 @@ export class EmailService {
 
   static async sendLeaseAnalysis(
     userEmail: string,
-    analysis: { summary: string; redFlags: string[]; keyTerms: any }
+    analysis: {
+      summary: string;
+      overallRating?: 'favorable' | 'neutral' | 'concerning';
+      redFlags: Array<{ title: string; description: string; severity: 'high' | 'medium' | 'low' }> | string[];
+      keyTerms: any;
+      importantDates?: Array<{ date: string; description: string }>;
+      financialSummary?: any;
+      tenantRights?: string[];
+      landlordObligations?: string[];
+      terminationClauses?: string[];
+      recommendations?: string[];
+    }
   ): Promise<{ success: boolean; messageId?: string; error?: string }> {
     const html = this.generateLeaseAnalysisEmail(analysis);
     return this.send({
@@ -182,9 +193,92 @@ export class EmailService {
   }
 
   private static generateLeaseAnalysisEmail(analysis: any): string {
-    const redFlagsHtml = analysis.redFlags
-      .map((flag: string) => `<li style="color: #dc2626; margin: 8px 0;">${flag}</li>`)
+    // Handle redFlags as either array of objects or strings
+    const redFlagsHtml = (analysis.redFlags || [])
+      .map((flag: any) => {
+        if (typeof flag === 'string') {
+          return `<li style="color: #dc2626; margin: 8px 0;">${flag}</li>`;
+        }
+        const severityColor = flag.severity === 'high' ? '#dc2626' : flag.severity === 'medium' ? '#f59e0b' : '#6b7280';
+        const severityLabel = flag.severity === 'high' ? '🔴' : flag.severity === 'medium' ? '🟡' : '🟢';
+        return `<li style="margin: 12px 0;">
+          <div style="color: ${severityColor}; font-weight: 600;">${severityLabel} ${flag.title}</div>
+          <div style="color: #374151; margin-top: 4px; font-size: 14px;">${flag.description}</div>
+        </li>`;
+      })
       .join('');
+
+    // Overall rating badge
+    const ratingColor = analysis.overallRating === 'favorable' ? '#059669' : 
+                        analysis.overallRating === 'concerning' ? '#dc2626' : '#f59e0b';
+    const ratingLabel = analysis.overallRating === 'favorable' ? '✓ Favorable' : 
+                        analysis.overallRating === 'concerning' ? '⚠ Concerning' : '○ Neutral';
+
+    // Important dates section
+    const importantDatesHtml = (analysis.importantDates || []).length > 0 ? `
+      <div style="margin-bottom: 24px;">
+        <h3 style="color: #111827;">📅 Important Dates</h3>
+        <div style="background: #f9fafb; padding: 16px; border-radius: 8px;">
+          ${analysis.importantDates.map((d: any) => `<p style="margin: 4px 0;"><strong>${d.date}:</strong> ${d.description}</p>`).join('')}
+        </div>
+      </div>
+    ` : '';
+
+    // Financial summary section
+    const financialHtml = analysis.financialSummary && Object.keys(analysis.financialSummary).length > 0 ? `
+      <div style="margin-bottom: 24px;">
+        <h3 style="color: #111827;">💰 Financial Summary</h3>
+        <div style="background: #f0fdf4; padding: 16px; border-radius: 8px; border-left: 4px solid #059669;">
+          ${analysis.financialSummary.totalMoveInCost ? `<p style="margin: 4px 0;"><strong>Total Move-in Cost:</strong> ${analysis.financialSummary.totalMoveInCost}</p>` : ''}
+          ${analysis.financialSummary.monthlyTotal ? `<p style="margin: 4px 0;"><strong>Monthly Total:</strong> ${analysis.financialSummary.monthlyTotal}</p>` : ''}
+          ${analysis.financialSummary.annualCost ? `<p style="margin: 4px 0;"><strong>Annual Cost:</strong> ${analysis.financialSummary.annualCost}</p>` : ''}
+        </div>
+      </div>
+    ` : '';
+
+    // Tenant rights section
+    const tenantRightsHtml = (analysis.tenantRights || []).length > 0 ? `
+      <div style="margin-bottom: 24px;">
+        <h3 style="color: #111827;">⚖️ Your Rights as Tenant</h3>
+        <ul style="margin: 0; padding-left: 20px; color: #374151;">
+          ${analysis.tenantRights.map((r: string) => `<li style="margin: 4px 0;">${r}</li>`).join('')}
+        </ul>
+      </div>
+    ` : '';
+
+    // Landlord obligations section
+    const landlordObligationsHtml = (analysis.landlordObligations || []).length > 0 ? `
+      <div style="margin-bottom: 24px;">
+        <h3 style="color: #111827;">🏠 Landlord Obligations</h3>
+        <ul style="margin: 0; padding-left: 20px; color: #374151;">
+          ${analysis.landlordObligations.map((o: string) => `<li style="margin: 4px 0;">${o}</li>`).join('')}
+        </ul>
+      </div>
+    ` : '';
+
+    // Termination clauses section
+    const terminationHtml = (analysis.terminationClauses || []).length > 0 ? `
+      <div style="margin-bottom: 24px;">
+        <h3 style="color: #111827;">🚪 Termination & Early Exit</h3>
+        <div style="background: #fef2f2; padding: 16px; border-radius: 8px;">
+          <ul style="margin: 0; padding-left: 20px; color: #991b1b;">
+            ${analysis.terminationClauses.map((t: string) => `<li style="margin: 4px 0;">${t}</li>`).join('')}
+          </ul>
+        </div>
+      </div>
+    ` : '';
+
+    // Recommendations section
+    const recommendationsHtml = (analysis.recommendations || []).length > 0 ? `
+      <div style="margin-bottom: 24px;">
+        <h3 style="color: #111827;">💡 Recommendations</h3>
+        <div style="background: #eff6ff; padding: 16px; border-radius: 8px; border-left: 4px solid #2563eb;">
+          <ul style="margin: 0; padding-left: 20px; color: #1e40af;">
+            ${analysis.recommendations.map((r: string) => `<li style="margin: 4px 0;">${r}</li>`).join('')}
+          </ul>
+        </div>
+      </div>
+    ` : '';
 
     return `
       <!DOCTYPE html>
@@ -196,6 +290,14 @@ export class EmailService {
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #111827; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="text-align: center; margin-bottom: 32px;">
             <h1 style="color: #2563eb; margin: 0;">LeaseIQ Lease Analysis</h1>
+            <p style="color: #6b7280; margin: 8px 0;">Your comprehensive lease review</p>
+          </div>
+
+          <!-- Overall Rating Badge -->
+          <div style="text-align: center; margin-bottom: 24px;">
+            <span style="display: inline-block; padding: 8px 20px; background: ${ratingColor}15; color: ${ratingColor}; font-weight: 600; border-radius: 20px; border: 2px solid ${ratingColor};">
+              ${ratingLabel}
+            </span>
           </div>
           
           <div style="margin-bottom: 24px;">
@@ -203,27 +305,41 @@ export class EmailService {
             <p style="color: #374151;">${analysis.summary}</p>
           </div>
           
-          ${analysis.redFlags.length > 0 ? `
+          ${(analysis.redFlags || []).length > 0 ? `
           <div style="margin-bottom: 24px;">
-            <h3 style="color: #dc2626;">⚠️ Red Flags</h3>
-            <ul style="margin: 0; padding-left: 20px;">
+            <h3 style="color: #dc2626;">⚠️ Red Flags & Concerns</h3>
+            <ul style="margin: 0; padding-left: 20px; list-style: none;">
               ${redFlagsHtml}
             </ul>
           </div>
           ` : '<div style="background: #f0fdf4; padding: 16px; border-radius: 8px; border-left: 4px solid #059669; margin-bottom: 24px;"><p style="color: #059669; margin: 0;">✓ No major red flags detected</p></div>'}
           
           <div style="margin-bottom: 24px;">
-            <h3 style="color: #111827;">Key Terms</h3>
+            <h3 style="color: #111827;">📋 Key Terms</h3>
             <div style="background: #f9fafb; padding: 16px; border-radius: 8px;">
-              <p><strong>Monthly Rent:</strong> ${analysis.keyTerms.rent || 'N/A'}</p>
-              <p><strong>Security Deposit:</strong> ${analysis.keyTerms.deposit || 'N/A'}</p>
-              <p><strong>Lease Term:</strong> ${analysis.keyTerms.term || 'N/A'}</p>
-              <p><strong>Move-in Fees:</strong> ${analysis.keyTerms.fees || 'N/A'}</p>
+              ${analysis.keyTerms?.monthlyRent ? `<p style="margin: 4px 0;"><strong>Monthly Rent:</strong> ${analysis.keyTerms.monthlyRent}</p>` : ''}
+              ${analysis.keyTerms?.securityDeposit ? `<p style="margin: 4px 0;"><strong>Security Deposit:</strong> ${analysis.keyTerms.securityDeposit}</p>` : ''}
+              ${analysis.keyTerms?.leaseTerm ? `<p style="margin: 4px 0;"><strong>Lease Term:</strong> ${analysis.keyTerms.leaseTerm}</p>` : ''}
+              ${analysis.keyTerms?.moveInDate ? `<p style="margin: 4px 0;"><strong>Move-in Date:</strong> ${analysis.keyTerms.moveInDate}</p>` : ''}
+              ${analysis.keyTerms?.moveOutDate ? `<p style="margin: 4px 0;"><strong>Move-out Date:</strong> ${analysis.keyTerms.moveOutDate}</p>` : ''}
+              ${analysis.keyTerms?.lateFee ? `<p style="margin: 4px 0;"><strong>Late Fee:</strong> ${analysis.keyTerms.lateFee}</p>` : ''}
+              ${analysis.keyTerms?.petPolicy ? `<p style="margin: 4px 0;"><strong>Pet Policy:</strong> ${analysis.keyTerms.petPolicy}</p>` : ''}
+              ${analysis.keyTerms?.utilities ? `<p style="margin: 4px 0;"><strong>Utilities:</strong> ${analysis.keyTerms.utilities}</p>` : ''}
+              ${analysis.keyTerms?.parking ? `<p style="margin: 4px 0;"><strong>Parking:</strong> ${analysis.keyTerms.parking}</p>` : ''}
+              ${analysis.keyTerms?.maintenanceResponsibility ? `<p style="margin: 4px 0;"><strong>Maintenance:</strong> ${analysis.keyTerms.maintenanceResponsibility}</p>` : ''}
             </div>
           </div>
+
+          ${importantDatesHtml}
+          ${financialHtml}
+          ${tenantRightsHtml}
+          ${landlordObligationsHtml}
+          ${terminationHtml}
+          ${recommendationsHtml}
           
           <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb; text-align: center; color: #6b7280; font-size: 14px;">
             <p>Analysis powered by LeaseIQ</p>
+            <p style="margin-top: 8px;">This analysis is for informational purposes only and does not constitute legal advice.</p>
           </div>
         </body>
       </html>

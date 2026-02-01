@@ -1,5 +1,5 @@
 import { AbstractListingScraper } from './base.scraper';
-import { ListingSource, ScrapeConfig } from '../types';
+import { ListingSource, ScrapeConfig, LISTING_EXTRACTION_SCHEMA } from '../types';
 
 /**
  * Scraper for PadMapper listings
@@ -10,31 +10,7 @@ export class PadMapperScraper extends AbstractListingScraper {
   }
 
   protected getJsonSchema(): any {
-    return {
-      type: 'object',
-      properties: {
-        listings: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              listingId: { type: 'string' },
-              listingUrl: { type: 'string' },
-              address: { type: 'string' },
-              price: { type: 'number' },
-              bedrooms: { type: 'number' },
-              bathrooms: { type: 'number' },
-              squareFeet: { type: 'number' },
-              description: { type: 'string' },
-              images: { type: 'array', items: { type: 'string' } },
-              amenities: { type: 'array', items: { type: 'string' } },
-              petPolicy: { type: 'string' },
-              brokerFee: { type: 'string' },
-            },
-          },
-        },
-      },
-    };
+    return LISTING_EXTRACTION_SCHEMA;
   }
 
   protected buildSearchUrl(config: ScrapeConfig): string {

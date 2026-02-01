@@ -97,7 +97,21 @@ export function buildListingQuery(criteria: SearchCriteria): FilterQuery<IListin
 
   // Neighborhoods filter
   if (criteria.neighborhoods && criteria.neighborhoods.length > 0) {
-    query['address.city'] = { $in: criteria.neighborhoods };
+    // Search in both city and street fields to match neighborhoods
+    const neighborhoodQuery = {
+      $or: [
+        { 'address.city': { $in: criteria.neighborhoods } },
+        { 'address.street': { $regex: criteria.neighborhoods.join('|'), $options: 'i' } }
+      ]
+    };
+    
+    // If query already has $or, combine them with $and
+    if (query.$or) {
+      query.$and = [{ $or: query.$or }, neighborhoodQuery];
+      delete query.$or;
+    } else {
+      Object.assign(query, neighborhoodQuery);
+    }
   }
 
   // Move-in date range filter

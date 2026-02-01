@@ -3,7 +3,11 @@
 import { useState } from 'react'
 import { SlidersHorizontal } from 'lucide-react'
 
-export default function SearchFilters() {
+interface SearchFiltersProps {
+  onApplyFilters: (filters: any) => void
+}
+
+export default function SearchFilters({ onApplyFilters }: SearchFiltersProps) {
   const [filters, setFilters] = useState({
     minPrice: '',
     maxPrice: '',
@@ -14,13 +18,27 @@ export default function SearchFilters() {
     noFee: false,
   })
 
+  const handleClearFilters = () => {
+    const clearedFilters = {
+      minPrice: '',
+      maxPrice: '',
+      bedrooms: '',
+      bathrooms: '',
+      neighborhoods: [] as string[],
+      petsAllowed: false,
+      noFee: false,
+    }
+    setFilters(clearedFilters)
+    onApplyFilters({})
+  }
+
   const neighborhoods = [
     'Manhattan', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island',
     'Williamsburg', 'Park Slope', 'Astoria', 'Long Island City'
   ]
 
   return (
-    <div className="bg-card rounded-3xl p-6 shadow-soft border border-border sticky top-24">
+    <div className="bg-card rounded-3xl p-6 shadow-soft border border-border sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto">
       <div className="flex items-center gap-2 mb-6">
         <SlidersHorizontal size={20} className="text-primary" strokeWidth={1.5} />
         <h2 className="text-xl font-serif font-semibold text-foreground">Filters</h2>
@@ -38,14 +56,14 @@ export default function SearchFilters() {
               placeholder="Min"
               value={filters.minPrice}
               onChange={(e) => setFilters({ ...filters, minPrice: e.target.value })}
-              className="px-4 py-2 bg-card-alt rounded-full border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all duration-300"
+              className="px-4 py-2 bg-card-alt rounded-full border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all duration-300 text-sm"
             />
             <input
               type="number"
               placeholder="Max"
               value={filters.maxPrice}
               onChange={(e) => setFilters({ ...filters, maxPrice: e.target.value })}
-              className="px-4 py-2 bg-card-alt rounded-full border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all duration-300"
+              className="px-4 py-2 bg-card-alt rounded-full border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all duration-300 text-sm"
             />
           </div>
         </div>
@@ -58,7 +76,7 @@ export default function SearchFilters() {
           <select
             value={filters.bedrooms}
             onChange={(e) => setFilters({ ...filters, bedrooms: e.target.value })}
-            className="w-full px-4 py-2 bg-card-alt rounded-full border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all duration-300"
+            className="w-full px-4 py-2 bg-card-alt rounded-full border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all duration-300 text-sm"
           >
             <option value="">Any</option>
             <option value="0">Studio</option>
@@ -76,7 +94,7 @@ export default function SearchFilters() {
           <select
             value={filters.bathrooms}
             onChange={(e) => setFilters({ ...filters, bathrooms: e.target.value })}
-            className="w-full px-4 py-2 bg-card-alt rounded-full border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all duration-300"
+            className="w-full px-4 py-2 bg-card-alt rounded-full border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all duration-300 text-sm"
           >
             <option value="">Any</option>
             <option value="1">1 Bath</option>
@@ -90,7 +108,7 @@ export default function SearchFilters() {
           <label className="block text-sm font-medium text-foreground mb-2">
             Neighborhoods
           </label>
-          <div className="space-y-2 max-h-48 overflow-y-auto">
+          <div className="space-y-2 max-h-40 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
             {neighborhoods.map((neighborhood) => (
               <label key={neighborhood} className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -140,8 +158,19 @@ export default function SearchFilters() {
         </div>
 
         {/* Apply Button */}
-        <button className="w-full px-6 py-3 bg-foreground text-background rounded-full text-sm tracking-widest uppercase hover:bg-opacity-90 transition-all duration-300">
+        <button 
+          onClick={() => onApplyFilters(filters)}
+          className="w-full px-6 py-3 bg-foreground text-background rounded-full text-sm tracking-widest uppercase hover:bg-opacity-90 transition-all duration-300"
+        >
           Apply Filters
+        </button>
+
+        {/* Clear Button */}
+        <button 
+          onClick={handleClearFilters}
+          className="w-full px-6 py-3 bg-transparent text-foreground border border-border rounded-full text-sm tracking-widest uppercase hover:bg-card-alt transition-all duration-300"
+        >
+          Clear Filters
         </button>
       </div>
     </div>

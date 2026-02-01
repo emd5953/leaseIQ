@@ -9,7 +9,7 @@ export default function Footer() {
           {/* Brand */}
           <div className="space-y-4">
             <h3 className="text-2xl font-serif font-bold text-foreground">
-              Lease<span className="italic">IQ</span>
+              <span className="italic">LeaseI</span>Q
             </h3>
             <p className="text-foreground/70 text-sm leading-relaxed">
               Find apartments faster. Know what you're signing before you sign.

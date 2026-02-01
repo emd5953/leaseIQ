@@ -1,403 +1,259 @@
-# LeaseIQ - Deployment Guide
+# LeaseIQ Deployment Guide
 
-## Production Deployment Checklist
+## Production Architecture
 
-### 1. Environment Setup
+LeaseIQ requires **3 services** to run in production:
 
-Create a production `.env` file with all required variables:
+1. **Backend API** - Express server (port 3001)
+2. **Scraper Cron** - Background job that runs every 15 minutes
+3. **Frontend** - Next.js app (port 3000)
 
-```env
-# MongoDB (Production)
-MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net/leaseiq?retryWrites=true&w=majority
-
-# Email Service
-RESEND_API_KEY=re_your_production_key
-
-# Web Scraping
-FIRECRAWL_API_KEY=fc_your_production_key
-
-# AI Analysis
-OPENROUTER_API_KEY=sk_your_production_key
-
-# Optional Services
-GOOGLE_GEOCODING_API_KEY=your_google_key
-REDUCTO_API_KEY=your_reducto_key
-
-# Server Configuration
-PORT=3000
-NODE_ENV=production
-LOG_LEVEL=info
-
-# Rate Limiting
-RATE_LIMIT_FIRECRAWL=100
-RATE_LIMIT_GEOCODING=50
-
-# Scraping Configuration
-SCRAPING_SCHEDULE=0 */6 * * *
-MAX_LISTINGS_PER_SOURCE=1000
-STALE_LISTING_DAYS=30
-```
-
-### 2. Build the Application
+## Quick Start (All Services)
 
 ```bash
-# Install production dependencies
-npm ci --production
+# Start backend + scraper together
+npm start
 
-# Build TypeScript
-npm run build
-
-# Verify build
-ls dist/
+# In another terminal, start frontend
+cd frontend && npm run dev
 ```
 
-### 3. Database Setup
+## Individual Services
 
-1. **Create MongoDB Atlas Cluster** (or use your MongoDB instance)
-   - Go to [mongodb.com/cloud/atlas](https://www.mongodb.com/cloud/atlas)
-   - Create a free M0 cluster
-   - Whitelist your server IP
-   - Create database user
-   - Get connection string
-
-2. **Initialize Database**
-   - Models will auto-create collections on first use
-   - Indexes will be created automatically
-   - No manual schema setup needed
-
-### 4. Deployment Options
-
-#### Option A: Traditional VPS (DigitalOcean, AWS EC2, etc.)
-
-1. **Install Node.js 18+**
-   ```bash
-   curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-   sudo apt-get install -y nodejs
-   ```
-
-2. **Install PM2 for process management**
-   ```bash
-   npm install -g pm2
-   ```
-
-3. **Deploy application**
-   ```bash
-   # Clone repository
-   git clone https://github.com/your-repo/leaseiq.git
-   cd leaseiq
-   
-   # Install dependencies
-   npm ci --production
-   
-   # Build
-   npm run build
-   
-   # Start with PM2
-   pm2 start dist/server.js --name leaseiq-api
-   pm2 start dist/jobs/alert-cron.js --name leaseiq-alerts
-   
-   # Save PM2 configuration
-   pm2 save
-   pm2 startup
-   ```
-
-4. **Set up Nginx reverse proxy**
-   ```nginx
-   server {
-       listen 80;
-       server_name api.leaseiq.app;
-       
-       location / {
-           proxy_pass http://localhost:3000;
-           proxy_http_version 1.1;
-           proxy_set_header Upgrade $http_upgrade;
-           proxy_set_header Connection 'upgrade';
-           proxy_set_header Host $host;
-           proxy_cache_bypass $http_upgrade;
-       }
-   }
-   ```
-
-5. **Set up SSL with Let's Encrypt**
-   ```bash
-   sudo apt-get install certbot python3-certbot-nginx
-   sudo certbot --nginx -d api.leaseiq.app
-   ```
-
-#### Option B: Docker Deployment
-
-1. **Create Dockerfile**
-   ```dockerfile
-   FROM node:18-alpine
-   
-   WORKDIR /app
-   
-   COPY package*.json ./
-   RUN npm ci --production
-   
-   COPY . .
-   RUN npm run build
-   
-   EXPOSE 3000
-   
-   CMD ["node", "dist/server.js"]
-   ```
-
-2. **Create docker-compose.yml**
-   ```yaml
-   version: '3.8'
-   
-   services:
-     api:
-       build: .
-       ports:
-         - "3000:3000"
-       env_file:
-         - .env
-       restart: unless-stopped
-       depends_on:
-         - mongodb
-     
-     alerts:
-       build: .
-       command: node dist/jobs/alert-cron.js
-       env_file:
-         - .env
-       restart: unless-stopped
-       depends_on:
-         - mongodb
-     
-     mongodb:
-       image: mongo:7
-       volumes:
-         - mongodb_data:/data/db
-       restart: unless-stopped
-   
-   volumes:
-     mongodb_data:
-   ```
-
-3. **Deploy**
-   ```bash
-   docker-compose up -d
-   ```
-
-#### Option C: Serverless (Vercel/Railway/Render)
-
-**Note:** Cron jobs need separate handling in serverless environments.
-
-1. **Deploy API to Vercel**
-   ```bash
-   npm install -g vercel
-   vercel --prod
-   ```
-
-2. **Set up cron job separately**
-   - Use Vercel Cron (paid feature)
-   - Or use external cron service (cron-job.org, EasyCron)
-   - Or deploy cron job to separate service (Railway, Render)
-
-### 5. Monitoring & Logging
-
-#### Set up logging
-
-```typescript
-// Add to src/server.ts
-import winston from 'winston';
-
-const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || 'info',
-  format: winston.format.json(),
-  transports: [
-    new winston.transports.File({ filename: 'error.log', level: 'error' }),
-    new winston.transports.File({ filename: 'combined.log' }),
-  ],
-});
-
-if (process.env.NODE_ENV !== 'production') {
-  logger.add(new winston.transports.Console({
-    format: winston.format.simple(),
-  }));
-}
+### Backend API Only
+```bash
+npm run start:backend
 ```
 
-#### Set up monitoring
+### Scraper Only
+```bash
+npm run start:scraper
+```
 
-- **Uptime monitoring:** UptimeRobot, Pingdom
-- **Error tracking:** Sentry
-- **Performance monitoring:** New Relic, DataDog
-- **Log aggregation:** Logtail, Papertrail
+### Frontend Only
+```bash
+cd frontend && npm run dev
+```
 
-### 6. Security Checklist
+## Deployment Options
 
-- [ ] Use HTTPS (SSL certificate)
-- [ ] Set secure environment variables
-- [ ] Enable MongoDB authentication
-- [ ] Whitelist IP addresses in MongoDB Atlas
-- [ ] Add rate limiting to API endpoints
-- [ ] Implement API authentication (Supabase)
-- [ ] Sanitize user inputs
-- [ ] Keep dependencies updated
-- [ ] Use secrets management (AWS Secrets Manager, Vault)
+### Option 1: Single Server (Recommended for MVP)
 
-### 7. Performance Optimization
+Run all services on one server using PM2:
 
-1. **Enable MongoDB indexes**
-   - Already configured in models
-   - Verify with: `db.listings.getIndexes()`
+```bash
+# Install PM2
+npm install -g pm2
 
-2. **Add Redis caching** (optional)
-   ```bash
-   npm install redis
-   ```
-   
-   Cache search results, geocoding results, etc.
+# Start all services
+pm2 start ecosystem.config.js
 
-3. **Enable compression**
-   ```typescript
-   import compression from 'compression';
-   app.use(compression());
-   ```
+# View logs
+pm2 logs
 
-4. **Set up CDN** for static assets (if you add a frontend)
+# Stop all
+pm2 stop all
+```
 
-### 8. Backup Strategy
+Create `ecosystem.config.js`:
+```javascript
+module.exports = {
+  apps: [
+    {
+      name: 'leaseiq-api',
+      script: 'npx',
+      args: 'tsx src/server.ts',
+      env: {
+        NODE_ENV: 'production',
+        PORT: 3001
+      }
+    },
+    {
+      name: 'leaseiq-scraper',
+      script: 'npx',
+      args: 'tsx src/jobs/scraping-cron.ts',
+      env: {
+        NODE_ENV: 'production'
+      }
+    },
+    {
+      name: 'leaseiq-frontend',
+      script: 'npm',
+      args: 'run dev',
+      cwd: './frontend',
+      env: {
+        NODE_ENV: 'production',
+        PORT: 3000
+      }
+    }
+  ]
+};
+```
 
-1. **MongoDB backups**
-   - MongoDB Atlas: Automatic backups enabled by default
-   - Self-hosted: Set up daily backups with `mongodump`
+### Option 2: Separate Services (Recommended for Scale)
 
-2. **Backup script**
-   ```bash
-   #!/bin/bash
-   DATE=$(date +%Y%m%d_%H%M%S)
-   mongodump --uri="$MONGODB_URI" --out="/backups/leaseiq_$DATE"
-   ```
+Deploy each service separately:
 
-3. **Store backups offsite** (S3, Backblaze B2)
+#### Vercel (Frontend)
+```bash
+cd frontend
+vercel deploy
+```
 
-### 9. Scaling Considerations
+#### Railway/Render (Backend API)
+- Deploy `src/server.ts`
+- Set environment variables
+- Expose port 3001
 
-#### Horizontal Scaling
+#### Railway/Render (Scraper Cron)
+- Deploy `src/jobs/scraping-cron.ts` as a separate service
+- No port needed (background job)
+- Set environment variables
 
-1. **Load balancer** (nginx, AWS ALB)
-2. **Multiple API instances** behind load balancer
-3. **Separate cron job server**
-4. **Redis for distributed rate limiting**
+### Option 3: Docker
 
-#### Vertical Scaling
+```dockerfile
+# Dockerfile
+FROM node:20-alpine
 
-1. **Increase server resources** (CPU, RAM)
-2. **Optimize MongoDB queries**
-3. **Add database read replicas**
+WORKDIR /app
 
-### 10. Post-Deployment
+COPY package*.json ./
+RUN npm install
 
-1. **Verify all endpoints**
-   ```bash
-   curl https://api.leaseiq.app/health
-   curl https://api.leaseiq.app/api/search/recent
-   ```
+COPY . .
 
-2. **Test alert system**
-   ```bash
-   curl -X POST https://api.leaseiq.app/api/alerts/process
-   ```
+# Start both API and scraper
+CMD ["npm", "start"]
+```
 
-3. **Monitor logs**
-   ```bash
-   pm2 logs leaseiq-api
-   pm2 logs leaseiq-alerts
-   ```
+```yaml
+# docker-compose.yml
+version: '3.8'
+services:
+  api:
+    build: .
+    command: npm run start:backend
+    ports:
+      - "3001:3001"
+    environment:
+      - MONGODB_URI=${MONGODB_URI}
+      - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY}
+    
+  scraper:
+    build: .
+    command: npm run start:scraper
+    environment:
+      - MONGODB_URI=${MONGODB_URI}
+      - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY}
+    
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://api:3001
+```
 
-4. **Set up monitoring alerts**
-   - API downtime
-   - High error rates
-   - Database connection issues
-   - Email delivery failures
+## Environment Variables
 
-### 11. Maintenance
+Required for all services:
 
-#### Daily
-- Check error logs
-- Monitor API response times
-- Verify alert delivery
+```env
+# MongoDB
+MONGODB_URI=mongodb+srv://...
 
-#### Weekly
-- Review scraping job success rates
-- Check database size and performance
-- Update dependencies (security patches)
+# Firecrawl
+FIRECRAWL_API_KEY=fc-...
+FIRECRAWL_API_URL=https://api.firecrawl.dev/v1
 
-#### Monthly
-- Review and optimize slow queries
-- Clean up old data (optional)
-- Review API usage and costs
-- Update documentation
+# Google Geocoding
+GOOGLE_GEOCODING_API_KEY=...
 
-### 12. Rollback Plan
+# Email (Resend)
+RESEND_API_KEY=re_...
 
-If deployment fails:
+# AI Analysis (OpenRouter)
+OPENROUTER_API_KEY=sk-or-v1-...
 
-1. **Revert to previous version**
-   ```bash
-   pm2 stop all
-   git checkout previous-tag
-   npm ci --production
-   npm run build
-   pm2 restart all
-   ```
+# PDF Parsing (Reducto)
+REDUCTO_API_KEY=...
+```
 
-2. **Restore database backup** (if needed)
-   ```bash
-   mongorestore --uri="$MONGODB_URI" /backups/leaseiq_YYYYMMDD_HHMMSS
-   ```
+## Monitoring
 
-### 13. Cost Estimates (Monthly)
+### Check if services are running:
 
-**Minimal Setup:**
-- MongoDB Atlas (M0): $0 (free tier)
-- Resend: $0 (100 emails/day free)
-- Firecrawl: ~$20 (depends on usage)
-- OpenRouter: ~$5 (depends on usage)
-- VPS (DigitalOcean): $6 (basic droplet)
-- **Total: ~$31/month**
+```bash
+# API health check
+curl http://localhost:3001/health
 
-**Production Setup:**
-- MongoDB Atlas (M10): $57
-- Resend: $20 (50k emails/month)
-- Firecrawl: ~$100
-- OpenRouter: ~$20
-- VPS (2GB RAM): $12
-- **Total: ~$209/month**
+# Check scraper logs
+pm2 logs leaseiq-scraper
 
-### 14. Support & Troubleshooting
+# Check database
+curl http://localhost:3001/api/search/recent
+```
 
-Common issues:
+### Scraper Status
 
-1. **"MongoDB connection failed"**
-   - Check MONGODB_URI
-   - Verify IP whitelist
-   - Check network connectivity
+The scraper:
+- Runs immediately on startup
+- Then runs every 15 minutes
+- Scrapes 100+ NYC apartments per run
+- Takes ~3-5 minutes per run
+- Stores in MongoDB automatically
 
-2. **"Email send failed"**
-   - Verify RESEND_API_KEY
-   - Check email quota
-   - Verify sender domain
+## Troubleshooting
 
-3. **"Scraping failed"**
-   - Check FIRECRAWL_API_KEY
-   - Verify API quota
-   - Check rate limits
+### Scraper not running?
+```bash
+# Check if process is alive
+pm2 list
 
-4. **"High memory usage"**
-   - Increase server RAM
-   - Optimize queries
-   - Add pagination
+# View scraper logs
+pm2 logs leaseiq-scraper
 
----
+# Restart scraper
+pm2 restart leaseiq-scraper
+```
 
-## Ready to Deploy?
+### No listings in database?
+```bash
+# Manually trigger scrape
+npm run scrape
 
-Follow this checklist and you'll have LeaseIQ running in production in under an hour!
+# Check MongoDB connection
+curl http://localhost:3001/health
+```
 
-For questions or issues, check the documentation or open an issue on GitHub.
+### API not responding?
+```bash
+# Check if port is in use
+lsof -i :3001
+
+# Restart API
+pm2 restart leaseiq-api
+```
+
+## Production Checklist
+
+- [ ] MongoDB Atlas connection string configured
+- [ ] All API keys in environment variables
+- [ ] Backend API running and accessible
+- [ ] Scraper cron running in background
+- [ ] Frontend deployed and connected to API
+- [ ] Health checks passing
+- [ ] First scrape completed successfully
+- [ ] Monitoring/logging set up (PM2, Datadog, etc.)
+
+## Scaling Considerations
+
+As you grow:
+
+1. **Separate scraper service** - Run on dedicated server/container
+2. **Add more scrapers** - Run multiple instances for different cities
+3. **Queue system** - Use Bull/BullMQ for job management
+4. **Cache layer** - Add Redis for frequently accessed data
+5. **Load balancer** - Multiple API instances behind load balancer
+6. **Database replicas** - MongoDB replica set for high availability

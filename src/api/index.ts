@@ -5,6 +5,7 @@ import alertsRoutes from './routes/alerts.routes';
 import researchRoutes from './routes/research.routes';
 import leaseRoutes from './routes/lease.routes';
 import webhookRoutes from './routes/webhook.routes';
+import imageProxyRoutes from './routes/image-proxy';
 
 export function createApp(): Express {
   const app = express();
@@ -25,6 +26,7 @@ export function createApp(): Express {
   app.use('/api/research', researchRoutes);
   app.use('/api/lease', leaseRoutes);
   app.use('/api/webhook', webhookRoutes);
+  app.use('/api/image-proxy', imageProxyRoutes);
 
   // 404 handler
   app.use((req, res) => {

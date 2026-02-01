@@ -103,8 +103,11 @@ export class CombinedAnalysisService {
 
     // Analyze lease
     if (lease) {
-      // Add lease red flags as concerns
-      concerns.push(...lease.redFlags);
+      // Add lease red flags as concerns (extract titles from red flag objects)
+      const redFlagConcerns = lease.redFlags.map(flag => 
+        typeof flag === 'string' ? flag : `${flag.title}: ${flag.description}`
+      );
+      concerns.push(...redFlagConcerns);
 
       // Adjust score based on red flags
       matchScore -= lease.redFlags.length * 5;
@@ -142,7 +145,7 @@ export class CombinedAnalysisService {
 
       if (floorPlan.layout.estimatedSquareFeet) {
         const sqft = floorPlan.layout.estimatedSquareFeet;
-        const rent = this.extractRentAmount(lease.keyTerms.rent);
+        const rent = this.extractRentAmount(lease.keyTerms.monthlyRent);
         if (rent && sqft) {
           const pricePerSqft = rent / sqft;
           if (pricePerSqft > 4) {

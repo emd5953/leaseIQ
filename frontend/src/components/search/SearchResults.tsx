@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import ListingCard from './ListingCard'
+import { api, SearchOptions } from '@/lib/api'
 
 interface Listing {
   _id: string
@@ -19,22 +20,59 @@ interface Listing {
   amenities?: string[]
 }
 
-export default function SearchResults() {
+interface SearchResultsProps {
+  filters: any
+  triggerSearch: number
+}
+
+type SortOption = 'newest' | 'price-asc' | 'price-desc' | 'bedrooms'
+
+export default function SearchResults({ filters, triggerSearch }: SearchResultsProps) {
   const [listings, setListings] = useState<Listing[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [total, setTotal] = useState(0)
+  const [sortOption, setSortOption] = useState<SortOption>('newest')
 
   useEffect(() => {
     fetchListings()
-  }, [])
+  }, [triggerSearch, sortOption])
+
+  const getSortOptions = (): SearchOptions => {
+    switch (sortOption) {
+      case 'price-asc':
+        return { sortBy: 'price', sortOrder: 'asc' }
+      case 'price-desc':
+        return { sortBy: 'price', sortOrder: 'desc' }
+      case 'bedrooms':
+        return { sortBy: 'bedrooms', sortOrder: 'desc' }
+      case 'newest':
+      default:
+        return { sortBy: 'createdAt', sortOrder: 'desc' }
+    }
+  }
 
   const fetchListings = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/search/recent?limit=20')
-      if (!response.ok) throw new Error('Failed to fetch listings')
-      const data = await response.json()
-      setListings(data.listings || [])
+      setError(null)
+      
+      const sortOptions = getSortOptions()
+      
+      // Build filter object for API
+      const apiFilters: any = {}
+      
+      if (filters.minPrice) apiFilters.minPrice = parseInt(filters.minPrice)
+      if (filters.maxPrice) apiFilters.maxPrice = parseInt(filters.maxPrice)
+      if (filters.bedrooms) apiFilters.minBedrooms = parseInt(filters.bedrooms)
+      if (filters.bathrooms) apiFilters.minBathrooms = parseInt(filters.bathrooms)
+      if (filters.neighborhoods?.length > 0) apiFilters.neighborhoods = filters.neighborhoods
+      if (filters.petsAllowed) apiFilters.petsAllowed = true
+      if (filters.noFee) apiFilters.noFee = true
+      
+      const result = await api.searchListings(apiFilters, { limit: 20, ...sortOptions })
+      setListings(result.listings || [])
+      setTotal(result.total || 0)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load listings')
     } finally {
@@ -84,13 +122,17 @@ export default function SearchResults() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <p className="text-foreground/70">
-          <span className="font-semibold text-foreground">{listings.length}</span> listings found
+          <span className="font-semibold text-foreground">{total}</span> listings found
         </p>
-        <select className="px-4 py-2 bg-card rounded-full border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all duration-300 text-sm">
-          <option>Newest First</option>
-          <option>Price: Low to High</option>
-          <option>Price: High to Low</option>
-          <option>Bedrooms</option>
+        <select 
+          value={sortOption}
+          onChange={(e) => setSortOption(e.target.value as SortOption)}
+          className="px-4 py-2 bg-card rounded-full border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all duration-300 text-sm"
+        >
+          <option value="newest">Newest First</option>
+          <option value="price-asc">Price: Low to High</option>
+          <option value="price-desc">Price: High to Low</option>
+          <option value="bedrooms">Bedrooms</option>
         </select>
       </div>
 

@@ -17,11 +17,12 @@ router.get('/', async (req: Request, res: Response) => {
       minBathrooms: req.query.minBathrooms ? parseFloat(req.query.minBathrooms as string) : undefined,
       maxBathrooms: req.query.maxBathrooms ? parseFloat(req.query.maxBathrooms as string) : undefined,
       neighborhoods: req.query.neighborhoods ? (req.query.neighborhoods as string).split(',') : undefined,
-      petsAllowed: req.query.petsAllowed === 'true',
-      noFee: req.query.noFee === 'true',
-      amenities: req.query.amenities ? (req.query.amenities as string).split(',') : undefined,
-      minSquareFeet: req.query.minSquareFeet ? parseInt(req.query.minSquareFeet as string) : undefined,
-      maxSquareFeet: req.query.maxSquareFeet ? parseInt(req.query.maxSquareFeet as string) : undefined,
+      requiresDogsAllowed: req.query.petsAllowed === 'true' ? true : undefined,
+      requiresCatsAllowed: req.query.petsAllowed === 'true' ? true : undefined,
+      noFeeOnly: req.query.noFee === 'true' ? true : undefined,
+      requiredAmenities: req.query.amenities ? (req.query.amenities as string).split(',') : undefined,
+      minSquareFootage: req.query.minSquareFeet ? parseInt(req.query.minSquareFeet as string) : undefined,
+      maxSquareFootage: req.query.maxSquareFeet ? parseInt(req.query.maxSquareFeet as string) : undefined,
     };
 
     const options = {

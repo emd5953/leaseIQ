@@ -44,6 +44,7 @@ export interface IListing extends Document {
   // Listing content
   description: string;
   images: string[];                 // Array of image URLs
+  floorPlanImages: string[];        // Array of floor plan image URLs
   amenities: string[];              // Standardized amenity names
   
   // Pet policy
@@ -58,6 +59,33 @@ export interface IListing extends Document {
     required: boolean;
     amount: number | null;          // Fee amount if known
   };
+  
+  // Building & unit details
+  buildingType: string | null;      // Apartment, Condo, Townhouse, etc.
+  yearBuilt: number | null;
+  totalUnits: number | null;
+  parking: string | null;
+  laundry: string | null;           // In-unit, In-building, None
+  heating: string | null;
+  cooling: string | null;
+  
+  // Lease terms
+  leaseLength: string | null;       // e.g., "12 months"
+  securityDeposit: number | null;
+  applicationFee: number | null;
+  
+  // Utilities included in rent
+  utilities: {
+    electric: boolean;
+    gas: boolean;
+    water: boolean;
+    internet: boolean;
+    trash: boolean;
+  };
+  
+  // Contact info
+  contactPhone: string | null;
+  contactEmail: string | null;
   
   // Source tracking
   sources: Array<{
@@ -195,6 +223,11 @@ const listingSchema = new Schema<IListing>({
     default: []
   },
   
+  floorPlanImages: {
+    type: [String],
+    default: []
+  },
+  
   amenities: {
     type: [String],
     default: []
@@ -227,6 +260,93 @@ const listingSchema = new Schema<IListing>({
       type: Number,
       default: null
     }
+  },
+  
+  // Building & unit details
+  buildingType: {
+    type: String,
+    default: null
+  },
+  
+  yearBuilt: {
+    type: Number,
+    default: null
+  },
+  
+  totalUnits: {
+    type: Number,
+    default: null
+  },
+  
+  parking: {
+    type: String,
+    default: null
+  },
+  
+  laundry: {
+    type: String,
+    default: null
+  },
+  
+  heating: {
+    type: String,
+    default: null
+  },
+  
+  cooling: {
+    type: String,
+    default: null
+  },
+  
+  // Lease terms
+  leaseLength: {
+    type: String,
+    default: null
+  },
+  
+  securityDeposit: {
+    type: Number,
+    default: null
+  },
+  
+  applicationFee: {
+    type: Number,
+    default: null
+  },
+  
+  // Utilities
+  utilities: {
+    electric: {
+      type: Boolean,
+      default: false
+    },
+    gas: {
+      type: Boolean,
+      default: false
+    },
+    water: {
+      type: Boolean,
+      default: false
+    },
+    internet: {
+      type: Boolean,
+      default: false
+    },
+    trash: {
+      type: Boolean,
+      default: false
+    }
+  },
+  
+  // Contact info
+  contactPhone: {
+    type: String,
+    default: null
+  },
+  
+  contactEmail: {
+    type: String,
+    default: null
   },
   
   sources: {

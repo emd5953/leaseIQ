@@ -33,6 +33,61 @@ export interface SearchResult {
 }
 
 export class SearchService {
+  /**
+   * Transform listing data for frontend consumption
+   * Converts address object to string and flattens nested structures
+   */
+  private static transformListing(listing: any): any {
+    if (!listing) return null;
+
+    // Format address as a string
+    const addressParts = [
+      listing.address?.street,
+      listing.address?.unit,
+      listing.address?.city,
+      listing.address?.state,
+      listing.address?.zipCode
+    ].filter(Boolean);
+    
+    const addressString = addressParts.join(', ');
+
+    // Flatten price - handle both object and number formats
+    const price = typeof listing.price === 'object' && listing.price !== null
+      ? listing.price.amount
+      : listing.price;
+
+    // Flatten pet policy
+    const petsAllowed = listing.petPolicy?.dogsAllowed || listing.petPolicy?.catsAllowed || false;
+
+    // Flatten broker fee
+    const noFee = !listing.brokerFee?.required;
+
+    // Get primary source
+    const source = listing.sources?.[0]?.source || 'Unknown';
+    const sourceUrl = listing.sources?.[0]?.sourceUrl || null;
+
+    // Get square footage
+    const squareFeet = listing.squareFootage;
+
+    // Generate title from address and bedrooms
+    const bedroomText = listing.bedrooms === 0 ? 'Studio' : `${listing.bedrooms} Bedroom`;
+    const title = `${bedroomText} in ${listing.address?.city || listing.address?.street || 'NYC'}`;
+
+    return {
+      ...listing,
+      title,
+      address: addressString,
+      price,
+      petsAllowed,
+      noFee,
+      source,
+      sourceUrl,
+      squareFeet,
+      // Keep original address object for map functionality if needed
+      addressDetails: listing.address,
+    };
+  }
+
   static async search(filters: SearchFilters, options: SearchOptions = {}): Promise<SearchResult> {
     const page = options.page || 1;
     const limit = options.limit || 20;
@@ -41,10 +96,13 @@ export class SearchService {
     // Build query from filters
     const query = buildListingQuery(filters);
 
-    // Build sort
-    const sortField = options.sortBy || 'createdAt';
+    // Build sort - handle nested price field
+    let sortField: string = options.sortBy || 'createdAt';
+    if (sortField === 'price') {
+      sortField = 'price.amount';
+    }
     const sortOrder = options.sortOrder === 'asc' ? 1 : -1;
-    const sort: any = { [sortField]: sortOrder };
+    const sort: Record<string, 1 | -1> = { [sortField]: sortOrder };
 
     // Execute query
     const [listings, total] = await Promise.all([
@@ -59,7 +117,7 @@ export class SearchService {
     ]);
 
     return {
-      listings,
+      listings: listings.map(this.transformListing),
       total,
       page,
       totalPages: Math.ceil(total / limit),
@@ -67,15 +125,18 @@ export class SearchService {
   }
 
   static async getListingById(id: string): Promise<any | null> {
-    return Listing.findById(id).select('-__v').lean().exec();
+    const listing = await Listing.findById(id).select('-__v').lean().exec();
+    return this.transformListing(listing);
   }
 
   static async getRecentListings(limit: number = 10): Promise<any[]> {
-    return Listing.find({ isActive: true })
+    const listings = await Listing.find({ isActive: true })
       .sort({ createdAt: -1 })
       .limit(limit)
       .select('-__v')
       .lean()
       .exec();
+    
+    return listings.map(this.transformListing);
   }
 }

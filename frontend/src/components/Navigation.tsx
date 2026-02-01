@@ -14,7 +14,7 @@ export default function Navigation() {
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 group">
             <span className="text-2xl font-serif font-bold text-foreground group-hover:text-primary transition-colors duration-300">
-              Lease<span className="italic">IQ</span>
+              <span className="italic">LeaseI</span>Q
             </span>
           </Link>
 

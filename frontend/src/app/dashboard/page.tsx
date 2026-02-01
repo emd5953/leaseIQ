@@ -6,6 +6,16 @@ import { Heart, Bell, Search, FileText, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
 
 export default function DashboardPage() {
+  // SVG placeholder for mock listings
+  const getPlaceholderSvg = (color: string) => `data:image/svg+xml,${encodeURIComponent(`
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" fill="none">
+      <rect width="400" height="300" fill="#f5f5f0"/>
+      <rect x="100" y="80" width="200" height="140" rx="8" fill="${color}" fill-opacity="0.15" stroke="${color}" stroke-width="2"/>
+      <path d="M150 160 L200 120 L250 160" stroke="${color}" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="170" cy="130" r="15" fill="${color}" fill-opacity="0.3"/>
+    </svg>
+  `)}`
+
   // Mock data - in production, fetch from API
   const savedListings = [
     {
@@ -13,14 +23,14 @@ export default function DashboardPage() {
       title: 'Spacious 2BR in Williamsburg',
       price: 3200,
       address: '123 Bedford Ave, Brooklyn',
-      image: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=400&q=80',
+      image: getPlaceholderSvg('#8B7355'),
     },
     {
       id: '2',
       title: 'Modern Studio in Manhattan',
       price: 2800,
       address: '456 Broadway, New York',
-      image: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=400&q=80',
+      image: getPlaceholderSvg('#6B8E6B'),
     },
   ]
 

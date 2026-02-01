@@ -23,7 +23,7 @@ router.post('/firecrawl', async (req: Request, res: Response) => {
       }
 
       try {
-        wh.verify(JSON.stringify(req.body), signature);
+        wh.verify(JSON.stringify(req.body), { 'webhook-signature': signature });
       } catch (err) {
         console.error('Invalid webhook signature:', err);
         return res.status(401).json({ error: 'Invalid signature' });

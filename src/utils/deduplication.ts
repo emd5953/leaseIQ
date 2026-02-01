@@ -151,17 +151,17 @@ export async function mergeListing(
   // Add new source to sources array if not already present
   const newSource = newListingData.sources[0];
   const sourceExists = existingListing.sources.some(
-    s => s.sourceName === newSource.sourceName && s.sourceId === newSource.sourceId
+    s => s.source === newSource.source && s.sourceId === newSource.sourceId
   );
   
   if (!sourceExists) {
     existingListing.sources.push(newSource);
   } else {
-    // Update existing source's scrapedAt timestamp
+    // Update existing source's lastSeenAt timestamp
     const existingSourceIndex = existingListing.sources.findIndex(
-      s => s.sourceName === newSource.sourceName && s.sourceId === newSource.sourceId
+      s => s.source === newSource.source && s.sourceId === newSource.sourceId
     );
-    existingListing.sources[existingSourceIndex].scrapedAt = newSource.scrapedAt;
+    existingListing.sources[existingSourceIndex].lastSeenAt = newSource.lastSeenAt;
   }
   
   // Update with most recent data

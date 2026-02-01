@@ -1,9 +1,9 @@
 export default function Stats() {
   const stats = [
-    { value: '10K+', label: 'Active Listings' },
-    { value: '5', label: 'Data Sources' },
+    { value: '500+', label: 'New Listings Daily' },
+    { value: '15', label: 'Data Sources' },
     { value: '24/7', label: 'Real-time Updates' },
-    { value: '98%', label: 'User Satisfaction' },
+    { value: '<30s', label: 'AI Lease Analysis' },
   ]
 
   return (
