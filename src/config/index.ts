@@ -6,6 +6,10 @@ export const config = {
   mongodb: {
     uri: process.env.MONGODB_URI || 'mongodb://localhost:27017/leaseiq',
   },
+  supabase: {
+    url: process.env.SUPABASE_URL || '',
+    anonKey: process.env.SUPABASE_ANON_KEY || '',
+  },
   resend: {
     apiKey: process.env.RESEND_API_KEY || '',
   },

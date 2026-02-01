@@ -8,6 +8,8 @@ import floorplanRoutes from './routes/floorplan.routes';
 import webhookRoutes from './routes/webhook.routes';
 import imageProxyRoutes from './routes/image-proxy';
 import propertyAnalysisRoutes from './routes/property-analysis.routes';
+import authRoutes from './routes/auth.routes';
+import userRoutes from './routes/user.routes';
 
 export function createApp(): Express {
   const app = express();
@@ -23,6 +25,8 @@ export function createApp(): Express {
   });
 
   // Routes
+  app.use('/api/auth', authRoutes);
+  app.use('/api/user', userRoutes);
   app.use('/api/search', searchRoutes);
   app.use('/api/alerts', alertsRoutes);
   app.use('/api/research', researchRoutes);

@@ -1,17 +1,18 @@
 import { Router, Request, Response } from 'express';
 import { User, UserPreferences, ListingInteraction, SavedSearch, Listing } from '../../models';
 import { Types } from 'mongoose';
+import { getUserIdFromToken } from './auth.routes';
 
 const router = Router();
 
-// Middleware to get user from Supabase ID
+// Middleware to get user from token
 async function getUser(req: Request, res: Response): Promise<any> {
-  const supabaseId = req.headers['x-supabase-id'] as string;
-  if (!supabaseId) {
+  const userId = getUserIdFromToken(req.headers.authorization);
+  if (!userId) {
     res.status(401).json({ error: 'Not authenticated' });
     return null;
   }
-  const user = await User.findOne({ supabaseId });
+  const user = await User.findById(userId);
   if (!user) {
     res.status(404).json({ error: 'User not found' });
     return null;
@@ -159,3 +160,151 @@ router.delete('/like/:listingId', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Failed to remove listing' });
   }
 });
+
+
+/**
+ * GET /api/user/saved-searches
+ * Get user's saved searches
+ */
+router.get('/saved-searches', async (req: Request, res: Response) => {
+  try {
+    const user = await getUser(req, res);
+    if (!user) return;
+
+    const searches = await SavedSearch.find({ userId: user._id, isActive: true })
+      .sort({ createdAt: -1 });
+
+    // Get count of new listings for each search
+    const searchesWithCounts = await Promise.all(
+      searches.map(async (search) => {
+        const query: any = {};
+        const c = search.criteria;
+
+        if (c.minPrice) query['price.amount'] = { $gte: c.minPrice };
+        if (c.maxPrice) query['price.amount'] = { ...query['price.amount'], $lte: c.maxPrice };
+        if (c.minBedrooms) query.bedrooms = { $gte: c.minBedrooms };
+        if (c.maxBedrooms) query.bedrooms = { ...query.bedrooms, $lte: c.maxBedrooms };
+        if (c.neighborhoods?.length) query['address.neighborhood'] = { $in: c.neighborhoods };
+        if (c.requiresDogsAllowed) query['petPolicy.dogsAllowed'] = true;
+        if (c.requiresCatsAllowed) query['petPolicy.catsAllowed'] = true;
+        if (c.noFeeOnly) query['brokerFee.required'] = false;
+
+        if (search.lastAlertSentAt) {
+          query.createdAt = { $gt: search.lastAlertSentAt };
+        }
+
+        const newCount = await Listing.countDocuments(query);
+
+        return {
+          ...search.toObject(),
+          newListingsCount: newCount,
+        };
+      })
+    );
+
+    res.json(searchesWithCounts);
+  } catch (error) {
+    console.error('Get saved searches error:', error);
+    res.status(500).json({ error: 'Failed to get saved searches' });
+  }
+});
+
+/**
+ * POST /api/user/saved-searches
+ * Create a new saved search
+ */
+router.post('/saved-searches', async (req: Request, res: Response) => {
+  try {
+    const user = await getUser(req, res);
+    if (!user) return;
+
+    const { name, criteria, alertsEnabled, alertFrequency, alertMethod } = req.body;
+
+    const search = await SavedSearch.create({
+      userId: user._id,
+      name,
+      criteria: criteria || {},
+      alertsEnabled: alertsEnabled ?? true,
+      alertFrequency: alertFrequency || 'daily',
+      alertMethod: alertMethod || 'email',
+    });
+
+    res.status(201).json(search);
+  } catch (error) {
+    console.error('Create saved search error:', error);
+    res.status(500).json({ error: 'Failed to create saved search' });
+  }
+});
+
+/**
+ * DELETE /api/user/saved-searches/:id
+ * Delete a saved search
+ */
+router.delete('/saved-searches/:id', async (req: Request, res: Response) => {
+  try {
+    const user = await getUser(req, res);
+    if (!user) return;
+
+    const { id } = req.params;
+
+    const result = await SavedSearch.deleteOne({
+      _id: new Types.ObjectId(id as string),
+      userId: user._id,
+    });
+
+    if (result.deletedCount === 0) {
+      res.status(404).json({ error: 'Saved search not found' });
+      return;
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete saved search error:', error);
+    res.status(500).json({ error: 'Failed to delete saved search' });
+  }
+});
+
+/**
+ * GET /api/user/stats
+ * Get user dashboard stats
+ */
+router.get('/stats', async (req: Request, res: Response) => {
+  try {
+    const user = await getUser(req, res);
+    if (!user) return;
+
+    const [savedCount, searchCount, viewedCount] = await Promise.all([
+      ListingInteraction.countDocuments({ userId: user._id, interactionType: 'saved' }),
+      SavedSearch.countDocuments({ userId: user._id, isActive: true, alertsEnabled: true }),
+      ListingInteraction.countDocuments({ userId: user._id, interactionType: 'viewed' }),
+    ]);
+
+    // Count new matches across all saved searches
+    const searches = await SavedSearch.find({ userId: user._id, isActive: true });
+    let newMatches = 0;
+
+    for (const search of searches) {
+      if (search.lastAlertSentAt) {
+        const query: any = { createdAt: { $gt: search.lastAlertSentAt } };
+        const c = search.criteria;
+        if (c.minPrice) query['price.amount'] = { $gte: c.minPrice };
+        if (c.maxPrice) query['price.amount'] = { ...query['price.amount'], $lte: c.maxPrice };
+        if (c.minBedrooms) query.bedrooms = { $gte: c.minBedrooms };
+        if (c.maxBedrooms) query.bedrooms = { ...query.bedrooms, $lte: c.maxBedrooms };
+        newMatches += await Listing.countDocuments(query);
+      }
+    }
+
+    res.json({
+      savedListings: savedCount,
+      activeAlerts: searchCount,
+      newMatches,
+      viewedListings: viewedCount,
+    });
+  } catch (error) {
+    console.error('Get stats error:', error);
+    res.status(500).json({ error: 'Failed to get stats' });
+  }
+});
+
+export default router;

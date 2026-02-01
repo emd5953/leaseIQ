@@ -1,46 +1,45 @@
 import { Schema, model, Document } from 'mongoose';
+import crypto from 'crypto';
 
 /**
  * User document interface
- * Represents a user profile synchronized with Supabase authentication
  */
 export interface IUser extends Document {
-  supabaseId: string;           // Unique identifier from Supabase (indexed, unique)
-  email: string;                // User email address (indexed)
-  displayName: string | null;   // Optional display name
-  createdAt: Date;              // Account creation timestamp
-  lastLoginAt: Date;            // Most recent login timestamp
-  updatedAt: Date;              // Last profile update timestamp
+  email: string;
+  passwordHash: string;
+  salt: string;
+  displayName: string | null;
+  createdAt: Date;
+  lastLoginAt: Date;
+  updatedAt: Date;
+  setPassword(password: string): void;
+  validatePassword(password: string): boolean;
 }
 
 /**
  * User schema definition
- * Stores user profile data and maintains synchronization with Supabase authentication
  */
 const userSchema = new Schema<IUser>({
-  supabaseId: {
-    type: String,
-    required: [true, 'Supabase ID is required'],
-    unique: true,
-    index: true,
-    validate: {
-      validator: function(v: string) {
-        return !!(v && v.trim().length > 0);
-      },
-      message: 'Supabase ID cannot be empty or whitespace'
-    }
-  },
   email: {
     type: String,
     required: [true, 'Email is required'],
+    unique: true,
     index: true,
+    lowercase: true,
     validate: {
       validator: function(v: string) {
-        // Basic email validation regex
         return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
       },
       message: 'Invalid email format'
     }
+  },
+  passwordHash: {
+    type: String,
+    required: [true, 'Password is required'],
+  },
+  salt: {
+    type: String,
+    required: true,
   },
   displayName: {
     type: String,
@@ -52,11 +51,23 @@ const userSchema = new Schema<IUser>({
     default: Date.now
   }
 }, {
-  timestamps: true  // Automatically manages createdAt and updatedAt
+  timestamps: true
 });
 
-/**
- * User model
- * Export Mongoose model for User collection
- */
+// Hash password
+userSchema.methods.setPassword = function(password: string) {
+  this.salt = crypto.randomBytes(16).toString('hex');
+  this.passwordHash = crypto
+    .pbkdf2Sync(password, this.salt, 10000, 64, 'sha512')
+    .toString('hex');
+};
+
+// Validate password
+userSchema.methods.validatePassword = function(password: string): boolean {
+  const hash = crypto
+    .pbkdf2Sync(password, this.salt, 10000, 64, 'sha512')
+    .toString('hex');
+  return this.passwordHash === hash;
+};
+
 export const User = model<IUser>('User', userSchema);

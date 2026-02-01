@@ -1,6 +1,53 @@
-# LeaseIQ - NYC Apartment Rental Platform
+# LeaseIQ - Smart Apartment Hunting Platform
 
-Intelligent apartment search platform with automated listing scraping, AI-powered lease analysis, and personalized recommendations.
+## The Problem
+
+Finding an apartment in NYC is broken:
+
+1. **Information is scattered** - Renters check 10+ sites daily, seeing the same listings everywhere
+2. **Landlord history is hidden** - No easy way to know if a landlord has violations, complaints, or bad reviews
+3. **Leases are confusing** - 30+ page legal documents with buried red flags that cost renters thousands
+4. **Floor plans are misleading** - Hard to tell if a layout actually works for your needs
+5. **Good deals disappear fast** - By the time you find a listing, it's already gone
+
+## Our Solution
+
+LeaseIQ is an all-in-one platform that gives renters an unfair advantage:
+
+### 🔍 One Search, All Listings
+We scrape 13+ rental sites every 15 minutes and deduplicate them. Search once, see everything.
+
+### 🏢 Research Before You Tour
+Enter any listing ID and get:
+- Neighborhood safety scores and crime details
+- Walk, transit, and bike scores
+- Local dining, nightlife, and culture
+- Parks, grocery stores, and amenities
+- Direct links to verify building violations (NYC HPD, DOB, JustFix)
+- AI-generated tips specific to that area
+
+### 📄 AI Lease Analysis
+Upload your lease PDF and get:
+- Plain-English summary of key terms
+- Red flags highlighted with severity ratings
+- Financial breakdown (move-in costs, annual total)
+- Your rights as a tenant
+- Negotiation recommendations
+
+### 🏠 Floor Plan Analysis
+Upload a floor plan image and get:
+- Room count and layout assessment
+- Space efficiency rating
+- Pros and cons of the layout
+- Furniture placement recommendations
+
+### 📧 Email Reports
+Every analysis can be emailed to you as a beautifully formatted report to review later or share with roommates.
+
+### 🔔 Instant Alerts
+Save your search criteria and get email alerts the moment new matching listings appear.
+
+---
 
 ## Quick Start
 
