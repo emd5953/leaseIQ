@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "LeaseIQ rental platform database layer",
   "main": "dist/server.js",
+  "engines": {
+    "node": ">=18.0.0 <23.0.0"
+  },
   "scripts": {
     "build": "tsc && echo 'Build completed successfully'",
     "prebuild": "echo 'Starting TypeScript compilation...'",
