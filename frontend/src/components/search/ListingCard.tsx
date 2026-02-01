@@ -12,7 +12,13 @@ interface ListingCardProps {
     bedrooms: number
     bathrooms: number
     squareFeet?: number
-    address: string
+    address: string | {
+      street?: string
+      unit?: string
+      city?: string
+      state?: string
+      zipCode?: string
+    }
     neighborhood?: string
     images: string[]
     source: string
@@ -67,11 +73,11 @@ export default function ListingCard({ listing }: ListingCardProps) {
   const addressString = typeof listing.address === 'string' 
     ? listing.address 
     : [
-        listing.address?.street,
-        listing.address?.unit,
-        listing.address?.city,
-        listing.address?.state,
-        listing.address?.zipCode
+        (listing.address as any)?.street,
+        (listing.address as any)?.unit,
+        (listing.address as any)?.city,
+        (listing.address as any)?.state,
+        (listing.address as any)?.zipCode
       ].filter(Boolean).join(', ')
 
   return (
