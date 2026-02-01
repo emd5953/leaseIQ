@@ -1,12 +1,76 @@
 'use client'
 
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Navigation from '@/components/Navigation'
 import Footer from '@/components/Footer'
-import { Heart, Bell, Search, FileText, TrendingUp } from 'lucide-react'
+import { Heart, Bell, Search, FileText, Trash2, X } from 'lucide-react'
 import Link from 'next/link'
+import { useAuth } from '@/contexts/AuthContext'
+import { api, UserStats, SavedSearch } from '@/lib/api'
 
 export default function DashboardPage() {
-  // SVG placeholder for mock listings
+  const router = useRouter()
+  const { user, loading: authLoading } = useAuth()
+  const [stats, setStats] = useState<UserStats | null>(null)
+  const [savedListings, setSavedListings] = useState<any[]>([])
+  const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/')
+    }
+  }, [user, authLoading, router])
+
+  useEffect(() => {
+    if (user) {
+      loadDashboardData()
+    }
+  }, [user])
+
+  const loadDashboardData = async () => {
+    try {
+      const [statsData, likedData, searchesData] = await Promise.all([
+        api.getUserStats(),
+        api.getLikedListings(),
+        api.getSavedSearches(),
+      ])
+      setStats(statsData)
+      setSavedListings(likedData)
+      setSavedSearches(searchesData)
+    } catch (error) {
+      console.error('Failed to load dashboard data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleUnlike = async (listingId: string) => {
+    try {
+      await api.unlikeListing(listingId)
+      setSavedListings(prev => prev.filter(l => l._id !== listingId))
+      if (stats) {
+        setStats({ ...stats, savedListings: stats.savedListings - 1 })
+      }
+    } catch (error) {
+      console.error('Failed to unlike listing:', error)
+    }
+  }
+
+  const handleDeleteSearch = async (searchId: string) => {
+    try {
+      await api.deleteSavedSearch(searchId)
+      setSavedSearches(prev => prev.filter(s => s._id !== searchId))
+      if (stats) {
+        setStats({ ...stats, activeAlerts: stats.activeAlerts - 1 })
+      }
+    } catch (error) {
+      console.error('Failed to delete search:', error)
+    }
+  }
+
+  // SVG placeholder for listings without images
   const getPlaceholderSvg = (color: string) => `data:image/svg+xml,${encodeURIComponent(`
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" fill="none">
       <rect width="400" height="300" fill="#f5f5f0"/>
@@ -16,44 +80,22 @@ export default function DashboardPage() {
     </svg>
   `)}`
 
-  // Mock data - in production, fetch from API
-  const savedListings = [
-    {
-      id: '1',
-      title: 'Spacious 2BR in Williamsburg',
-      price: 3200,
-      address: '123 Bedford Ave, Brooklyn',
-      image: getPlaceholderSvg('#8B7355'),
-    },
-    {
-      id: '2',
-      title: 'Modern Studio in Manhattan',
-      price: 2800,
-      address: '456 Broadway, New York',
-      image: getPlaceholderSvg('#6B8E6B'),
-    },
-  ]
+  if (authLoading || loading) {
+    return (
+      <main className="min-h-screen">
+        <Navigation />
+        <div className="pt-32 pb-16 px-6 lg:px-8">
+          <div className="max-w-7xl mx-auto text-center">
+            <p className="text-foreground/70">Loading...</p>
+          </div>
+        </div>
+      </main>
+    )
+  }
 
-  const savedSearches = [
-    {
-      id: '1',
-      name: 'Brooklyn 2BR under $3500',
-      criteria: '2 beds • $2500-$3500 • Brooklyn',
-      newListings: 5,
-    },
-    {
-      id: '2',
-      name: 'Pet-friendly Manhattan',
-      criteria: '1-2 beds • Pets OK • Manhattan',
-      newListings: 2,
-    },
-  ]
-
-  const recentActivity = [
-    { type: 'research', title: 'Researched listing on Bedford Ave', date: '2 days ago' },
-    { type: 'lease', title: 'Analyzed lease for 456 Broadway', date: '5 days ago' },
-    { type: 'save', title: 'Saved 3 new listings', date: '1 week ago' },
-  ]
+  if (!user) {
+    return null
+  }
 
   return (
     <main className="min-h-screen">
@@ -66,7 +108,7 @@ export default function DashboardPage() {
               Your <span className="italic">Dashboard</span>
             </h1>
             <p className="text-lg text-foreground/70">
-              Track your saved listings, alerts, and research history
+              Welcome back, {user.displayName || user.email}
             </p>
           </div>
 
@@ -75,26 +117,30 @@ export default function DashboardPage() {
             <div className="bg-card rounded-3xl p-6 shadow-soft border border-border">
               <Heart size={24} className="text-primary mb-3" strokeWidth={1.5} />
               <p className="text-3xl font-serif font-bold text-foreground mb-1">
-                {savedListings.length}
+                {stats?.savedListings || 0}
               </p>
               <p className="text-sm text-foreground/70">Saved Listings</p>
             </div>
             <div className="bg-card rounded-3xl p-6 shadow-soft border border-border">
               <Bell size={24} className="text-primary mb-3" strokeWidth={1.5} />
               <p className="text-3xl font-serif font-bold text-foreground mb-1">
-                {savedSearches.length}
+                {stats?.activeAlerts || 0}
               </p>
               <p className="text-sm text-foreground/70">Active Alerts</p>
             </div>
             <div className="bg-card rounded-3xl p-6 shadow-soft border border-border">
               <Search size={24} className="text-primary mb-3" strokeWidth={1.5} />
-              <p className="text-3xl font-serif font-bold text-foreground mb-1">7</p>
+              <p className="text-3xl font-serif font-bold text-foreground mb-1">
+                {stats?.newMatches || 0}
+              </p>
               <p className="text-sm text-foreground/70">New Matches</p>
             </div>
             <div className="bg-card rounded-3xl p-6 shadow-soft border border-border">
               <FileText size={24} className="text-primary mb-3" strokeWidth={1.5} />
-              <p className="text-3xl font-serif font-bold text-foreground mb-1">2</p>
-              <p className="text-sm text-foreground/70">Researched</p>
+              <p className="text-3xl font-serif font-bold text-foreground mb-1">
+                {stats?.viewedListings || 0}
+              </p>
+              <p className="text-sm text-foreground/70">Viewed</p>
             </div>
           </div>
 
@@ -111,91 +157,113 @@ export default function DashboardPage() {
                     href="/search"
                     className="text-primary hover:text-primary/80 transition-colors duration-300 text-sm"
                   >
-                    View All
+                    Find More
                   </Link>
                 </div>
-                <div className="space-y-4">
-                  {savedListings.map((listing) => (
+                
+                {savedListings.length === 0 ? (
+                  <div className="bg-card-alt rounded-3xl p-8 text-center">
+                    <Heart size={32} className="text-foreground/30 mx-auto mb-4" strokeWidth={1.5} />
+                    <p className="text-foreground/70 mb-4">No saved listings yet</p>
                     <Link
-                      key={listing.id}
-                      href={`/listing/${listing.id}`}
-                      className="group block bg-card rounded-3xl p-4 shadow-soft hover:shadow-soft-lg hover:-translate-y-1 transition-all duration-500 border border-border"
+                      href="/search"
+                      className="inline-block px-6 py-3 bg-foreground text-background rounded-full text-sm tracking-widest uppercase hover:bg-opacity-90 transition-all duration-300"
                     >
-                      <div className="flex gap-4">
-                        <div className="w-32 h-32 rounded-2xl overflow-hidden flex-shrink-0">
-                          <img
-                            src={listing.image}
-                            alt={listing.title}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                          />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-lg font-semibold text-foreground mb-2 truncate">
-                            {listing.title}
-                          </h3>
-                          <p className="text-foreground/70 text-sm mb-2">{listing.address}</p>
-                          <p className="text-2xl font-serif font-bold text-foreground">
-                            ${listing.price.toLocaleString()}
-                            <span className="text-sm font-sans font-normal text-foreground/60">/mo</span>
-                          </p>
-                        </div>
-                      </div>
+                      Browse Listings
                     </Link>
-                  ))}
-                </div>
-              </div>
-
-              {/* Recent Activity */}
-              <div>
-                <h2 className="text-2xl font-serif font-bold text-foreground mb-6">
-                  Recent Activity
-                </h2>
-                <div className="space-y-3">
-                  {recentActivity.map((activity, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center gap-4 p-4 bg-card-alt rounded-2xl"
-                    >
-                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        {activity.type === 'research' && <Search size={18} className="text-primary" strokeWidth={1.5} />}
-                        {activity.type === 'lease' && <FileText size={18} className="text-primary" strokeWidth={1.5} />}
-                        {activity.type === 'save' && <Heart size={18} className="text-primary" strokeWidth={1.5} />}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {savedListings.map((listing) => (
+                      <div
+                        key={listing._id}
+                        className="group relative bg-card rounded-3xl p-4 shadow-soft hover:shadow-soft-lg transition-all duration-500 border border-border"
+                      >
+                        <Link href={`/listing/${listing._id}`} className="flex gap-4">
+                          <div className="w-32 h-32 rounded-2xl overflow-hidden flex-shrink-0 bg-card-alt">
+                            <img
+                              src={listing.images?.[0] || getPlaceholderSvg('#8B7355')}
+                              alt={listing.address?.street || 'Listing'}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-lg font-semibold text-foreground mb-2 truncate">
+                              {listing.address?.street || 'Address unavailable'}
+                            </h3>
+                            <p className="text-foreground/70 text-sm mb-2">
+                              {listing.address?.neighborhood}, {listing.address?.city}
+                            </p>
+                            <p className="text-2xl font-serif font-bold text-foreground">
+                              ${listing.price?.amount?.toLocaleString() || 'N/A'}
+                              <span className="text-sm font-sans font-normal text-foreground/60">/mo</span>
+                            </p>
+                            <p className="text-sm text-foreground/60 mt-1">
+                              {listing.bedrooms} bed • {listing.bathrooms} bath
+                              {listing.squareFeet && ` • ${listing.squareFeet} sqft`}
+                            </p>
+                          </div>
+                        </Link>
+                        <button
+                          onClick={() => handleUnlike(listing._id)}
+                          className="absolute top-4 right-4 p-2 text-foreground/40 hover:text-red-500 transition-colors"
+                          title="Remove from saved"
+                        >
+                          <X size={18} />
+                        </button>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-foreground font-medium">{activity.title}</p>
-                        <p className="text-foreground/60 text-sm">{activity.date}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Sidebar */}
             <div className="lg:col-span-1 space-y-8">
-              {/* Saved Searches */}
+              {/* Saved Searches / Alerts */}
               <div className="bg-card rounded-3xl p-6 shadow-soft border border-border">
                 <h3 className="text-xl font-serif font-bold text-foreground mb-4">
                   Saved Searches
                 </h3>
-                <div className="space-y-4">
-                  {savedSearches.map((search) => (
-                    <div key={search.id} className="p-4 bg-card-alt rounded-2xl">
-                      <div className="flex items-start justify-between mb-2">
-                        <h4 className="font-semibold text-foreground">{search.name}</h4>
-                        {search.newListings > 0 && (
-                          <span className="px-2 py-1 bg-accent text-background text-xs font-semibold rounded-full">
-                            {search.newListings} new
-                          </span>
-                        )}
+                
+                {savedSearches.length === 0 ? (
+                  <div className="text-center py-4">
+                    <p className="text-foreground/70 text-sm mb-4">No saved searches yet</p>
+                    <Link
+                      href="/search"
+                      className="text-primary hover:text-primary/80 text-sm"
+                    >
+                      Create your first search
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {savedSearches.map((search) => (
+                      <div key={search._id} className="p-4 bg-card-alt rounded-2xl relative">
+                        <div className="flex items-start justify-between mb-2">
+                          <h4 className="font-semibold text-foreground pr-8">{search.name}</h4>
+                          {(search.newListingsCount || 0) > 0 && (
+                            <span className="px-2 py-1 bg-accent text-background text-xs font-semibold rounded-full">
+                              {search.newListingsCount} new
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-foreground/70 text-sm">
+                          {search.criteria.minBedrooms && `${search.criteria.minBedrooms}+ beds`}
+                          {search.criteria.maxPrice && ` • Under $${search.criteria.maxPrice.toLocaleString()}`}
+                          {search.alertsEnabled && ` • ${search.alertFrequency} alerts`}
+                        </p>
+                        <button
+                          onClick={() => handleDeleteSearch(search._id)}
+                          className="absolute top-4 right-4 p-1 text-foreground/40 hover:text-red-500 transition-colors"
+                          title="Delete search"
+                        >
+                          <Trash2 size={14} />
+                        </button>
                       </div>
-                      <p className="text-foreground/70 text-sm">{search.criteria}</p>
-                    </div>
-                  ))}
-                </div>
-                <button className="w-full mt-4 px-6 py-3 bg-transparent text-primary border border-primary rounded-full text-sm tracking-widest uppercase hover:bg-primary hover:text-background transition-all duration-300">
-                  Create Alert
-                </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Quick Actions */}

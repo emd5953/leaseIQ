@@ -93,10 +93,10 @@ export const api = {
     return response.json()
   },
 
-  // User endpoints
+  // User endpoints (require auth)
   async getUserStats(): Promise<UserStats> {
     const response = await fetch(`${API_URL}/api/user/stats`, {
-      headers: authHeadersFn(),
+      headers: { ...authHeadersFn() },
     })
     if (!response.ok) throw new Error('Failed to get stats')
     return response.json()
@@ -104,7 +104,7 @@ export const api = {
 
   async getUserPreferences(): Promise<UserPreferences> {
     const response = await fetch(`${API_URL}/api/user/preferences`, {
-      headers: authHeadersFn(),
+      headers: { ...authHeadersFn() },
     })
     if (!response.ok) throw new Error('Failed to get preferences')
     return response.json()
@@ -122,7 +122,7 @@ export const api = {
 
   async getLikedListings() {
     const response = await fetch(`${API_URL}/api/user/liked`, {
-      headers: authHeadersFn(),
+      headers: { ...authHeadersFn() },
     })
     if (!response.ok) throw new Error('Failed to get liked listings')
     return response.json()
@@ -141,7 +141,7 @@ export const api = {
   async unlikeListing(listingId: string) {
     const response = await fetch(`${API_URL}/api/user/like/${listingId}`, {
       method: 'DELETE',
-      headers: authHeadersFn(),
+      headers: { ...authHeadersFn() },
     })
     if (!response.ok) throw new Error('Failed to unlike listing')
     return response.json()
@@ -149,7 +149,7 @@ export const api = {
 
   async getSavedSearches(): Promise<SavedSearch[]> {
     const response = await fetch(`${API_URL}/api/user/saved-searches`, {
-      headers: authHeadersFn(),
+      headers: { ...authHeadersFn() },
     })
     if (!response.ok) throw new Error('Failed to get saved searches')
     return response.json()
@@ -174,7 +174,7 @@ export const api = {
   async deleteSavedSearch(id: string) {
     const response = await fetch(`${API_URL}/api/user/saved-searches/${id}`, {
       method: 'DELETE',
-      headers: authHeadersFn(),
+      headers: { ...authHeadersFn() },
     })
     if (!response.ok) throw new Error('Failed to delete saved search')
     return response.json()
