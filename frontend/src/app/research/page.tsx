@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Navigation from '@/components/Navigation'
 import Footer from '@/components/Footer'
@@ -49,6 +49,28 @@ interface ResearchData {
 }
 
 export default function ResearchPage() {
+  return (
+    <Suspense fallback={<ResearchPageLoading />}>
+      <ResearchPageContent />
+    </Suspense>
+  )
+}
+
+function ResearchPageLoading() {
+  return (
+    <main className="min-h-screen">
+      <Navigation />
+      <div className="pt-32 pb-16 px-6 lg:px-8">
+        <div className="max-w-4xl mx-auto text-center">
+          <Loader2 size={32} className="animate-spin mx-auto text-primary" />
+        </div>
+      </div>
+      <Footer />
+    </main>
+  )
+}
+
+function ResearchPageContent() {
   const searchParams = useSearchParams()
   const listingIdFromUrl = searchParams.get('listingId')
   
