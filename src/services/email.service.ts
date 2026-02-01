@@ -125,13 +125,6 @@ export class EmailService {
       html,
     });
   }
-    const html = this.generateCombinedAnalysisEmail(analysis);
-    return this.send({
-      to: userEmail,
-      subject: `🏠 Complete Property Analysis - Lease & Floor Plan`,
-      html,
-    });
-  }
 
   private static generateAlertEmail(listings: any[], searchName: string): string {
     const listingCards = listings

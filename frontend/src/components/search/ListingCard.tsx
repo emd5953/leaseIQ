@@ -3,8 +3,6 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { Bed, Bath, Maximize, MapPin, Heart } from 'lucide-react'
-import { useAuth } from '@/contexts/AuthContext'
-import { api } from '@/lib/api'
 
 interface ListingCardProps {
   listing: {
@@ -21,8 +19,6 @@ interface ListingCardProps {
     petsAllowed?: boolean
     noFee?: boolean
   }
-  isLiked?: boolean
-  onLikeChange?: (liked: boolean) => void
 }
 
 // SVG placeholder for listings without images
@@ -45,7 +41,6 @@ function getPlaceholderImage(id: string): string {
 
 function isValidImageUrl(url: string | undefined): boolean {
   if (!url) return false
-  // Check if it's a real image URL, not a page URL or placeholder SVG
   const invalidPatterns = [
     '/homes/for_rent',
     '/rentals/',
@@ -56,14 +51,11 @@ function isValidImageUrl(url: string | undefined): boolean {
   return !invalidPatterns.some(pattern => url.toLowerCase().includes(pattern))
 }
 
-export default function ListingCard({ listing, isLiked: initialLiked = false, onLikeChange }: ListingCardProps) {
-  const { user } = useAuth()
+export default function ListingCard({ listing }: ListingCardProps) {
   const hasValidImage = isValidImageUrl(listing.images?.[0])
   const placeholderImage = getPlaceholderImage(listing._id)
   const [imageUrl, setImageUrl] = useState(hasValidImage ? listing.images[0] : placeholderImage)
   const [imageError, setImageError] = useState(false)
-  const [liked, setLiked] = useState(initialLiked)
-  const [likeLoading, setLikeLoading] = useState(false)
 
   const handleImageError = () => {
     if (!imageError) {
@@ -71,32 +63,7 @@ export default function ListingCard({ listing, isLiked: initialLiked = false, on
       setImageUrl(placeholderImage)
     }
   }
-
-  const handleLikeClick = async (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    
-    if (!user || likeLoading) return
-    
-    setLikeLoading(true)
-    try {
-      if (liked) {
-        await api.unlikeListing(listing._id)
-        setLiked(false)
-        onLikeChange?.(false)
-      } else {
-        await api.likeListing(listing._id)
-        setLiked(true)
-        onLikeChange?.(true)
-      }
-    } catch (error) {
-      console.error('Failed to update like:', error)
-    } finally {
-      setLikeLoading(false)
-    }
-  }
   
-  // Safety check: if address is an object, convert it to string
   const addressString = typeof listing.address === 'string' 
     ? listing.address 
     : [
@@ -134,19 +101,8 @@ export default function ListingCard({ listing, isLiked: initialLiked = false, on
           </div>
 
           {/* Favorite Button */}
-          <button 
-            onClick={handleLikeClick}
-            disabled={!user || likeLoading}
-            className={`absolute top-4 right-4 w-10 h-10 bg-card/90 backdrop-blur-sm rounded-full flex items-center justify-center transition-colors duration-300 ${
-              user ? 'hover:bg-card cursor-pointer' : 'cursor-default opacity-60'
-            }`}
-            title={user ? (liked ? 'Remove from saved' : 'Save listing') : 'Sign in to save'}
-          >
-            <Heart 
-              size={18} 
-              className={liked ? 'text-red-500 fill-red-500' : 'text-foreground'} 
-              strokeWidth={1.5} 
-            />
+          <button className="absolute top-4 right-4 w-10 h-10 bg-card/90 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-card transition-colors duration-300">
+            <Heart size={18} className="text-foreground" strokeWidth={1.5} />
           </button>
 
           {/* Source Badge */}
