@@ -33,4 +33,7 @@ export const config = {
   server: {
     port: parseInt(process.env.PORT || '3001', 10),
   },
+  frontend: {
+    url: process.env.FRONTEND_URL || 'http://localhost:3000',
+  },
 };

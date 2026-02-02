@@ -1,13 +1,17 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
 import { AlertService } from '../../services/alert.service';
+import { requireAuth, AuthRequest } from '../middleware/auth';
 
 const router = Router();
+
+// Require authentication for all alert endpoints
+router.use(requireAuth);
 
 /**
  * POST /api/alerts/process
  * Process all alerts (typically called by cron job)
  */
-router.post('/process', async (req: Request, res: Response) => {
+router.post('/process', async (req: AuthRequest, res: Response) => {
   try {
     const result = await AlertService.processAlerts();
     res.json(result);
@@ -21,7 +25,7 @@ router.post('/process', async (req: Request, res: Response) => {
  * POST /api/alerts/send/:savedSearchId
  * Send immediate alert for a specific saved search
  */
-router.post('/send/:savedSearchId', async (req: Request, res: Response) => {
+router.post('/send/:savedSearchId', async (req: AuthRequest, res: Response) => {
   try {
     const savedSearchId = Array.isArray(req.params.savedSearchId) 
       ? req.params.savedSearchId[0] 

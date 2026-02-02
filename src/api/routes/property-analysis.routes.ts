@@ -5,13 +5,17 @@
  * Supports uploading both PDFs and images
  */
 
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
 import multer from 'multer';
 import { CombinedAnalysisService } from '../../services/combined-analysis.service';
 import { LeaseService } from '../../services/lease.service';
 import { FloorPlanService } from '../../services/floorplan.service';
+import { requireAuth, AuthRequest } from '../middleware/auth';
 
 const router = Router();
+
+// Require authentication for all property analysis endpoints
+router.use(requireAuth);
 
 // Configure multer for multiple file uploads
 const upload = multer({
@@ -47,7 +51,7 @@ const upload = multer({
 router.post('/analyze', upload.fields([
   { name: 'lease', maxCount: 1 },
   { name: 'floorplan', maxCount: 1 },
-]), async (req: Request, res: Response) => {
+]), async (req: AuthRequest, res: Response) => {
   try {
     const files = req.files as { [fieldname: string]: Express.Multer.File[] };
     const { email, sendEmail } = req.body;
@@ -96,7 +100,6 @@ router.post('/analyze', upload.fields([
           keyTerms: analysis.lease.keyTerms,
         } : undefined,
         floorPlan: analysis.floorPlan,
-        overallAssessment: analysis.overallAssessment,
       },
       emailSent: analysis.emailSent,
     });
@@ -114,7 +117,7 @@ router.post('/analyze', upload.fields([
  * 
  * Analyze only the lease PDF
  */
-router.post('/analyze-lease-only', upload.single('lease'), async (req: Request, res: Response) => {
+router.post('/analyze-lease-only', upload.single('lease'), async (req: AuthRequest, res: Response) => {
   try {
     if (!req.file) {
       return res.status(400).json({
@@ -153,7 +156,7 @@ router.post('/analyze-lease-only', upload.single('lease'), async (req: Request, 
  * 
  * Analyze only the floor plan image
  */
-router.post('/analyze-floorplan-only', upload.single('floorplan'), async (req: Request, res: Response) => {
+router.post('/analyze-floorplan-only', upload.single('floorplan'), async (req: AuthRequest, res: Response) => {
   try {
     if (!req.file) {
       return res.status(400).json({
@@ -206,7 +209,7 @@ router.post('/analyze-floorplan-only', upload.single('floorplan'), async (req: R
  * 
  * Check service status
  */
-router.get('/status', async (req: Request, res: Response) => {
+router.get('/status', async (req: AuthRequest, res: Response) => {
   res.json({
     services: {
       reducto: !!process.env.REDUCTO_API_KEY,

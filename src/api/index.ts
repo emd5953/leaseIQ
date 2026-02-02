@@ -21,8 +21,20 @@ import { sanitizeBody } from './middleware/validation';
 export function createApp(): Express {
   const app = express();
 
-  // Middleware
-  app.use(cors());
+  // Trust proxy for Render.com
+  app.set('trust proxy', 1);
+
+  // CORS - environment aware
+  const corsOptions = process.env.NODE_ENV === 'production'
+    ? {
+        origin: process.env.FRONTEND_URL || 'https://leaseiq.com',
+        credentials: true,
+        methods: ['GET', 'POST', 'PUT', 'DELETE'],
+        allowedHeaders: ['Content-Type', 'Authorization']
+      }
+    : undefined; // Allow all in development
+
+  app.use(cors(corsOptions));
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true }));
   app.use(sanitizeBody); // Sanitize all request bodies

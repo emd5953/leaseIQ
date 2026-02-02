@@ -1,15 +1,19 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
 import { ResearchService } from '../../services/research.service';
 import { SearchService } from '../../services/search.service';
 import { validateEmail, validateObjectId } from '../middleware/validation';
+import { requireAuth, AuthRequest } from '../middleware/auth';
 
 const router = Router();
+
+// Require authentication for all research endpoints
+router.use(requireAuth);
 
 /**
  * POST /api/research/:listingId
  * Research a listing and optionally send email
  */
-router.post('/:listingId', validateObjectId('listingId'), validateEmail, async (req: Request, res: Response) => {
+router.post('/:listingId', validateObjectId('listingId'), validateEmail, async (req: AuthRequest, res: Response) => {
   try {
     const { email } = req.body;
     

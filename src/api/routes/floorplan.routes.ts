@@ -1,10 +1,14 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
 import multer from 'multer';
 import { FloorPlanService } from '../../services/floorplan.service';
 import { EmailService } from '../../services/email.service';
 import { validateEmail, validateUrl } from '../middleware/validation';
+import { requireAuth, AuthRequest } from '../middleware/auth';
 
 const router = Router();
+
+// Require authentication for all floorplan endpoints
+router.use(requireAuth);
 
 // Configure multer for image uploads (10MB limit)
 const upload = multer({
@@ -23,7 +27,7 @@ const upload = multer({
  * POST /api/floorplan/analyze
  * Upload and analyze a floor plan image
  */
-router.post('/analyze', upload.single('file'), validateEmail, async (req: Request, res: Response) => {
+router.post('/analyze', upload.single('file'), validateEmail, async (req: AuthRequest, res: Response) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
@@ -61,7 +65,7 @@ router.post('/analyze', upload.single('file'), validateEmail, async (req: Reques
  * POST /api/floorplan/analyze-url
  * Analyze a floor plan from URL
  */
-router.post('/analyze-url', validateUrl('imageUrl'), validateEmail, async (req: Request, res: Response) => {
+router.post('/analyze-url', validateUrl('imageUrl'), validateEmail, async (req: AuthRequest, res: Response) => {
   try {
     const { imageUrl, email } = req.body;
 
