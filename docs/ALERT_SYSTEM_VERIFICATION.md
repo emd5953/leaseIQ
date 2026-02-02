@@ -8,7 +8,7 @@ Yes, **Resend is properly configured and working for alerts**. Here's the verifi
 
 ### 1. Resend API Key
 - **Location**: `.env` file
-- **Key**: `RESEND_API_KEY=re_M6FPLnjS_ADtkx3ryHRd5sxm4mwTdJB4x`
+- **Key**: `RESEND_API_KEY=re_your_api_key_here`
 - **Status**: ✅ Configured
 
 ### 2. Email Service Implementation
