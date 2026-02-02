@@ -27,13 +27,13 @@ services:
     healthCheckPath: /health
     autoDeploy: true
 
-  # Alert Cron Job (runs every 15 minutes)
+  # Alert Cron Job (runs 10 minutes after scraping completes)
   - type: cron
     name: leaseiq-alerts
     env: node
     buildCommand: npm ci && npm run build
     startCommand: node dist/jobs/alert-cron.js
-    schedule: "*/15 * * * *"
+    schedule: "10 6 * * *"
     envVars:
       - key: NODE_ENV
         value: production
@@ -44,13 +44,13 @@ services:
       - key: RESEND_API_KEY
         sync: false
 
-  # Scraping Cron Job (runs every 6 hours)
+  # Scraping Cron Job (runs once daily at 6am UTC)
   - type: cron
     name: leaseiq-scraping
     env: node
     buildCommand: npm ci && npm run build
     startCommand: node dist/jobs/scraping-cron.js
-    schedule: "0 */6 * * *"
+    schedule: "0 6 * * *"
     envVars:
       - key: NODE_ENV
         value: production

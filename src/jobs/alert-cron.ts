@@ -21,9 +21,9 @@ async function startAlertCron() {
     await mongoose.connect(config.mongodb.uri);
     console.log('✓ MongoDB connected');
 
-    // Run every 15 minutes
-    cron.schedule('*/15 * * * *', runAlertJob);
-    console.log('✓ Alert cron job scheduled (every 15 minutes)');
+    // Run once daily at 6:10am UTC (10 min after scraping)
+    cron.schedule('10 6 * * *', runAlertJob);
+    console.log('✓ Alert cron job scheduled (daily at 6:10am UTC, after scraping)');
 
     // Run immediately on startup
     await runAlertJob();

@@ -32,9 +32,9 @@ async function startScrapingCron() {
     });
     console.log('✓ MongoDB connected');
 
-    // Run every 15 minutes
-    cron.schedule('*/15 * * * *', runScrapingJob);
-    console.log('✓ Scraping cron job scheduled (every 15 minutes)');
+    // Run once daily at 6am UTC
+    cron.schedule('0 6 * * *', runScrapingJob);
+    console.log('✓ Scraping cron job scheduled (daily at 6am UTC)');
 
     // Run immediately on startup
     await runScrapingJob();
