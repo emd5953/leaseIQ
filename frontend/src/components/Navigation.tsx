@@ -6,12 +6,15 @@ import { Menu, X, User, LogOut } from 'lucide-react'
 import { useGoogleLogin } from '@react-oauth/google'
 import { useAuth } from '@/contexts/AuthContext'
 
+const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
+
 export default function Navigation() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [isSigningIn, setIsSigningIn] = useState(false)
   const { user, isLoading, loginWithCode, logout } = useAuth()
 
-  const googleLogin = useGoogleLogin({
+  // Only initialize Google login if client ID is available
+  const googleLogin = GOOGLE_CLIENT_ID ? useGoogleLogin({
     flow: 'auth-code',
     onSuccess: async (response) => {
       setIsSigningIn(true)
@@ -26,7 +29,7 @@ export default function Navigation() {
       console.error('Google login failed')
       setIsSigningIn(false)
     },
-  })
+  }) : null
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-40 bg-background/80 backdrop-blur-sm border-b border-border">
@@ -86,7 +89,7 @@ export default function Navigation() {
                       <LogOut size={18} />
                     </button>
                   </div>
-                ) : (
+                ) : googleLogin ? (
                   <button
                     onClick={() => googleLogin()}
                     disabled={isSigningIn}
@@ -94,7 +97,7 @@ export default function Navigation() {
                   >
                     {isSigningIn ? 'Signing in...' : 'Sign In'}
                   </button>
-                )}
+                ) : null}
               </>
             )}
           </div>
@@ -167,7 +170,7 @@ export default function Navigation() {
                       Sign Out
                     </button>
                   </div>
-                ) : (
+                ) : googleLogin ? (
                   <button
                     onClick={() => {
                       googleLogin()
@@ -178,7 +181,7 @@ export default function Navigation() {
                   >
                     {isSigningIn ? 'Signing in...' : 'Sign In with Google'}
                   </button>
-                )}
+                ) : null}
               </div>
             )}
           </div>
