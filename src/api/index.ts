@@ -25,11 +25,32 @@ export function createApp(): Express {
   app.set('trust proxy', 1);
 
   // CORS - environment aware
+  const allowedOrigins = process.env.NODE_ENV === 'production'
+    ? [
+        'https://lease-iq.vercel.app',
+        'https://lease-iq.vercel.app/',
+        process.env.FRONTEND_URL,
+      ].filter(Boolean)
+    : true; // Allow all in development
+
   const corsOptions = process.env.NODE_ENV === 'production'
     ? {
-        origin: process.env.FRONTEND_URL || 'https://leaseiq.com',
+        origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+          // Allow requests with no origin (like mobile apps or curl)
+          if (!origin) return callback(null, true);
+          
+          // Remove trailing slash from origin for comparison
+          const normalizedOrigin = origin.replace(/\/$/, '');
+          const normalizedAllowed = (allowedOrigins as string[]).map(o => o?.replace(/\/$/, ''));
+          
+          if (normalizedAllowed.includes(normalizedOrigin)) {
+            callback(null, true);
+          } else {
+            callback(new Error('Not allowed by CORS'));
+          }
+        },
         credentials: true,
-        methods: ['GET', 'POST', 'PUT', 'DELETE'],
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
         allowedHeaders: ['Content-Type', 'Authorization']
       }
     : undefined; // Allow all in development
