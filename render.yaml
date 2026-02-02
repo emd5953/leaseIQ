@@ -2,8 +2,7 @@ services:
   # Main API Backend
   - type: web
     name: leaseiq-api
-    runtime: node
-    nodeVersion: "20"
+    env: node
     buildCommand: chmod +x scripts/render-build.sh && ./scripts/render-build.sh
     startCommand: node dist/server.js
     envVars:
@@ -31,8 +30,7 @@ services:
   # Alert Cron Job (runs every 15 minutes)
   - type: cron
     name: leaseiq-alerts
-    runtime: node
-    nodeVersion: "20"
+    env: node
     buildCommand: npm ci && npm run build
     startCommand: node dist/jobs/alert-cron.js
     schedule: "*/15 * * * *"
@@ -49,8 +47,7 @@ services:
   # Scraping Cron Job (runs every 6 hours)
   - type: cron
     name: leaseiq-scraping
-    runtime: node
-    nodeVersion: "20"
+    env: node
     buildCommand: npm ci && npm run build
     startCommand: node dist/jobs/scraping-cron.js
     schedule: "0 */6 * * *"
