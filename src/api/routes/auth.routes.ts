@@ -80,7 +80,7 @@ router.post('/google', async (req: Request, res: Response) => {
  */
 router.post('/google/code', async (req: Request, res: Response) => {
   try {
-    const { code } = req.body;
+    const { code, redirect_uri } = req.body;
 
     if (!code) {
       console.error('No authorization code provided');
@@ -89,8 +89,11 @@ router.post('/google/code', async (req: Request, res: Response) => {
 
     console.log('Exchanging authorization code for tokens...');
 
-    // Exchange code for tokens
-    const { tokens } = await googleClient.getToken(code);
+    // Exchange code for tokens with redirect_uri
+    const { tokens } = await googleClient.getToken({
+      code,
+      redirect_uri: redirect_uri || 'postmessage', // 'postmessage' is used for popup/iframe flows
+    });
     
     console.log('Tokens received:', { 
       hasIdToken: !!tokens.id_token, 
