@@ -45,7 +45,7 @@ export default function DashboardPage() {
         loadData()
       }
     }
-  }, [user, activeTab])
+  }, [user, activeTab, preferencesLoaded])
 
   const loadData = async () => {
     setIsLoading(true)
@@ -109,7 +109,10 @@ export default function DashboardPage() {
   const handleSavePreferences = async () => {
     setIsSaving(true)
     try {
-      await api.updatePreferences(preferences)
+      console.log('Saving preferences:', preferences)
+      const saved = await api.updatePreferences(preferences)
+      console.log('Saved preferences response:', saved)
+      // Don't override the state with the response - keep what the user typed
       alert('Preferences saved!')
     } catch (error) {
       console.error('Failed to save preferences:', error)
@@ -357,6 +360,7 @@ export default function DashboardPage() {
                         <input
                           type="number"
                           placeholder="Min"
+                          min="0"
                           value={preferences.minPrice ?? ''}
                           onChange={(e) => setPreferences(p => ({ ...p, minPrice: e.target.value ? Number(e.target.value) : undefined }))}
                           className="flex-1 px-3 py-2 border border-border rounded-lg bg-background"
@@ -364,6 +368,7 @@ export default function DashboardPage() {
                         <input
                           type="number"
                           placeholder="Max"
+                          min="0"
                           value={preferences.maxPrice ?? ''}
                           onChange={(e) => setPreferences(p => ({ ...p, maxPrice: e.target.value ? Number(e.target.value) : undefined }))}
                           className="flex-1 px-3 py-2 border border-border rounded-lg bg-background"
@@ -377,22 +382,14 @@ export default function DashboardPage() {
                         <Bed size={16} />
                         Bedrooms
                       </label>
-                      <div className="flex gap-4">
-                        <input
-                          type="number"
-                          placeholder="Min"
-                          value={preferences.minBedrooms ?? ''}
-                          onChange={(e) => setPreferences(p => ({ ...p, minBedrooms: e.target.value ? Number(e.target.value) : undefined }))}
-                          className="flex-1 px-3 py-2 border border-border rounded-lg bg-background"
-                        />
-                        <input
-                          type="number"
-                          placeholder="Max"
-                          value={preferences.maxBedrooms ?? ''}
-                          onChange={(e) => setPreferences(p => ({ ...p, maxBedrooms: e.target.value ? Number(e.target.value) : undefined }))}
-                          className="flex-1 px-3 py-2 border border-border rounded-lg bg-background"
-                        />
-                      </div>
+                      <input
+                        type="number"
+                        placeholder="Minimum bedrooms"
+                        min="0"
+                        value={preferences.minBedrooms ?? ''}
+                        onChange={(e) => setPreferences(p => ({ ...p, minBedrooms: e.target.value ? Number(e.target.value) : undefined }))}
+                        className="w-full px-3 py-2 border border-border rounded-lg bg-background"
+                      />
                     </div>
 
                     {/* Bathrooms */}
@@ -401,22 +398,15 @@ export default function DashboardPage() {
                         <Bath size={16} />
                         Bathrooms
                       </label>
-                      <div className="flex gap-4">
-                        <input
-                          type="number"
-                          placeholder="Min"
-                          value={preferences.minBathrooms ?? ''}
-                          onChange={(e) => setPreferences(p => ({ ...p, minBathrooms: e.target.value ? Number(e.target.value) : undefined }))}
-                          className="flex-1 px-3 py-2 border border-border rounded-lg bg-background"
-                        />
-                        <input
-                          type="number"
-                          placeholder="Max"
-                          value={preferences.maxBathrooms ?? ''}
-                          onChange={(e) => setPreferences(p => ({ ...p, maxBathrooms: e.target.value ? Number(e.target.value) : undefined }))}
-                          className="flex-1 px-3 py-2 border border-border rounded-lg bg-background"
-                        />
-                      </div>
+                      <input
+                        type="number"
+                        placeholder="Minimum bathrooms"
+                        min="0"
+                        step="0.5"
+                        value={preferences.minBathrooms ?? ''}
+                        onChange={(e) => setPreferences(p => ({ ...p, minBathrooms: e.target.value ? Number(e.target.value) : undefined }))}
+                        className="w-full px-3 py-2 border border-border rounded-lg bg-background"
+                      />
                     </div>
 
                     {/* Neighborhoods */}
