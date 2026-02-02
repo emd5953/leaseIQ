@@ -82,7 +82,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
         console.error('Authentication failed:', errorData)
-        throw new Error(`Authentication failed: ${errorData.error || response.statusText}`)
+        
+        // Show more detailed error to user
+        const errorMessage = errorData.details || errorData.error || 'Authentication failed'
+        throw new Error(`Authentication failed: ${errorMessage}`)
       }
 
       const data = await response.json()
