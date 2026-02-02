@@ -29,6 +29,7 @@ export interface SearchOptions {
 }
 
 export interface UserPreferences {
+  userId?: string
   minPrice?: number | null
   maxPrice?: number | null
   minBedrooms?: number | null
@@ -54,6 +55,34 @@ export interface SavedSearch {
 }
 
 export const api = {
+  // Cache for saved listings to avoid repeated API calls
+  _savedListingsCache: null as Set<string> | null,
+  _savedListingsCacheTime: 0,
+  _savedListingsCacheDuration: 60000, // 1 minute
+
+  async getSavedListingIds(): Promise<Set<string>> {
+    // Return cached data if fresh
+    const now = Date.now()
+    if (this._savedListingsCache && (now - this._savedListingsCacheTime) < this._savedListingsCacheDuration) {
+      return this._savedListingsCache
+    }
+
+    // Fetch fresh data
+    try {
+      const listings = await this.getSavedListings()
+      this._savedListingsCache = new Set(listings.map((l: any) => l._id))
+      this._savedListingsCacheTime = now
+      return this._savedListingsCache
+    } catch {
+      return new Set()
+    }
+  },
+
+  invalidateSavedListingsCache() {
+    this._savedListingsCache = null
+    this._savedListingsCacheTime = 0
+  },
+
   async searchListings(filters: SearchFilters = {}, options: SearchOptions = {}) {
     const params = new URLSearchParams()
     
@@ -155,6 +184,7 @@ export const api = {
       body: JSON.stringify({ notes }),
     })
     if (!response.ok) throw new Error('Failed to save listing')
+    this.invalidateSavedListingsCache() // Clear cache
     return response.json()
   },
 
@@ -164,15 +194,14 @@ export const api = {
       headers: { ...getAuthHeaders() },
     })
     if (!response.ok) throw new Error('Failed to unsave listing')
+    this.invalidateSavedListingsCache() // Clear cache
     return response.json()
   },
 
   async checkListingSaved(listingId: string): Promise<{ isSaved: boolean }> {
-    const response = await fetch(`${API_URL}/api/user/check-listing/${listingId}`, {
-      headers: { ...getAuthHeaders() },
-    })
-    if (!response.ok) throw new Error('Failed to check listing')
-    return response.json()
+    // Use cached data if available
+    const savedIds = await this.getSavedListingIds()
+    return { isSaved: savedIds.has(listingId) }
   },
 
   async getSavedSearches(): Promise<SavedSearch[]> {

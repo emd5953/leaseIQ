@@ -50,6 +50,7 @@ export class DataNormalizer {
 
   /**
    * Parse address string into structured components
+   * Enhanced for NYC address formats
    */
   private normalizeAddress(addressStr: string | null): Address {
     if (!addressStr) {
@@ -84,6 +85,25 @@ export class DataNormalizer {
       }
     }
 
+    // Normalize state variations
+    if (state === 'New York' || state === 'new york') {
+      state = 'NY';
+    }
+
+    // Normalize NYC borough names
+    const cityLower = city.toLowerCase();
+    if (cityLower === 'manhattan' || cityLower === 'brooklyn' || 
+        cityLower === 'queens' || cityLower === 'bronx' || 
+        cityLower === 'staten island') {
+      // Keep borough name but ensure state is NY
+      if (!state) state = 'NY';
+    }
+
+    // If city is "New York" and we have a NYC zip code, set state to NY
+    if (cityLower === 'new york' && zipCode && this.isNYCZipCode(zipCode)) {
+      state = 'NY';
+    }
+
     return {
       street,
       city,
@@ -91,6 +111,22 @@ export class DataNormalizer {
       zipCode,
       fullAddress: addressStr,
     };
+  }
+
+  /**
+   * Check if a zip code is within NYC
+   */
+  private isNYCZipCode(zip: string): boolean {
+    const nycZipRanges = [
+      { min: 10001, max: 10282 }, // Manhattan
+      { min: 10301, max: 10314 }, // Staten Island
+      { min: 10451, max: 10475 }, // Bronx
+      { min: 11004, max: 11109 }, // Queens
+      { min: 11201, max: 11256 }, // Brooklyn
+    ];
+
+    const zipNum = parseInt(zip);
+    return nycZipRanges.some(range => zipNum >= range.min && zipNum <= range.max);
   }
 
   /**

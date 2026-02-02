@@ -121,7 +121,7 @@ async function testCombinedAnalysis() {
     console.log('═'.repeat(60));
     console.log('OVERALL ASSESSMENT');
     console.log('═'.repeat(60));
-    console.log(`\nMatch Score: ${analysis.overallAssessment.matchScore}/100`);
+    console.log(`\nOverall Quality Score: ${analysis.overallAssessment.overallScore}/100`);
     console.log(`\nSummary: ${analysis.overallAssessment.summary}`);
     
     if (analysis.overallAssessment.recommendations.length > 0) {

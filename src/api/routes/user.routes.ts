@@ -34,7 +34,15 @@ router.get('/preferences', async (req: AuthRequest, res: Response) => {
  */
 router.put('/preferences', async (req: AuthRequest, res: Response) => {
   try {
-    const updateData = { ...req.body, userId: new Types.ObjectId(req.userId) };
+    // Clean up the data - convert undefined to null for proper storage
+    const cleanData = { ...req.body };
+    Object.keys(cleanData).forEach(key => {
+      if (cleanData[key] === undefined) {
+        cleanData[key] = null;
+      }
+    });
+    
+    const updateData = { ...cleanData, userId: new Types.ObjectId(req.userId) };
     delete updateData._id;
 
     const preferences = await UserPreferences.findOneAndUpdate(

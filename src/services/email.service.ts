@@ -475,20 +475,15 @@ export class EmailService {
   }
 
   private static generateCombinedAnalysisEmail(analysis: any): string {
-    const { lease, floorPlan, overallAssessment } = analysis;
+    const { lease, floorPlan } = analysis;
 
-    // Match score color
-    const scoreColor = 
-      overallAssessment.matchScore >= 80 ? '#059669' :
-      overallAssessment.matchScore >= 60 ? '#f59e0b' : '#dc2626';
-
-    // Floor plan layout
+    // Floor plan section
     const floorPlanSection = floorPlan ? `
       <div style="margin-bottom: 24px;">
         <h3 style="color: #111827;">🏠 Floor Plan Analysis</h3>
         <div style="background: #f9fafb; padding: 16px; border-radius: 8px;">
           <p style="margin: 4px 0;"><strong>Layout:</strong> ${floorPlan.layout.bedrooms} Bed, ${floorPlan.layout.bathrooms} Bath${floorPlan.layout.estimatedSquareFeet ? `, ~${floorPlan.layout.estimatedSquareFeet} sqft` : ''}</p>
-          <p style="margin: 4px 0;"><strong>Space Efficiency:</strong> <span style="color: ${scoreColor};">${floorPlan.spaceEfficiency}</span></p>
+          <p style="margin: 4px 0;"><strong>Space Efficiency:</strong> ${floorPlan.spaceEfficiency}</p>
           <p style="margin: 8px 0 4px 0;"><strong>Summary:</strong></p>
           <p style="color: #374151; margin: 4px 0;">${floorPlan.summary}</p>
         </div>
@@ -519,6 +514,15 @@ export class EmailService {
           </ul>
         </div>
         ` : ''}
+
+        ${floorPlan.recommendations.length > 0 ? `
+        <div style="margin-top: 12px; background: #eff6ff; padding: 12px; border-radius: 6px; border-left: 4px solid #2563eb;">
+          <p style="margin: 0 0 4px 0; color: #2563eb;"><strong>💡 Recommendations:</strong></p>
+          <ul style="margin: 4px 0; padding-left: 20px; color: #1e40af;">
+            ${floorPlan.recommendations.map((r: string) => `<li>${r}</li>`).join('')}
+          </ul>
+        </div>
+        ` : ''}
       </div>
     ` : '';
 
@@ -533,10 +537,12 @@ export class EmailService {
         <div style="margin-top: 12px;">
           <p style="margin: 4px 0;"><strong>Key Terms:</strong></p>
           <div style="background: #f9fafb; padding: 12px; border-radius: 6px;">
-            <p style="margin: 4px 0;"><strong>Monthly Rent:</strong> ${lease.keyTerms.rent || 'N/A'}</p>
-            <p style="margin: 4px 0;"><strong>Security Deposit:</strong> ${lease.keyTerms.deposit || 'N/A'}</p>
-            <p style="margin: 4px 0;"><strong>Lease Term:</strong> ${lease.keyTerms.term || 'N/A'}</p>
-            <p style="margin: 4px 0;"><strong>Move-in Fees:</strong> ${lease.keyTerms.fees || 'N/A'}</p>
+            ${lease.keyTerms.monthlyRent ? `<p style="margin: 4px 0;"><strong>Monthly Rent:</strong> ${lease.keyTerms.monthlyRent}</p>` : ''}
+            ${lease.keyTerms.securityDeposit ? `<p style="margin: 4px 0;"><strong>Security Deposit:</strong> ${lease.keyTerms.securityDeposit}</p>` : ''}
+            ${lease.keyTerms.leaseTerm ? `<p style="margin: 4px 0;"><strong>Lease Term:</strong> ${lease.keyTerms.leaseTerm}</p>` : ''}
+            ${lease.keyTerms.moveInDate ? `<p style="margin: 4px 0;"><strong>Move-in Date:</strong> ${lease.keyTerms.moveInDate}</p>` : ''}
+            ${lease.keyTerms.lateFee ? `<p style="margin: 4px 0;"><strong>Late Fee:</strong> ${lease.keyTerms.lateFee}</p>` : ''}
+            ${lease.keyTerms.petPolicy ? `<p style="margin: 4px 0;"><strong>Pet Policy:</strong> ${lease.keyTerms.petPolicy}</p>` : ''}
           </div>
         </div>
 
@@ -544,10 +550,24 @@ export class EmailService {
         <div style="margin-top: 12px; background: #fef2f2; padding: 12px; border-radius: 6px; border-left: 4px solid #dc2626;">
           <p style="margin: 0 0 4px 0; color: #dc2626;"><strong>⚠️ Red Flags:</strong></p>
           <ul style="margin: 4px 0; padding-left: 20px; color: #991b1b;">
-            ${lease.redFlags.map((flag: string) => `<li>${flag}</li>`).join('')}
+            ${lease.redFlags.map((flag: any) => {
+              if (typeof flag === 'string') {
+                return `<li>${flag}</li>`;
+              }
+              return `<li><strong>${flag.title}:</strong> ${flag.description}</li>`;
+            }).join('')}
           </ul>
         </div>
         ` : '<div style="background: #f0fdf4; padding: 12px; border-radius: 6px; border-left: 4px solid #059669; margin-top: 12px;"><p style="color: #059669; margin: 0;">✓ No major red flags detected</p></div>'}
+
+        ${lease.recommendations.length > 0 ? `
+        <div style="margin-top: 12px; background: #eff6ff; padding: 12px; border-radius: 6px; border-left: 4px solid #2563eb;">
+          <p style="margin: 0 0 4px 0; color: #2563eb;"><strong>💡 Recommendations:</strong></p>
+          <ul style="margin: 4px 0; padding-left: 20px; color: #1e40af;">
+            ${lease.recommendations.map((r: string) => `<li>${r}</li>`).join('')}
+          </ul>
+        </div>
+        ` : ''}
       </div>
     ` : '';
 
@@ -564,39 +584,8 @@ export class EmailService {
             <p style="color: #6b7280; margin: 8px 0;">Your comprehensive property report</p>
           </div>
 
-          <!-- Overall Assessment -->
-          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 24px; border-radius: 12px; margin-bottom: 24px; text-align: center;">
-            <h2 style="margin: 0 0 8px 0; font-size: 24px;">Overall Match Score</h2>
-            <div style="font-size: 48px; font-weight: bold; margin: 8px 0;">${overallAssessment.matchScore}/100</div>
-            <p style="margin: 8px 0; opacity: 0.9;">${overallAssessment.summary}</p>
-          </div>
-
           ${floorPlanSection}
           ${leaseSection}
-
-          <!-- Recommendations -->
-          ${overallAssessment.recommendations.length > 0 ? `
-          <div style="margin-bottom: 24px;">
-            <h3 style="color: #111827;">💡 Recommendations</h3>
-            <div style="background: #eff6ff; padding: 16px; border-radius: 8px; border-left: 4px solid #2563eb;">
-              <ul style="margin: 0; padding-left: 20px; color: #1e40af;">
-                ${overallAssessment.recommendations.map((rec: string) => `<li style="margin: 4px 0;">${rec}</li>`).join('')}
-              </ul>
-            </div>
-          </div>
-          ` : ''}
-
-          <!-- Concerns -->
-          ${overallAssessment.concerns.length > 0 ? `
-          <div style="margin-bottom: 24px;">
-            <h3 style="color: #111827;">⚠️ Things to Consider</h3>
-            <div style="background: #fef2f2; padding: 16px; border-radius: 8px; border-left: 4px solid #dc2626;">
-              <ul style="margin: 0; padding-left: 20px; color: #991b1b;">
-                ${overallAssessment.concerns.map((concern: string) => `<li style="margin: 4px 0;">${concern}</li>`).join('')}
-              </ul>
-            </div>
-          </div>
-          ` : ''}
 
           <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb; text-align: center; color: #6b7280; font-size: 14px;">
             <p>Analysis powered by LeaseIQ</p>

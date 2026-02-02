@@ -31,6 +31,16 @@ export class AlertService {
           // Find new listings since last alert
           const query = buildListingQuery(search.criteria);
           
+          // Add NYC-only filter
+          query.$and = query.$and || [];
+          query.$and.push({
+            $or: [
+              { 'address.state': 'NY' },
+              { 'address.state': 'New York' },
+              { 'address.city': { $in: ['New York', 'Manhattan', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island'] } },
+            ]
+          });
+          
           // Only get listings created after last alert
           if (search.lastAlertSentAt) {
             query.createdAt = { $gt: search.lastAlertSentAt };
@@ -114,6 +124,17 @@ export class AlertService {
 
       // Find matching listings
       const query = buildListingQuery(search.criteria);
+      
+      // Add NYC-only filter
+      query.$and = query.$and || [];
+      query.$and.push({
+        $or: [
+          { 'address.state': 'NY' },
+          { 'address.state': 'New York' },
+          { 'address.city': { $in: ['New York', 'Manhattan', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island'] } },
+        ]
+      });
+      
       const listings = await Listing.find(query)
         .sort({ createdAt: -1 })
         .limit(50)

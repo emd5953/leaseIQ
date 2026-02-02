@@ -68,7 +68,7 @@ export default function ListingCard({ listing }: ListingCardProps) {
   const [isSaved, setIsSaved] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
 
-  // Check if listing is saved on mount
+  // Check if listing is saved on mount (uses cached data)
   useEffect(() => {
     if (user && listing._id) {
       api.checkListingSaved(listing._id)
@@ -97,6 +97,7 @@ export default function ListingCard({ listing }: ListingCardProps) {
       }
     } catch (error) {
       console.error('Failed to save listing:', error)
+      alert('Failed to save listing. Please try again.')
     }
     setIsSaving(false)
   }

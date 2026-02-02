@@ -119,6 +119,7 @@ export default function ListingDetail({ listing }: ListingDetailProps) {
       }
     } catch (error) {
       console.error('Failed to save listing:', error)
+      alert('Failed to save listing. Please try again.')
     }
     setIsSaving(false)
   }

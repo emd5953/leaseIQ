@@ -318,6 +318,12 @@ export class ScrapingOrchestrator {
       await this.rateLimiter.acquire('geocoding');
       const coordinates = await this.geocoder.geocode(normalized.address.fullAddress);
 
+      // Validate NYC location - reject listings outside NYC
+      if (!this.isNYCListing(normalized.address, coordinates)) {
+        console.log(`[Orchestrator] Rejected non-NYC listing: ${normalized.address.fullAddress}`);
+        return 'error';
+      }
+
       // Deduplicate
       const duplicateId = await this.deduplicator.findDuplicate(normalized);
       if (duplicateId) {
@@ -334,6 +340,64 @@ export class ScrapingOrchestrator {
       });
       return 'error';
     }
+  }
+
+  /**
+   * Validate if a listing is within NYC boundaries
+   * Uses both address validation and coordinate boundaries
+   */
+  private isNYCListing(address: any, coordinates: any): boolean {
+    // NYC coordinate boundaries (approximate)
+    const NYC_BOUNDS = {
+      minLat: 40.4774,  // Southern tip of Staten Island
+      maxLat: 40.9176,  // Northern Bronx
+      minLng: -74.2591, // Western Staten Island
+      maxLng: -73.7004, // Eastern Queens
+    };
+
+    // Valid NYC states
+    const validStates = ['NY', 'New York'];
+    
+    // Valid NYC cities/boroughs
+    const validCities = [
+      'New York',
+      'Manhattan',
+      'Brooklyn',
+      'Queens',
+      'Bronx',
+      'Staten Island',
+      'New York City',
+      'NYC',
+    ];
+
+    // Check state
+    if (address.state && !validStates.includes(address.state)) {
+      return false;
+    }
+
+    // Check city (case-insensitive)
+    if (address.city) {
+      const cityLower = address.city.toLowerCase();
+      const isValidCity = validCities.some(c => cityLower.includes(c.toLowerCase()));
+      if (!isValidCity) {
+        return false;
+      }
+    }
+
+    // Check coordinates if available
+    if (coordinates && coordinates.latitude && coordinates.longitude) {
+      const { latitude, longitude } = coordinates;
+      if (
+        latitude < NYC_BOUNDS.minLat ||
+        latitude > NYC_BOUNDS.maxLat ||
+        longitude < NYC_BOUNDS.minLng ||
+        longitude > NYC_BOUNDS.maxLng
+      ) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   /**

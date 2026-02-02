@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { api, UserPreferences, SavedSearch } from '@/lib/api'
 import { 
   Heart, Bell, Settings, Trash2, Send, Plus, X, 
-  Home, DollarSign, Bed, Bath, PawPrint, MapPin 
+  DollarSign, Bed, Bath, PawPrint, MapPin 
 } from 'lucide-react'
 
 type TabType = 'saved' | 'alerts' | 'preferences'
@@ -24,6 +24,7 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [showNewSearchModal, setShowNewSearchModal] = useState(false)
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false)
 
   // Redirect if not logged in
   useEffect(() => {
@@ -32,10 +33,17 @@ export default function DashboardPage() {
     }
   }, [user, authLoading, router])
 
-  // Load data
+  // Load data only once per tab, not on every tab change
   useEffect(() => {
     if (user) {
-      loadData()
+      // Only load if we don't have data for this tab yet
+      if (activeTab === 'saved' && savedListings.length === 0) {
+        loadData()
+      } else if (activeTab === 'alerts' && savedSearches.length === 0) {
+        loadData()
+      } else if (activeTab === 'preferences' && !preferencesLoaded) {
+        loadData()
+      }
     }
   }, [user, activeTab])
 
@@ -51,6 +59,7 @@ export default function DashboardPage() {
       } else if (activeTab === 'preferences') {
         const prefs = await api.getPreferences()
         setPreferences(prefs)
+        setPreferencesLoaded(true)
       }
     } catch (error) {
       console.error('Failed to load data:', error)
@@ -348,15 +357,15 @@ export default function DashboardPage() {
                         <input
                           type="number"
                           placeholder="Min"
-                          value={preferences.minPrice || ''}
-                          onChange={(e) => setPreferences(p => ({ ...p, minPrice: e.target.value ? Number(e.target.value) : null }))}
+                          value={preferences.minPrice ?? ''}
+                          onChange={(e) => setPreferences(p => ({ ...p, minPrice: e.target.value ? Number(e.target.value) : undefined }))}
                           className="flex-1 px-3 py-2 border border-border rounded-lg bg-background"
                         />
                         <input
                           type="number"
                           placeholder="Max"
-                          value={preferences.maxPrice || ''}
-                          onChange={(e) => setPreferences(p => ({ ...p, maxPrice: e.target.value ? Number(e.target.value) : null }))}
+                          value={preferences.maxPrice ?? ''}
+                          onChange={(e) => setPreferences(p => ({ ...p, maxPrice: e.target.value ? Number(e.target.value) : undefined }))}
                           className="flex-1 px-3 py-2 border border-border rounded-lg bg-background"
                         />
                       </div>
@@ -372,15 +381,15 @@ export default function DashboardPage() {
                         <input
                           type="number"
                           placeholder="Min"
-                          value={preferences.minBedrooms || ''}
-                          onChange={(e) => setPreferences(p => ({ ...p, minBedrooms: e.target.value ? Number(e.target.value) : null }))}
+                          value={preferences.minBedrooms ?? ''}
+                          onChange={(e) => setPreferences(p => ({ ...p, minBedrooms: e.target.value ? Number(e.target.value) : undefined }))}
                           className="flex-1 px-3 py-2 border border-border rounded-lg bg-background"
                         />
                         <input
                           type="number"
                           placeholder="Max"
-                          value={preferences.maxBedrooms || ''}
-                          onChange={(e) => setPreferences(p => ({ ...p, maxBedrooms: e.target.value ? Number(e.target.value) : null }))}
+                          value={preferences.maxBedrooms ?? ''}
+                          onChange={(e) => setPreferences(p => ({ ...p, maxBedrooms: e.target.value ? Number(e.target.value) : undefined }))}
                           className="flex-1 px-3 py-2 border border-border rounded-lg bg-background"
                         />
                       </div>
@@ -396,15 +405,15 @@ export default function DashboardPage() {
                         <input
                           type="number"
                           placeholder="Min"
-                          value={preferences.minBathrooms || ''}
-                          onChange={(e) => setPreferences(p => ({ ...p, minBathrooms: e.target.value ? Number(e.target.value) : null }))}
+                          value={preferences.minBathrooms ?? ''}
+                          onChange={(e) => setPreferences(p => ({ ...p, minBathrooms: e.target.value ? Number(e.target.value) : undefined }))}
                           className="flex-1 px-3 py-2 border border-border rounded-lg bg-background"
                         />
                         <input
                           type="number"
                           placeholder="Max"
-                          value={preferences.maxBathrooms || ''}
-                          onChange={(e) => setPreferences(p => ({ ...p, maxBathrooms: e.target.value ? Number(e.target.value) : null }))}
+                          value={preferences.maxBathrooms ?? ''}
+                          onChange={(e) => setPreferences(p => ({ ...p, maxBathrooms: e.target.value ? Number(e.target.value) : undefined }))}
                           className="flex-1 px-3 py-2 border border-border rounded-lg bg-background"
                         />
                       </div>
@@ -414,18 +423,39 @@ export default function DashboardPage() {
                     <div>
                       <label className="flex items-center gap-2 text-sm font-medium mb-2">
                         <MapPin size={16} />
-                        Neighborhoods (comma-separated)
+                        Neighborhoods
                       </label>
-                      <input
-                        type="text"
-                        placeholder="e.g., Manhattan, Brooklyn, Queens"
-                        value={preferences.neighborhoods?.join(', ') || ''}
-                        onChange={(e) => setPreferences(p => ({ 
-                          ...p, 
-                          neighborhoods: e.target.value ? e.target.value.split(',').map(n => n.trim()) : [] 
-                        }))}
-                        className="w-full px-3 py-2 border border-border rounded-lg bg-background"
-                      />
+                      <div className="space-y-2 max-h-48 overflow-y-auto border border-border rounded-lg p-3 bg-background">
+                        {['Manhattan', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island', 'Williamsburg', 'Park Slope', 'Astoria', 'Long Island City'].map((neighborhood) => (
+                          <label key={neighborhood} className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 p-2 rounded transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={preferences.neighborhoods?.includes(neighborhood) || false}
+                              onChange={(e) => {
+                                const current = preferences.neighborhoods || []
+                                if (e.target.checked) {
+                                  setPreferences(p => ({ 
+                                    ...p, 
+                                    neighborhoods: [...current, neighborhood] 
+                                  }))
+                                } else {
+                                  setPreferences(p => ({ 
+                                    ...p, 
+                                    neighborhoods: current.filter(n => n !== neighborhood) 
+                                  }))
+                                }
+                              }}
+                              className="w-4 h-4 text-primary border-border rounded focus:ring-primary"
+                            />
+                            <span className="text-sm">{neighborhood}</span>
+                          </label>
+                        ))}
+                      </div>
+                      {preferences.neighborhoods && preferences.neighborhoods.length > 0 && (
+                        <p className="text-xs text-muted-foreground mt-2">
+                          {preferences.neighborhoods.length} neighborhood{preferences.neighborhoods.length !== 1 ? 's' : ''} selected
+                        </p>
+                      )}
                     </div>
 
                     {/* Pet Preferences */}
@@ -582,16 +612,37 @@ function NewSearchModal({
 
           <div>
             <label className="text-sm font-medium mb-1 block">Neighborhoods</label>
-            <input
-              type="text"
-              placeholder="e.g., Brooklyn, Manhattan"
-              value={criteria.neighborhoods?.join(', ') || ''}
-              onChange={(e) => setCriteria(c => ({ 
-                ...c, 
-                neighborhoods: e.target.value ? e.target.value.split(',').map(n => n.trim()) : [] 
-              }))}
-              className="w-full px-3 py-2 border border-border rounded-lg bg-background"
-            />
+            <div className="space-y-2 max-h-48 overflow-y-auto border border-border rounded-lg p-3 bg-background">
+              {['Manhattan', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island', 'Williamsburg', 'Park Slope', 'Astoria', 'Long Island City'].map((neighborhood) => (
+                <label key={neighborhood} className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 p-2 rounded transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={criteria.neighborhoods?.includes(neighborhood) || false}
+                    onChange={(e) => {
+                      const current = criteria.neighborhoods || []
+                      if (e.target.checked) {
+                        setCriteria(c => ({ 
+                          ...c, 
+                          neighborhoods: [...current, neighborhood] 
+                        }))
+                      } else {
+                        setCriteria(c => ({ 
+                          ...c, 
+                          neighborhoods: current.filter(n => n !== neighborhood) 
+                        }))
+                      }
+                    }}
+                    className="w-4 h-4 text-primary border-border rounded focus:ring-primary"
+                  />
+                  <span className="text-sm">{neighborhood}</span>
+                </label>
+              ))}
+            </div>
+            {criteria.neighborhoods && criteria.neighborhoods.length > 0 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {criteria.neighborhoods.length} selected
+              </p>
+            )}
           </div>
 
           <div className="flex gap-4">
