@@ -5,10 +5,11 @@ import { config } from '../../config';
 import { generateToken, requireAuth, AuthRequest } from '../middleware/auth';
 
 const router = Router();
+
+// Create OAuth2Client with proper redirect URI for auth-code flow
 const googleClient = new OAuth2Client(
   config.google.oauthClientId,
-  config.google.oauthClientSecret,
-  'postmessage' // Required for auth-code flow
+  config.google.oauthClientSecret
 );
 
 /**
@@ -82,13 +83,22 @@ router.post('/google/code', async (req: Request, res: Response) => {
     const { code } = req.body;
 
     if (!code) {
+      console.error('No authorization code provided');
       return res.status(400).json({ error: 'Authorization code required' });
     }
+
+    console.log('Exchanging authorization code for tokens...');
 
     // Exchange code for tokens
     const { tokens } = await googleClient.getToken(code);
     
+    console.log('Tokens received:', { 
+      hasIdToken: !!tokens.id_token, 
+      hasAccessToken: !!tokens.access_token 
+    });
+
     if (!tokens.id_token) {
+      console.error('No ID token in response');
       return res.status(400).json({ error: 'Failed to get ID token' });
     }
 
@@ -99,7 +109,13 @@ router.post('/google/code', async (req: Request, res: Response) => {
     });
 
     const payload = ticket.getPayload();
+    console.log('Token verified, payload:', { 
+      email: payload?.email, 
+      name: payload?.name 
+    });
+
     if (!payload || !payload.email) {
+      console.error('Invalid token payload');
       return res.status(400).json({ error: 'Invalid Google token' });
     }
 
@@ -109,6 +125,7 @@ router.post('/google/code', async (req: Request, res: Response) => {
     let user = await User.findOne({ email: email.toLowerCase() });
 
     if (!user) {
+      console.log('Creating new user:', email);
       user = new User({
         email: email.toLowerCase(),
         displayName: name || null,
@@ -118,6 +135,7 @@ router.post('/google/code', async (req: Request, res: Response) => {
       });
       await user.save();
     } else {
+      console.log('Updating existing user:', email);
       user.lastLoginAt = new Date();
       if (name && !user.displayName) {
         user.displayName = name;
@@ -126,6 +144,8 @@ router.post('/google/code', async (req: Request, res: Response) => {
     }
 
     const token = generateToken(user._id.toString(), user.email);
+
+    console.log('Authentication successful for:', email);
 
     res.json({
       token,
@@ -136,9 +156,16 @@ router.post('/google/code', async (req: Request, res: Response) => {
         picture,
       },
     });
-  } catch (error) {
-    console.error('Google auth code error:', error);
-    res.status(500).json({ error: 'Authentication failed' });
+  } catch (error: any) {
+    console.error('Google auth code error:', {
+      message: error.message,
+      stack: error.stack,
+      code: error.code,
+    });
+    res.status(500).json({ 
+      error: 'Authentication failed',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
