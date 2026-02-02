@@ -87,15 +87,25 @@ GET  /api/search/:id          # Get by ID
 POST /api/research/:listingId # Research listing
 ```
 
-### Lease
+### Lease & Floor Plan
 ```
-POST /api/lease/analyze       # Analyze lease
+POST /api/lease/analyze              # Analyze lease text
+POST /api/property/analyze           # Combined lease + floor plan
+POST /api/property/analyze-floorplan-only  # Floor plan only
 ```
 
-### Alerts
+### User & Alerts
 ```
-POST /api/alerts/process      # Process all
-POST /api/alerts/send/:id     # Send one
+GET  /api/user/preferences                    # Get preferences
+PUT  /api/user/preferences                    # Update preferences
+GET  /api/user/saved-listings                 # Get saved listings
+POST /api/user/saved-listings/:id             # Save listing
+DELETE /api/user/saved-listings/:id           # Unsave listing
+GET  /api/user/saved-searches                 # Get saved searches
+POST /api/user/saved-searches                 # Create saved search
+PUT  /api/user/saved-searches/:id             # Update saved search
+DELETE /api/user/saved-searches/:id           # Delete saved search
+POST /api/user/saved-searches/:id/test-alert  # Send test alert
 ```
 
 ## 📄 Pages
@@ -228,11 +238,13 @@ npm run build
 ## 📚 Documentation
 
 - `README.md` - Project overview
-- `FRONTEND_GUIDE.md` - Complete guide
-- `FRONTEND_COMPLETE.md` - Implementation summary
-- `VISUAL_SHOWCASE.md` - Design showcase
-- `frontend/README.md` - Frontend docs
-- `frontend/SETUP.md` - Setup guide
+- `docs/FRONTEND_GUIDE.md` - Frontend guide
+- `docs/RESEND_REDUCTO_GUIDE.md` - Email & PDF parsing
+- `docs/FLOOR_PLAN_ANALYSIS.md` - Floor plan analysis
+- `docs/RESEND_ALERT_INTEGRATION.md` - Alert system with Resend
+- `docs/ALERT_QUICK_START.md` - Quick alert setup
+- `docs/API.md` - API documentation
+- `docs/QUICKSTART.md` - Quick start guide
 
 ## 🎨 Design Patterns
 

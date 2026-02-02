@@ -96,6 +96,17 @@ export class SearchService {
     // Build query from filters
     const query = buildListingQuery(filters);
 
+    // Add NYC-only filter to ensure only NYC listings are returned
+    // This is a safety net in case any non-NYC listings slip through
+    query.$and = query.$and || [];
+    query.$and.push({
+      $or: [
+        { 'address.state': 'NY' },
+        { 'address.state': 'New York' },
+        { 'address.city': { $in: ['New York', 'Manhattan', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island'] } },
+      ]
+    });
+
     // Build sort - handle nested price field
     let sortField: string = options.sortBy || 'createdAt';
     if (sortField === 'price') {

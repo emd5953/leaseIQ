@@ -318,6 +318,12 @@ export class ScrapingOrchestrator {
       await this.rateLimiter.acquire('geocoding');
       const coordinates = await this.geocoder.geocode(normalized.address.fullAddress);
 
+      // Validate NYC location - reject listings outside NYC
+      if (!this.isNYCListing(normalized.address, coordinates)) {
+        console.log(`[Orchestrator] Rejected non-NYC listing: ${normalized.address.fullAddress}`);
+        return 'error';
+      }
+
       // Deduplicate
       const duplicateId = await this.deduplicator.findDuplicate(normalized);
       if (duplicateId) {
@@ -334,6 +340,111 @@ export class ScrapingOrchestrator {
       });
       return 'error';
     }
+  }
+
+  /**
+   * Validate if a listing is within NYC boundaries
+   * Uses both address validation and coordinate boundaries
+   */
+  private isNYCListing(address: any, coordinates: any): boolean {
+    // NYC coordinate boundaries (approximate)
+    const NYC_BOUNDS = {
+      minLat: 40.4774,  // Southern tip of Staten Island
+      maxLat: 40.9176,  // Northern Bronx
+      minLng: -74.2591, // Western Staten Island
+      maxLng: -73.7004, // Eastern Queens
+    };
+
+    // Valid NYC states
+    const validStates = ['NY', 'New York'];
+    
+    // Valid NYC cities/boroughs
+    const validCities = [
+      'New York',
+      'Manhattan',
+      'Brooklyn',
+      'Queens',
+      'Bronx',
+      'Staten Island',
+      'New York City',
+      'NYC',
+    ];
+
+    // NYC zip code ranges (more reliable than city names)
+    const nycZipRanges = [
+      { min: 10001, max: 10282 }, // Manhattan
+      { min: 10301, max: 10314 }, // Staten Island
+      { min: 10451, max: 10475 }, // Bronx
+      { min: 11004, max: 11109 }, // Queens
+      { min: 11201, max: 11256 }, // Brooklyn
+      { min: 11351, max: 11697 }, // Queens (extended)
+    ];
+
+    // Check state - must be NY
+    if (address.state && !validStates.includes(address.state)) {
+      return false;
+    }
+
+    // Check zip code first (most reliable for NYC)
+    if (address.zipCode) {
+      const zip = parseInt(address.zipCode.toString().substring(0, 5));
+      const isNYCZip = nycZipRanges.some(range => zip >= range.min && zip <= range.max);
+      if (isNYCZip) {
+        // If zip is NYC, validate with coordinates if available
+        if (coordinates && coordinates.latitude && coordinates.longitude) {
+          const { latitude, longitude } = coordinates;
+          if (
+            latitude >= NYC_BOUNDS.minLat &&
+            latitude <= NYC_BOUNDS.maxLat &&
+            longitude >= NYC_BOUNDS.minLng &&
+            longitude <= NYC_BOUNDS.maxLng
+          ) {
+            return true;
+          }
+        } else {
+          // No coordinates, trust the zip code
+          return true;
+        }
+      }
+    }
+
+    // Fallback: Check city name (case-insensitive)
+    if (address.city) {
+      const cityLower = address.city.toLowerCase();
+      const isValidCity = validCities.some(c => cityLower.includes(c.toLowerCase()));
+      if (isValidCity) {
+        // Validate with coordinates if available
+        if (coordinates && coordinates.latitude && coordinates.longitude) {
+          const { latitude, longitude } = coordinates;
+          if (
+            latitude >= NYC_BOUNDS.minLat &&
+            latitude <= NYC_BOUNDS.maxLat &&
+            longitude >= NYC_BOUNDS.minLng &&
+            longitude <= NYC_BOUNDS.maxLng
+          ) {
+            return true;
+          }
+        } else {
+          // No coordinates, trust the city name
+          return true;
+        }
+      }
+    }
+
+    // If we have coordinates but no valid city/zip, check coordinates alone
+    if (coordinates && coordinates.latitude && coordinates.longitude) {
+      const { latitude, longitude } = coordinates;
+      if (
+        latitude >= NYC_BOUNDS.minLat &&
+        latitude <= NYC_BOUNDS.maxLat &&
+        longitude >= NYC_BOUNDS.minLng &&
+        longitude <= NYC_BOUNDS.maxLng
+      ) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   /**
