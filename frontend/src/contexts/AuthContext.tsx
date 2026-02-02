@@ -29,12 +29,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Load user from localStorage on mount
   useEffect(() => {
+    console.log('AuthProvider: Loading user from localStorage...')
     const storedToken = localStorage.getItem('leaseiq_token')
     const storedUser = localStorage.getItem('leaseiq_user')
 
     if (storedToken && storedUser) {
+      console.log('Found stored user:', JSON.parse(storedUser))
       setToken(storedToken)
       setUser(JSON.parse(storedUser))
+    } else {
+      console.log('No stored user found')
     }
     setIsLoading(false)
   }, [])
@@ -66,23 +70,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginWithCode = async (code: string) => {
     try {
+      console.log('Attempting login with code...')
       const response = await fetch(`${API_URL}/api/auth/google/code`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code }),
       })
 
+      console.log('Response status:', response.status)
+
       if (!response.ok) {
-        throw new Error('Authentication failed')
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        console.error('Authentication failed:', errorData)
+        throw new Error(`Authentication failed: ${errorData.error || response.statusText}`)
       }
 
       const data = await response.json()
+      console.log('Login successful, user:', data.user)
 
       setToken(data.token)
       setUser(data.user)
 
       localStorage.setItem('leaseiq_token', data.token)
       localStorage.setItem('leaseiq_user', JSON.stringify(data.user))
+      
+      console.log('User state updated and saved to localStorage')
     } catch (error) {
       console.error('Login error:', error)
       throw error
