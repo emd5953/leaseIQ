@@ -5,16 +5,18 @@ import { config } from '../config';
 async function runAlertJob() {
   console.log(`[${new Date().toISOString()}] Running alert job...`);
   
-  // Set a timeout to prevent hanging
+  // Set a timeout to prevent hanging (2 minutes max)
   const timeout = setTimeout(() => {
-    console.error(`[${new Date().toISOString()}] Alert job timed out after 5 minutes`);
+    console.error(`[${new Date().toISOString()}] Alert job timed out after 2 minutes - forcing exit`);
     process.exit(1);
-  }, 5 * 60 * 1000); // 5 minutes
+  }, 2 * 60 * 1000); // 2 minutes
   
   try {
+    console.log(`[${new Date().toISOString()}] Starting AlertService.processAlerts()...`);
     const result = await AlertService.processAlerts();
     clearTimeout(timeout);
     console.log(`[${new Date().toISOString()}] Alert job complete:`, result);
+    return result;
   } catch (error) {
     clearTimeout(timeout);
     console.error(`[${new Date().toISOString()}] Alert job failed:`, error);
