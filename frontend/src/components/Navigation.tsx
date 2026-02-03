@@ -13,18 +13,13 @@ export default function Navigation() {
   const [isSigningIn, setIsSigningIn] = useState(false)
   const { user, isLoading, loginWithCode, logout } = useAuth()
 
-  // Debug logging
-  console.log('Navigation render - user:', user, 'isLoading:', isLoading)
-
   // Only initialize Google login if client ID is available
   const googleLogin = GOOGLE_CLIENT_ID ? useGoogleLogin({
     flow: 'auth-code',
     onSuccess: async (response) => {
-      console.log('Google OAuth success, code received')
       setIsSigningIn(true)
       try {
         await loginWithCode(response.code)
-        console.log('Login completed successfully')
         // Close mobile menu if open
         setMobileMenuOpen(false)
       } catch (error) {

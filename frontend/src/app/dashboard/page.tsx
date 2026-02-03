@@ -109,9 +109,7 @@ export default function DashboardPage() {
   const handleSavePreferences = async () => {
     setIsSaving(true)
     try {
-      console.log('Saving preferences:', preferences)
       const saved = await api.updatePreferences(preferences)
-      console.log('Saved preferences response:', saved)
       // Don't override the state with the response - keep what the user typed
       alert('Preferences saved!')
     } catch (error) {
