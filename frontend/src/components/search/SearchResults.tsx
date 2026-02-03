@@ -70,7 +70,7 @@ export default function SearchResults({ filters, triggerSearch }: SearchResultsP
       if (filters.petsAllowed) apiFilters.petsAllowed = true
       if (filters.noFee) apiFilters.noFee = true
       
-      const result = await api.searchListings(apiFilters, { limit: 20, ...sortOptions })
+      const result = await api.searchListings(apiFilters, { limit: 100, ...sortOptions })
       setListings(result.listings || [])
       setTotal(result.total || 0)
     } catch (err) {
@@ -82,7 +82,7 @@ export default function SearchResults({ filters, triggerSearch }: SearchResultsP
 
   if (loading) {
     return (
-      <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {[...Array(6)].map((_, i) => (
           <div key={i} className="bg-card rounded-3xl p-6 shadow-soft border border-border animate-pulse">
             <div className="h-48 bg-card-alt rounded-2xl mb-4" />
