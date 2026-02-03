@@ -35,23 +35,22 @@ async function startAlertCron() {
     });
     console.log('✓ MongoDB connected');
 
-    // Run once daily at 6:10am UTC (10 min after scraping)
-    cron.schedule('10 6 * * *', runAlertJob);
-    console.log('✓ Alert cron job scheduled (daily at 6:10am UTC, after scraping)');
-
-    // Run immediately on startup
-    console.log('Running initial alert job...');
+    // Run the alert job once (Render cron jobs run once per trigger)
+    console.log('Running alert job...');
     await runAlertJob();
-    console.log('✓ Initial alert job completed');
+    console.log('✓ Alert job completed');
     
-    // Keep process alive
-    console.log('Alert cron service running. Press Ctrl+C to exit.');
+    // Close connection and exit
+    await mongoose.connection.close();
+    console.log('✓ MongoDB connection closed');
+    process.exit(0);
   } catch (error) {
-    console.error('Failed to start alert cron:', error);
+    console.error('Failed to run alert cron:', error);
     if (error instanceof Error) {
       console.error('Error message:', error.message);
       console.error('Error stack:', error.stack);
     }
+    await mongoose.connection.close();
     process.exit(1);
   }
 }

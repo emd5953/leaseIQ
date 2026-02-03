@@ -43,23 +43,22 @@ async function startScrapingCron() {
     });
     console.log('✓ MongoDB connected');
 
-    // Run once daily at 6am UTC
-    cron.schedule('0 6 * * *', runScrapingJob);
-    console.log('✓ Scraping cron job scheduled (daily at 6am UTC)');
-
-    // Run immediately on startup
-    console.log('Running initial scraping job...');
+    // Run the scraping job once (Render cron jobs run once per trigger)
+    console.log('Running scraping job...');
     await runScrapingJob();
-    console.log('✓ Initial scraping job completed');
+    console.log('✓ Scraping job completed');
     
-    // Keep process alive
-    console.log('Scraping cron service running. Press Ctrl+C to exit.');
+    // Close connection and exit
+    await mongoose.connection.close();
+    console.log('✓ MongoDB connection closed');
+    process.exit(0);
   } catch (error) {
-    console.error('Failed to start scraping cron:', error);
+    console.error('Failed to run scraping cron:', error);
     if (error instanceof Error) {
       console.error('Error message:', error.message);
       console.error('Error stack:', error.stack);
     }
+    await mongoose.connection.close();
     process.exit(1);
   }
 }
