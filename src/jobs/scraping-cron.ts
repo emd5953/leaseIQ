@@ -1,4 +1,3 @@
-import cron from 'node-cron';
 import mongoose from 'mongoose';
 import { ScrapingOrchestrator } from '../ingestion/services/orchestrator';
 import { config } from '../config';

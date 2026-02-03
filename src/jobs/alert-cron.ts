@@ -1,4 +1,3 @@
-import cron from 'node-cron';
 import mongoose from 'mongoose';
 import { AlertService } from '../services/alert.service';
 import { config } from '../config';
