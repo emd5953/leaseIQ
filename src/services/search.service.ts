@@ -101,10 +101,8 @@ export class SearchService {
     query.isActive = true; // Only show active listings
 
     // Build sort - handle nested price field
-    let sortField: string = options.sortBy || 'createdAt';
-    if (sortField === 'price') {
-      sortField = 'price.amount';
-    }
+    const baseSortField = options.sortBy || 'createdAt';
+    const sortField: string = baseSortField === 'price' ? 'price.amount' : baseSortField;
     const sortOrder = options.sortOrder === 'asc' ? 1 : -1;
     const sort: Record<string, 1 | -1> = { [sortField]: sortOrder };
 
