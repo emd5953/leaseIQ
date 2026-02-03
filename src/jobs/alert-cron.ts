@@ -6,11 +6,20 @@ import { config } from '../config';
 async function runAlertJob() {
   console.log(`[${new Date().toISOString()}] Running alert job...`);
   
+  // Set a timeout to prevent hanging
+  const timeout = setTimeout(() => {
+    console.error(`[${new Date().toISOString()}] Alert job timed out after 5 minutes`);
+    process.exit(1);
+  }, 5 * 60 * 1000); // 5 minutes
+  
   try {
     const result = await AlertService.processAlerts();
+    clearTimeout(timeout);
     console.log(`[${new Date().toISOString()}] Alert job complete:`, result);
   } catch (error) {
+    clearTimeout(timeout);
     console.error(`[${new Date().toISOString()}] Alert job failed:`, error);
+    throw error;
   }
 }
 

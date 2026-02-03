@@ -31,7 +31,7 @@ services:
   - type: cron
     name: leaseiq-alerts
     env: node
-    buildCommand: npm ci && npm run build
+    buildCommand: npm install --production=false && npm run build
     startCommand: node dist/jobs/alert-cron.js
     schedule: "10 6 * * *"
     envVars:
@@ -48,7 +48,7 @@ services:
   - type: cron
     name: leaseiq-scraping
     env: node
-    buildCommand: npm ci && npm run build
+    buildCommand: npm install --production=false && npm run build
     startCommand: node dist/jobs/scraping-cron.js
     schedule: "0 6 * * *"
     envVars:
