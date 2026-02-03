@@ -67,7 +67,9 @@ function setCachedResult(key: string, data: SearchResult): void {
   // Clean up old cache entries (keep cache size reasonable)
   if (searchCache.size > 100) {
     const oldestKey = searchCache.keys().next().value;
-    searchCache.delete(oldestKey);
+    if (oldestKey !== undefined) {
+      searchCache.delete(oldestKey);
+    }
   }
 }
 
