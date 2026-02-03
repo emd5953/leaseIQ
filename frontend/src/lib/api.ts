@@ -96,6 +96,9 @@ export const api = {
       }
     })
 
+    // Add cache-busting timestamp to ensure fresh data
+    params.append('_t', Date.now().toString())
+
     const response = await fetch(`${API_URL}/api/search?${params}`)
     if (!response.ok) throw new Error('Search failed')
     return response.json()

@@ -32,6 +32,45 @@ export interface SearchResult {
   totalPages: number;
 }
 
+// Simple in-memory cache
+interface CacheEntry {
+  data: SearchResult;
+  timestamp: number;
+}
+
+const searchCache = new Map<string, CacheEntry>();
+const CACHE_TTL = 2 * 60 * 1000; // 2 minutes - shorter cache for faster listing updates
+
+function getCacheKey(filters: SearchFilters, options: SearchOptions): string {
+  return JSON.stringify({ filters, options });
+}
+
+function getCachedResult(key: string): SearchResult | null {
+  const entry = searchCache.get(key);
+  if (!entry) return null;
+  
+  const age = Date.now() - entry.timestamp;
+  if (age > CACHE_TTL) {
+    searchCache.delete(key);
+    return null;
+  }
+  
+  return entry.data;
+}
+
+function setCachedResult(key: string, data: SearchResult): void {
+  searchCache.set(key, {
+    data,
+    timestamp: Date.now()
+  });
+  
+  // Clean up old cache entries (keep cache size reasonable)
+  if (searchCache.size > 100) {
+    const oldestKey = searchCache.keys().next().value;
+    searchCache.delete(oldestKey);
+  }
+}
+
 export class SearchService {
   /**
    * Transform listing data for frontend consumption
@@ -89,6 +128,14 @@ export class SearchService {
   }
 
   static async search(filters: SearchFilters, options: SearchOptions = {}): Promise<SearchResult> {
+    // Check cache first
+    const cacheKey = getCacheKey(filters, options);
+    const cached = getCachedResult(cacheKey);
+    if (cached) {
+      console.log('Cache hit for search query');
+      return cached;
+    }
+
     const page = options.page || 1;
     const limit = Math.min(options.limit || 20, 100); // Cap at 100 for performance
     const skip = (page - 1) * limit;
@@ -121,12 +168,17 @@ export class SearchService {
       Listing.countDocuments(query).maxTimeMS(3000).exec(),
     ]);
 
-    return {
+    const result = {
       listings: listings.map(this.transformListing),
       total,
       page,
       totalPages: Math.ceil(total / limit),
     };
+
+    // Cache the result
+    setCachedResult(cacheKey, result);
+
+    return result;
   }
 
   static async getListingById(id: string): Promise<any | null> {
