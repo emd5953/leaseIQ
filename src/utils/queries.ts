@@ -95,23 +95,10 @@ export function buildListingQuery(criteria: SearchCriteria): FilterQuery<IListin
     query.squareFootage = { ...query.squareFootage, $lte: criteria.maxSquareFootage };
   }
 
-  // Neighborhoods filter
+  // Neighborhoods filter - optimized to use index
   if (criteria.neighborhoods && criteria.neighborhoods.length > 0) {
-    // Search in both city and street fields to match neighborhoods
-    const neighborhoodQuery = {
-      $or: [
-        { 'address.city': { $in: criteria.neighborhoods } },
-        { 'address.street': { $regex: criteria.neighborhoods.join('|'), $options: 'i' } }
-      ]
-    };
-    
-    // If query already has $or, combine them with $and
-    if (query.$or) {
-      query.$and = [{ $or: query.$or }, neighborhoodQuery];
-      delete query.$or;
-    } else {
-      Object.assign(query, neighborhoodQuery);
-    }
+    // Use simple $in query on city field for better index usage
+    query['address.city'] = { $in: criteria.neighborhoods };
   }
 
   // Move-in date range filter

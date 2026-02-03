@@ -90,22 +90,15 @@ export class SearchService {
 
   static async search(filters: SearchFilters, options: SearchOptions = {}): Promise<SearchResult> {
     const page = options.page || 1;
-    const limit = options.limit || 20;
+    const limit = Math.min(options.limit || 20, 100); // Cap at 100 for performance
     const skip = (page - 1) * limit;
 
     // Build query from filters
     const query = buildListingQuery(filters);
 
-    // Add NYC-only filter to ensure only NYC listings are returned
-    // This is a safety net in case any non-NYC listings slip through
-    query.$and = query.$and || [];
-    query.$and.push({
-      $or: [
-        { 'address.state': 'NY' },
-        { 'address.state': 'New York' },
-        { 'address.city': { $in: ['New York', 'Manhattan', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island'] } },
-      ]
-    });
+    // Add NYC-only filter - simplified for better index usage
+    query['address.state'] = { $in: ['NY', 'New York'] };
+    query.isActive = true; // Only show active listings
 
     // Build sort - handle nested price field
     let sortField: string = options.sortBy || 'createdAt';
@@ -115,16 +108,17 @@ export class SearchService {
     const sortOrder = options.sortOrder === 'asc' ? 1 : -1;
     const sort: Record<string, 1 | -1> = { [sortField]: sortOrder };
 
-    // Execute query
+    // Execute query with timeout and optimized projection
     const [listings, total] = await Promise.all([
       Listing.find(query)
         .sort(sort)
         .skip(skip)
         .limit(limit)
-        .select('-__v')
+        .select('address price bedrooms bathrooms squareFootage images sources petPolicy brokerFee amenities createdAt')
         .lean()
+        .maxTimeMS(5000) // 5 second timeout
         .exec(),
-      Listing.countDocuments(query).exec(),
+      Listing.countDocuments(query).maxTimeMS(3000).exec(),
     ]);
 
     return {
