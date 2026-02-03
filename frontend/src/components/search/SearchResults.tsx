@@ -33,10 +33,20 @@ export default function SearchResults({ filters, triggerSearch }: SearchResultsP
   const [error, setError] = useState<string | null>(null)
   const [total, setTotal] = useState(0)
   const [sortOption, setSortOption] = useState<SortOption>('newest')
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
   useEffect(() => {
     fetchListings()
   }, [triggerSearch, sortOption])
+
+  // Auto-refresh every 2 minutes to show new listings
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchListings()
+    }, 2 * 60 * 1000) // 2 minutes
+
+    return () => clearInterval(interval)
+  }, [filters, sortOption])
 
   const getSortOptions = (): SearchOptions => {
     switch (sortOption) {
@@ -70,9 +80,10 @@ export default function SearchResults({ filters, triggerSearch }: SearchResultsP
       if (filters.petsAllowed) apiFilters.petsAllowed = true
       if (filters.noFee) apiFilters.noFee = true
       
-      const result = await api.searchListings(apiFilters, { limit: 20, ...sortOptions })
+      const result = await api.searchListings(apiFilters, { limit: 100, ...sortOptions })
       setListings(result.listings || [])
       setTotal(result.total || 0)
+      setLastUpdated(new Date())
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load listings')
     } finally {
@@ -80,9 +91,13 @@ export default function SearchResults({ filters, triggerSearch }: SearchResultsP
     }
   }
 
+  const handleRefresh = () => {
+    fetchListings()
+  }
+
   if (loading) {
     return (
-      <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {[...Array(6)].map((_, i) => (
           <div key={i} className="bg-card rounded-3xl p-6 shadow-soft border border-border animate-pulse">
             <div className="h-48 bg-card-alt rounded-2xl mb-4" />
@@ -121,9 +136,23 @@ export default function SearchResults({ filters, triggerSearch }: SearchResultsP
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <p className="text-foreground/70">
-          <span className="font-semibold text-foreground">{total}</span> listings found
-        </p>
+        <div className="flex items-center gap-4">
+          <p className="text-foreground/70">
+            <span className="font-semibold text-foreground">{total}</span> listings found
+          </p>
+          {lastUpdated && (
+            <p className="text-xs text-foreground/50">
+              Updated {lastUpdated.toLocaleTimeString()}
+            </p>
+          )}
+          <button
+            onClick={handleRefresh}
+            disabled={loading}
+            className="text-xs text-primary hover:text-primary/80 underline disabled:opacity-50"
+          >
+            Refresh
+          </button>
+        </div>
         <select 
           value={sortOption}
           onChange={(e) => setSortOption(e.target.value as SortOption)}

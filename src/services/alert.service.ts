@@ -15,10 +15,16 @@ export class AlertService {
 
     try {
       // Get all active saved searches
-      const savedSearches = await SavedSearch.find({ isActive: true }).lean().exec();
+      console.log('[AlertService] Fetching active saved searches...');
+      const savedSearches = await SavedSearch.find({ isActive: true })
+        .limit(100) // Safety limit: max 100 searches per run
+        .lean()
+        .exec();
+      console.log(`[AlertService] Found ${savedSearches.length} active saved searches`);
 
       for (const search of savedSearches) {
         processed++;
+        console.log(`[AlertService] Processing search ${processed}/${savedSearches.length}: ${search._id}`);
 
         try {
           // Get user email
@@ -46,11 +52,14 @@ export class AlertService {
             query.createdAt = { $gt: search.lastAlertSentAt };
           }
 
+          console.log(`[AlertService] Querying listings for search ${search._id}...`);
           const newListings = await Listing.find(query)
             .sort({ createdAt: -1 })
             .limit(50) // Max 50 listings per alert
             .lean()
             .exec();
+
+          console.log(`[AlertService] Found ${newListings.length} new listings for search ${search._id}`);
 
           // Skip if no new listings
           if (newListings.length === 0) {
@@ -58,6 +67,7 @@ export class AlertService {
           }
 
           // Send email alert
+          console.log(`[AlertService] Sending email to ${user.email}...`);
           const emailResult = await EmailService.sendListingAlert(
             user.email,
             newListings,
@@ -100,6 +110,8 @@ export class AlertService {
           console.error(`Error processing search ${search._id}:`, error);
         }
       }
+
+      console.log(`[AlertService] Completed processing all searches`);
     } catch (error) {
       console.error('Error in processAlerts:', error);
     }
