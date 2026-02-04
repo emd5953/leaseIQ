@@ -127,13 +127,31 @@ export class ScrapingOrchestrator {
 
     // Process sources sequentially (not in parallel) to avoid overwhelming the system
     for (const source of sources) {
-      const result = await this.processSingleSource(source);
-      if (result) {
-        sourceResults.push(result);
-        totalListingsScraped += result.listingsScraped;
-        newListingsAdded += result.newAdded || 0;
-        duplicatesDetected += result.duplicates || 0;
-        errorsEncountered += result.errors;
+      try {
+        // Add timeout protection per source (50 seconds max per source)
+        const result = await Promise.race([
+          this.processSingleSource(source),
+          new Promise<SourceResult & { newAdded?: number; duplicates?: number }>((_, reject) =>
+            setTimeout(() => reject(new Error(`Source ${source} timeout after 50 seconds`)), 50000)
+          )
+        ]);
+        
+        if (result) {
+          sourceResults.push(result);
+          totalListingsScraped += result.listingsScraped;
+          newListingsAdded += result.newAdded || 0;
+          duplicatesDetected += result.duplicates || 0;
+          errorsEncountered += result.errors;
+        }
+      } catch (error) {
+        console.error(`[Orchestrator] Failed to process source ${source}:`, error);
+        errorsEncountered++;
+        sourceResults.push({
+          source,
+          listingsScraped: 0,
+          errors: 1,
+          duration: 50000,
+        });
       }
     }
 
@@ -204,14 +222,38 @@ export class ScrapingOrchestrator {
       // Get NYC-specific URLs for this source
       const urls = this.getNYCUrlsForSource(source);
       
-      // Scrape all URLs for this source
+      // Scrape all URLs for this source with timeout protection
       const allRawListings = [];
       for (const url of urls) {
-        const rawListings = await scraper.scrape({ url } as ScrapeConfig);
-        allRawListings.push(...rawListings);
+        console.log(`[Orchestrator] Scraping ${source} from ${url}...`);
+        const scrapeStart = Date.now();
+        
+        try {
+          const rawListings = await scraper.scrape({ url } as ScrapeConfig);
+          const scrapeDuration = Date.now() - scrapeStart;
+          console.log(`[Orchestrator] Scraped ${rawListings.length} listings from ${source} in ${scrapeDuration}ms`);
+          allRawListings.push(...rawListings);
+        } catch (scrapeError) {
+          const scrapeDuration = Date.now() - scrapeStart;
+          console.error(`[Orchestrator] Scrape failed for ${source} after ${scrapeDuration}ms:`, scrapeError);
+          sourceErrors++;
+          // Continue to next URL instead of failing entire source
+        }
       }
       
       sourceListings = allRawListings.length;
+
+      if (allRawListings.length === 0) {
+        console.log(`[Orchestrator] No listings found for ${source}, skipping processing`);
+        return {
+          source,
+          listingsScraped: 0,
+          errors: sourceErrors,
+          duration: Date.now() - sourceStart,
+          newAdded: 0,
+          duplicates: 0,
+        };
+      }
 
       // Process listings in parallel batches (3 at a time for faster completion within timeout)
       const BATCH_SIZE = 3;
@@ -239,6 +281,7 @@ export class ScrapingOrchestrator {
     }
 
     const sourceDuration = Date.now() - sourceStart;
+    console.log(`[Orchestrator] Completed ${source}: ${newAdded} new, ${duplicates} duplicates, ${sourceErrors} errors in ${sourceDuration}ms`);
     return {
       source,
       listingsScraped: sourceListings,
