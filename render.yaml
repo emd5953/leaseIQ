@@ -27,13 +27,14 @@ services:
     healthCheckPath: /health
     autoDeploy: true
 
-  # Alert Cron Job (runs every 2 hours, 10 minutes after scraping)
+  # Alert Cron Job (runs every 10 minutes, 3 minutes after scraping)
+  # Sends alerts within 3-5 minutes of new listings appearing
   - type: cron
     name: leaseiq-alerts
     env: node
     buildCommand: npm install --production=false && npm run build
     startCommand: node dist/jobs/alert-cron.js
-    schedule: "10 */2 * * *"
+    schedule: "3,13,23,33,43,53 * * * *"
     envVars:
       - key: NODE_ENV
         value: production
@@ -44,15 +45,15 @@ services:
       - key: RESEND_API_KEY
         sync: false
 
-  # Scraping Cron Job (runs every 2 hours = 12 times per day)
-  # Each run scrapes 4-5 sources, rotating through all 13 sources
-  # Result: Each source scraped 4 times per day = 48-52 scraping runs per source daily
+  # Scraping Cron Job - Every 10 minutes (you have the credits!)
+  # 144 runs per day = 4,320 credits/month (fits in your current plan)
+  # Each source scraped 11 times daily, max listing age: 2-3 hours
   - type: cron
     name: leaseiq-scraping
     env: node
     buildCommand: npm install --production=false && npm run build
     startCommand: node dist/jobs/scraping-cron.js
-    schedule: "0 */2 * * *"
+    schedule: "*/10 * * * *"
     envVars:
       - key: NODE_ENV
         value: production

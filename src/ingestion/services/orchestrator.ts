@@ -125,22 +125,15 @@ export class ScrapingOrchestrator {
     let duplicatesDetected = 0;
     let errorsEncountered = 0;
 
-    // Process sources in parallel (max 2 at a time for faster completion)
-    const PARALLEL_SOURCES = 2;
-    for (let i = 0; i < sources.length; i += PARALLEL_SOURCES) {
-      const batch = sources.slice(i, i + PARALLEL_SOURCES);
-      const batchResults = await Promise.all(
-        batch.map(source => this.processSingleSource(source))
-      );
-
-      for (const result of batchResults) {
-        if (result) {
-          sourceResults.push(result);
-          totalListingsScraped += result.listingsScraped;
-          newListingsAdded += result.newAdded || 0;
-          duplicatesDetected += result.duplicates || 0;
-          errorsEncountered += result.errors;
-        }
+    // Process sources sequentially (not in parallel) to avoid overwhelming the system
+    for (const source of sources) {
+      const result = await this.processSingleSource(source);
+      if (result) {
+        sourceResults.push(result);
+        totalListingsScraped += result.listingsScraped;
+        newListingsAdded += result.newAdded || 0;
+        duplicatesDetected += result.duplicates || 0;
+        errorsEncountered += result.errors;
       }
     }
 
@@ -220,8 +213,8 @@ export class ScrapingOrchestrator {
       
       sourceListings = allRawListings.length;
 
-      // Process listings in parallel batches (5 at a time for faster completion)
-      const BATCH_SIZE = 5;
+      // Process listings in parallel batches (3 at a time for faster completion within timeout)
+      const BATCH_SIZE = 3;
       for (let i = 0; i < allRawListings.length; i += BATCH_SIZE) {
         const batch = allRawListings.slice(i, i + BATCH_SIZE);
         const results = await Promise.allSettled(
@@ -322,7 +315,14 @@ export class ScrapingOrchestrator {
       // Normalize
       const normalized = await this.normalizer.normalize(parsed);
 
-      // Geocode (with rate limiting)
+      // Check for duplicates BEFORE geocoding (saves API calls)
+      const duplicateId = await this.deduplicator.findDuplicate(normalized);
+      if (duplicateId) {
+        await this.deduplicator.mergeListing(duplicateId, normalized);
+        return 'duplicate';
+      }
+
+      // Only geocode if it's a new listing
       await this.rateLimiter.acquire('geocoding');
       const coordinates = await this.geocoder.geocode(normalized.address.fullAddress);
 
@@ -332,15 +332,9 @@ export class ScrapingOrchestrator {
         return 'error';
       }
 
-      // Deduplicate
-      const duplicateId = await this.deduplicator.findDuplicate(normalized);
-      if (duplicateId) {
-        await this.deduplicator.mergeListing(duplicateId, normalized);
-        return 'duplicate';
-      } else {
-        await this.storage.insertListing(normalized, coordinates);
-        return 'new';
-      }
+      // Store new listing
+      await this.storage.insertListing(normalized, coordinates);
+      return 'new';
     } catch (error) {
       await this.errorHandler.handleError(error as Error, {
         operation: 'process_listing',

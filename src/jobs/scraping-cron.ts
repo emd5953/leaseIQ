@@ -4,23 +4,24 @@ import { RotatingScraper } from './rotating-scraper';
 import { config } from '../config';
 
 async function runScrapingJob() {
-  console.log(`[${new Date().toISOString()}] Running scraping job...`);
+  console.log(`[${new Date().toISOString()}] Running high-frequency scraping job...`);
   
   try {
     const orchestrator = new ScrapingOrchestrator();
     const rotator = new RotatingScraper();
     
-    // Get current sources from rotation (changes every 2 hours)
+    // Get current source from rotation (changes every 30 minutes)
     const sources = rotator.getCurrentSources();
     console.log(`[${new Date().toISOString()}] Scraping sources:`, sources);
-    console.log(`[${new Date().toISOString()}] Each source group runs ${rotator.getRunsPerDay()} times per day`);
+    console.log(`[${new Date().toISOString()}] Each source runs ${rotator.getRunsPerDay()} times per day`);
+    console.log(`[${new Date().toISOString()}] Max listing age: ${rotator.getMaxFreshness()} hours`);
     
-    // Run with timeout protection (50 seconds to allow cleanup time)
-    const timeoutMs = 50000; // 50 seconds
+    // Run with timeout protection (55 seconds to allow cleanup time)
+    const timeoutMs = 55000; // 55 seconds
     const result = await Promise.race([
       orchestrator.runPartialScrape(sources),
       new Promise<any>((_, reject) => 
-        setTimeout(() => reject(new Error('Scraping timeout - job exceeded 50 seconds')), timeoutMs)
+        setTimeout(() => reject(new Error('Scraping timeout - job exceeded 55 seconds')), timeoutMs)
       )
     ]);
     
