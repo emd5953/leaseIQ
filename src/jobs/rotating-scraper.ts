@@ -25,7 +25,7 @@ export class RotatingScraper {
   ];
 
   // Configuration for different phases
-  private readonly INTERVAL_MINUTES = 10; // You have the credits for 10-minute scraping!
+  private readonly INTERVAL_MINUTES = 15; // 15-minute interval for better API stability
 
   /**
    * Get sources to scrape based on current interval
