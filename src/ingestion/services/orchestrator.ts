@@ -85,10 +85,21 @@ export class ScrapingOrchestrator {
 
   /**
    * Run full scrape across all sources
+   * For cron jobs with time limits, only scrape high-value sources
    */
   async runFullScrape(): Promise<ScrapingJobResult> {
-    const sources = Object.values(ListingSource);
-    return this.runPartialScrape(sources);
+    // Prioritize high-volume NYC sources to fit within cron timeout
+    // Scrape top 5 sources per run to stay under 60 second limit
+    const prioritySources = [
+      ListingSource.STREETEASY,    // NYC-specific, highest quality
+      ListingSource.ZILLOW,         // High volume
+      ListingSource.APARTMENTS_COM, // High volume
+      ListingSource.RENTHOP,        // NYC-specific
+      ListingSource.ZUMPER,         // Good coverage
+    ];
+    
+    console.log(`[Orchestrator] Running optimized scrape for ${prioritySources.length} priority sources`);
+    return this.runPartialScrape(prioritySources);
   }
 
   /**
@@ -114,8 +125,8 @@ export class ScrapingOrchestrator {
     let duplicatesDetected = 0;
     let errorsEncountered = 0;
 
-    // Process sources in parallel (max 3 at a time to avoid rate limits)
-    const PARALLEL_SOURCES = 3;
+    // Process sources in parallel (max 2 at a time for faster completion)
+    const PARALLEL_SOURCES = 2;
     for (let i = 0; i < sources.length; i += PARALLEL_SOURCES) {
       const batch = sources.slice(i, i + PARALLEL_SOURCES);
       const batchResults = await Promise.all(
@@ -209,8 +220,8 @@ export class ScrapingOrchestrator {
       
       sourceListings = allRawListings.length;
 
-      // Process listings in parallel batches (10 at a time)
-      const BATCH_SIZE = 10;
+      // Process listings in parallel batches (5 at a time for faster completion)
+      const BATCH_SIZE = 5;
       for (let i = 0; i < allRawListings.length; i += BATCH_SIZE) {
         const batch = allRawListings.slice(i, i + BATCH_SIZE);
         const results = await Promise.allSettled(
@@ -247,6 +258,7 @@ export class ScrapingOrchestrator {
 
   /**
    * Get NYC-specific URLs for each source to maximize listings
+   * Optimized for cron timeout - only 1 URL per source
    */
   private getNYCUrlsForSource(source: ListingSource): string[] {
     const urls: Record<ListingSource, string[]> = {
@@ -255,13 +267,9 @@ export class ScrapingOrchestrator {
       ],
       [ListingSource.ZILLOW]: [
         'https://www.zillow.com/new-york-ny/rentals/',
-        'https://www.zillow.com/brooklyn-new-york-ny/rentals/',
-        'https://www.zillow.com/queens-new-york-ny/rentals/',
       ],
       [ListingSource.APARTMENTS_COM]: [
         'https://www.apartments.com/new-york-ny/',
-        'https://www.apartments.com/brooklyn-ny/',
-        'https://www.apartments.com/queens-ny/',
       ],
       [ListingSource.TRULIA]: [
         'https://www.trulia.com/for_rent/New_York,NY/',

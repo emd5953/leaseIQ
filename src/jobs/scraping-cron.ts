@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { ScrapingOrchestrator } from '../ingestion/services/orchestrator';
+import { RotatingScraper } from './rotating-scraper';
 import { config } from '../config';
 
 async function runScrapingJob() {
@@ -7,7 +8,22 @@ async function runScrapingJob() {
   
   try {
     const orchestrator = new ScrapingOrchestrator();
-    const result = await orchestrator.runFullScrape();
+    const rotator = new RotatingScraper();
+    
+    // Get current sources from rotation (changes every 2 hours)
+    const sources = rotator.getCurrentSources();
+    console.log(`[${new Date().toISOString()}] Scraping sources:`, sources);
+    console.log(`[${new Date().toISOString()}] Each source group runs ${rotator.getRunsPerDay()} times per day`);
+    
+    // Run with timeout protection (50 seconds to allow cleanup time)
+    const timeoutMs = 50000; // 50 seconds
+    const result = await Promise.race([
+      orchestrator.runPartialScrape(sources),
+      new Promise<any>((_, reject) => 
+        setTimeout(() => reject(new Error('Scraping timeout - job exceeded 50 seconds')), timeoutMs)
+      )
+    ]);
+    
     console.log(`[${new Date().toISOString()}] Scraping job complete:`, {
       totalListingsScraped: result.totalListingsScraped,
       newListingsAdded: result.newListingsAdded,
@@ -16,6 +32,7 @@ async function runScrapingJob() {
     });
   } catch (error) {
     console.error(`[${new Date().toISOString()}] Scraping job failed:`, error);
+    throw error; // Re-throw to ensure proper exit code
   }
 }
 
