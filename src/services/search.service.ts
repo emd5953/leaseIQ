@@ -39,7 +39,7 @@ interface CacheEntry {
 }
 
 const searchCache = new Map<string, CacheEntry>();
-const CACHE_TTL = 2 * 60 * 1000; // 2 minutes - shorter cache for faster listing updates
+const CACHE_TTL = 30 * 1000; // 30 seconds - fast updates for new listings
 
 function getCacheKey(filters: SearchFilters, options: SearchOptions): string {
   return JSON.stringify({ filters, options });

@@ -33,6 +33,12 @@ router.get('/', async (req: Request, res: Response) => {
     };
 
     const result = await SearchService.search(filters, options);
+    
+    // Prevent browser caching to ensure fresh listings
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    
     res.json(result);
   } catch (error) {
     console.error('Search error:', error);

@@ -39,11 +39,11 @@ export default function SearchResults({ filters, triggerSearch }: SearchResultsP
     fetchListings()
   }, [triggerSearch, sortOption])
 
-  // Auto-refresh every 2 minutes to show new listings
+  // Auto-refresh every 30 seconds to show new listings
   useEffect(() => {
     const interval = setInterval(() => {
       fetchListings()
-    }, 2 * 60 * 1000) // 2 minutes
+    }, 30 * 1000) // 30 seconds
 
     return () => clearInterval(interval)
   }, [filters, sortOption])
