@@ -64,7 +64,6 @@ export default function SearchResults({ filters, triggerSearch }: SearchResultsP
 
   const fetchListings = async () => {
     try {
-      setLoading(true)
       setError(null)
       
       const sortOptions = getSortOptions()

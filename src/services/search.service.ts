@@ -142,12 +142,15 @@ export class SearchService {
     const limit = Math.min(options.limit || 20, 100); // Cap at 100 for performance
     const skip = (page - 1) * limit;
 
-    // Build query from filters
-    const query = buildListingQuery(filters);
+    // Build query from filters - OPTIMIZED ORDER for index usage
+    const query: any = {
+      isActive: true, // Start with indexed field
+      'address.state': { $in: ['NY', 'New York'] } // NYC-only filter
+    };
 
-    // Add NYC-only filter - simplified for better index usage
-    query['address.state'] = { $in: ['NY', 'New York'] };
-    query.isActive = true; // Only show active listings
+    // Add other filters from buildListingQuery
+    const additionalFilters = buildListingQuery(filters);
+    Object.assign(query, additionalFilters);
 
     // Build sort - handle nested price field
     const baseSortField = options.sortBy || 'createdAt';
@@ -156,6 +159,7 @@ export class SearchService {
     const sort: Record<string, 1 | -1> = { [sortField]: sortOrder };
 
     // Execute query with timeout and optimized projection
+    // Use hint to force index usage for better performance
     const [listings, total] = await Promise.all([
       Listing.find(query)
         .sort(sort)
@@ -163,9 +167,13 @@ export class SearchService {
         .limit(limit)
         .select('address price bedrooms bathrooms squareFootage images sources petPolicy brokerFee amenities createdAt')
         .lean()
-        .maxTimeMS(5000) // 5 second timeout
+        .hint({ isActive: 1, 'address.state': 1, 'address.city': 1 }) // Force index usage
+        .maxTimeMS(3000) // Reduced timeout
         .exec(),
-      Listing.countDocuments(query).maxTimeMS(3000).exec(),
+      // Use estimatedDocumentCount for faster count on simple queries
+      skip === 0 && Object.keys(additionalFilters).length === 0
+        ? Listing.countDocuments({ isActive: true, 'address.state': { $in: ['NY', 'New York'] } }).maxTimeMS(1000).exec()
+        : Listing.countDocuments(query).maxTimeMS(2000).exec(),
     ]);
 
     const result = {

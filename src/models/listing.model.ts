@@ -398,11 +398,15 @@ listingSchema.index({ 'address.coordinates': '2dsphere' });
 // Compound index for deduplication
 listingSchema.index({ 'address.street': 1, 'address.unit': 1 });
 
-// Optimized compound index for search queries (price.amount instead of price)
-listingSchema.index({ 'price.amount': 1, bedrooms: 1, bathrooms: 1, createdAt: -1 });
-
-// Index for NYC filtering
-listingSchema.index({ 'address.state': 1, 'address.city': 1, isActive: 1 });
+// OPTIMIZED: Primary search index - covers most common queries
+listingSchema.index({ 
+  isActive: 1, 
+  'address.state': 1, 
+  'address.city': 1,
+  'price.amount': 1,
+  bedrooms: 1,
+  createdAt: -1 
+});
 
 // Index for pet policy searches
 listingSchema.index({ 'petPolicy.dogsAllowed': 1, 'petPolicy.catsAllowed': 1 });
@@ -413,8 +417,8 @@ listingSchema.index({ 'brokerFee.required': 1 });
 // Compound index for source lookups
 listingSchema.index({ 'sources.sourceId': 1, 'sources.sourceName': 1 });
 
-// Compound index for active listing queries
-listingSchema.index({ isActive: 1, updatedAt: -1 });
+// Index for recent active listings (fast default view)
+listingSchema.index({ isActive: 1, createdAt: -1 });
 
 /**
  * Listing model
