@@ -64,6 +64,10 @@ export default function SearchResults({ filters, triggerSearch }: SearchResultsP
 
   const fetchListings = async () => {
     try {
+      // Only show loading on initial load, not on refreshes
+      if (listings.length === 0) {
+        setLoading(true)
+      }
       setError(null)
       
       const sortOptions = getSortOptions()
