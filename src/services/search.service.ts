@@ -159,7 +159,6 @@ export class SearchService {
     const sort: Record<string, 1 | -1> = { [sortField]: sortOrder };
 
     // Execute query with timeout and optimized projection
-    // Use hint to force index usage for better performance
     const [listings, total] = await Promise.all([
       Listing.find(query)
         .sort(sort)
@@ -167,7 +166,6 @@ export class SearchService {
         .limit(limit)
         .select('address price bedrooms bathrooms squareFootage images sources petPolicy brokerFee amenities createdAt')
         .lean()
-        .hint({ isActive: 1, 'address.state': 1, 'address.city': 1 }) // Force index usage
         .maxTimeMS(3000) // Reduced timeout
         .exec(),
       // Use estimatedDocumentCount for faster count on simple queries
