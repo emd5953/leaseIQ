@@ -130,11 +130,14 @@ export class SearchService {
   }
 
   static async search(filters: SearchFilters, options: SearchOptions = {}): Promise<SearchResult> {
+    const startTime = Date.now();
+    console.log('[SEARCH] Starting search with filters:', JSON.stringify(filters));
+    
     // Check cache first
     const cacheKey = getCacheKey(filters, options);
     const cached = getCachedResult(cacheKey);
     if (cached) {
-      console.log('Cache hit for search query');
+      console.log('[SEARCH] Cache hit, returning cached result');
       return cached;
     }
 
@@ -152,11 +155,16 @@ export class SearchService {
     const additionalFilters = buildListingQuery(filters);
     Object.assign(query, additionalFilters);
 
+    console.log('[SEARCH] Query:', JSON.stringify(query));
+
     // Build sort - handle nested price field
     const baseSortField = options.sortBy || 'createdAt';
     const sortField: string = baseSortField === 'price' ? 'price.amount' : baseSortField;
     const sortOrder = options.sortOrder === 'asc' ? 1 : -1;
     const sort: Record<string, 1 | -1> = { [sortField]: sortOrder };
+
+    console.log('[SEARCH] Executing MongoDB query...');
+    const queryStartTime = Date.now();
 
     // Execute query with timeout and optimized projection
     const [listings, total] = await Promise.all([
@@ -174,6 +182,9 @@ export class SearchService {
         : Listing.countDocuments(query).maxTimeMS(2000).exec(),
     ]);
 
+    const queryTime = Date.now() - queryStartTime;
+    console.log(`[SEARCH] MongoDB query completed in ${queryTime}ms, found ${listings.length} listings`);
+
     const result = {
       listings: listings.map(this.transformListing),
       total,
@@ -183,6 +194,9 @@ export class SearchService {
 
     // Cache the result
     setCachedResult(cacheKey, result);
+
+    const totalTime = Date.now() - startTime;
+    console.log(`[SEARCH] Total search time: ${totalTime}ms`);
 
     return result;
   }
