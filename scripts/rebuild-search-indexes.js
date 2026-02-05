@@ -95,7 +95,7 @@ async function rebuildIndexes() {
     });
 
     // Get collection stats
-    const stats = await collection.stats();
+    const stats = await db.command({ collStats: 'listings' });
     console.log(`\nCollection stats:`);
     console.log(`  Documents: ${stats.count}`);
     console.log(`  Size: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
