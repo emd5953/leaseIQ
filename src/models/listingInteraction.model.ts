@@ -14,6 +14,7 @@ export interface IListingInteraction extends Document {
   metadata: {
     viewDurationSeconds: number | null;   // For 'viewed' interactions
     notes: string | null;                 // For 'saved' interactions
+    status: 'interested' | 'touring' | 'applied' | 'lease' | 'moved'; // For 'saved' interactions
   };
 }
 
@@ -55,6 +56,11 @@ const listingInteractionSchema = new Schema<IListingInteraction>({
     notes: {
       type: String,
       default: null
+    },
+    status: {
+      type: String,
+      enum: ['interested', 'touring', 'applied', 'lease', 'moved'],
+      default: 'interested'
     }
   }
 }, {

@@ -5,9 +5,9 @@ export default function HowItWorks() {
     {
       number: '01',
       title: 'Search & Discover',
-      description: 'Browse thousands of listings from all major platforms. Filter by price, location, amenities, and more.',
+      description: 'Browse StreetEasy listings and filter by price, location, amenities, and more.',
       image: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=600&q=80',
-      tech: 'Powered by Firecrawl API for real-time data extraction from 15 rental platforms',
+      tech: 'Powered by Firecrawl API for StreetEasy listing extraction',
     },
     {
       number: '02',
@@ -77,8 +77,8 @@ export default function HowItWorks() {
                 <div className="w-14 h-14 rounded-full bg-primary text-background flex items-center justify-center mb-4">
                   <span className="font-bold text-lg">1</span>
                 </div>
-                <p className="font-bold text-foreground text-lg">15 Sources</p>
-                <p className="text-foreground/60 text-sm">Rental platforms</p>
+                <p className="font-bold text-foreground text-lg">StreetEasy</p>
+                <p className="text-foreground/60 text-sm">Listing source</p>
               </div>
               
               <ArrowRight size={28} className="text-primary rotate-90 md:rotate-0" />

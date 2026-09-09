@@ -8,7 +8,7 @@ export default function HowItWorksPage() {
     {
       icon: Search,
       title: 'Unified Search',
-      description: 'We aggregate listings from 15 platforms: Zillow, StreetEasy, Apartments.com, Trulia, Realtor.com, Craigslist, Facebook, Zumper, HotPads, RentHop, PadMapper, Rent.com, Rentals.com, ApartmentList, and ApartmentGuide.',
+      description: 'We keep your apartment search focused on StreetEasy, then help you research the building and understand the lease before you commit.',
       benefits: ['Real-time updates', 'No duplicate listings', 'Advanced filters'],
       tech: 'Powered by Firecrawl API',
     },
@@ -46,7 +46,7 @@ export default function HowItWorksPage() {
       step: '02',
       title: 'Get Instant Alerts',
       description: 'We monitor all listing sources 24/7 and notify you the moment a match appears.',
-      tech: 'Firecrawl scrapes 15 sources in real-time',
+      tech: 'Firecrawl keeps StreetEasy listings fresh',
     },
     {
       step: '03',
@@ -120,8 +120,8 @@ export default function HowItWorksPage() {
                 <div className="w-14 h-14 rounded-full bg-primary text-background flex items-center justify-center mb-4">
                   <span className="font-bold text-lg">1</span>
                 </div>
-                <p className="font-bold text-foreground text-lg">15 Sources</p>
-                <p className="text-foreground/60 text-sm">Rental platforms</p>
+                <p className="font-bold text-foreground text-lg">StreetEasy</p>
+                <p className="text-foreground/60 text-sm">Listing source</p>
               </div>
               
               <ArrowRight size={28} className="text-primary rotate-90 md:rotate-0" />

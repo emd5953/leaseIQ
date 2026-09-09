@@ -4,8 +4,8 @@ export default function Features() {
   const features = [
     {
       icon: Search,
-      title: 'Unified Search',
-      description: 'Search across 15 platforms: Zillow, StreetEasy, Apartments.com, Trulia, Realtor.com, Craigslist, Facebook, Zumper, HotPads, RentHop, PadMapper, Rent.com, Rentals.com, ApartmentList, and ApartmentGuide—all in one place.',
+      title: 'StreetEasy Search',
+      description: 'Search StreetEasy rentals in one focused workspace, with filters for price, rooms, neighborhood, pets, and fees.',
     },
     {
       icon: Bell,

@@ -120,15 +120,15 @@ export default function ListingCard({ listing }: ListingCardProps) {
       ].filter(Boolean).join(', ')
 
   return (
-    <Link href={`/listing/${listing._id}`}>
-      <div className="group bg-card rounded-3xl overflow-hidden shadow-soft hover:shadow-soft-lg hover:-translate-y-2 transition-all duration-500 border border-border">
+    <Link href={`/listing/${listing._id}`} className="block pressable">
+      <div className="group bg-card rounded-3xl overflow-hidden shadow-soft transition-[transform,box-shadow] duration-200 ease-out border border-border hover:shadow-soft-lg md:hover:-translate-y-1">
         {/* Image */}
         <div className="relative aspect-[4/3] overflow-hidden">
           <img
             src={imageUrl}
             alt={listing.title}
             onError={handleImageError}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+            className="w-full h-full object-cover transition-transform duration-300 ease-out md:group-hover:scale-[1.03]"
           />
           
           {/* Badges */}
