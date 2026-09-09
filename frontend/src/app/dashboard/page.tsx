@@ -7,12 +7,13 @@ import Navigation from '@/components/Navigation'
 import Footer from '@/components/Footer'
 import { useAuth } from '@/contexts/AuthContext'
 import { api, UserPreferences, SavedSearch } from '@/lib/api'
+import ApplicationTracker from '@/components/dashboard/ApplicationTracker'
 import { 
-  Heart, Bell, Settings, Trash2, Send, Plus, X, 
+  Heart, Bell, Settings, Trash2, Send, Plus, X, ClipboardList,
   DollarSign, Bed, Bath, PawPrint, MapPin 
 } from 'lucide-react'
 
-type TabType = 'saved' | 'alerts' | 'preferences'
+type TabType = 'tracker' | 'saved' | 'alerts' | 'preferences'
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -37,7 +38,7 @@ export default function DashboardPage() {
   useEffect(() => {
     if (user) {
       // Only load if we don't have data for this tab yet
-      if (activeTab === 'saved' && savedListings.length === 0) {
+      if ((activeTab === 'tracker' || activeTab === 'saved') && savedListings.length === 0) {
         loadData()
       } else if (activeTab === 'alerts' && savedSearches.length === 0) {
         loadData()
@@ -139,12 +140,23 @@ export default function DashboardPage() {
               Welcome back, {user.displayName || user.email.split('@')[0]}
             </h1>
             <p className="text-muted-foreground mt-2">
-              Manage your saved listings, alerts, and preferences
+              Keep your apartment search, applications, and lease details together
             </p>
           </div>
 
           {/* Tabs */}
           <div className="flex gap-4 mb-8 border-b border-border">
+            <button
+              onClick={() => setActiveTab('tracker')}
+              className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
+                activeTab === 'tracker'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <ClipboardList size={18} />
+              My Apartment
+            </button>
             <button
               onClick={() => setActiveTab('saved')}
               className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
@@ -185,6 +197,11 @@ export default function DashboardPage() {
             <div className="text-center py-12 text-muted-foreground">Loading...</div>
           ) : (
             <>
+              {/* Apartment Tracker Tab */}
+              {activeTab === 'tracker' && (
+                <ApplicationTracker userId={user.id} listings={savedListings} />
+              )}
+
               {/* Saved Listings Tab */}
               {activeTab === 'saved' && (
                 <div>

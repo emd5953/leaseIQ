@@ -13,14 +13,14 @@ export default function Hero() {
             </h1>
             
             <p className="text-lg md:text-xl text-foreground/70 leading-relaxed max-w-xl">
-              Search all listings. Research landlords. Analyze leases. 
-              Everything you need to find and secure your next home—all in one place.
+              Search StreetEasy listings. Research the building. Analyze the lease.
+              Everything you need to move from browsing to signing with confidence.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4">
               <Link
                 href="/search"
-                className="group inline-flex items-center justify-center gap-2 px-8 py-4 bg-foreground text-background rounded-full text-sm tracking-widest uppercase hover:bg-opacity-90 transition-all duration-300"
+                className="pressable group inline-flex items-center justify-center gap-2 px-8 py-4 bg-foreground text-background rounded-full text-sm tracking-widest uppercase hover:bg-opacity-90 transition-opacity duration-200"
               >
                 <Search size={18} strokeWidth={1.5} />
                 Start Searching
@@ -29,7 +29,7 @@ export default function Hero() {
               
               <Link
                 href="/how-it-works"
-                className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-transparent text-primary border border-primary rounded-full text-sm tracking-widest uppercase hover:bg-primary hover:text-background transition-all duration-300"
+                className="pressable inline-flex items-center justify-center gap-2 px-8 py-4 bg-transparent text-primary border border-primary rounded-full text-sm tracking-widest uppercase hover:bg-primary hover:text-background transition-colors duration-200"
               >
                 How It Works
               </Link>

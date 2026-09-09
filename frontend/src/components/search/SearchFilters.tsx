@@ -94,14 +94,14 @@ export default function SearchFilters({ onApplyFilters }: SearchFiltersProps) {
               placeholder="Min"
               value={filters.minPrice}
               onChange={(e) => setFilters({ ...filters, minPrice: e.target.value })}
-              className="px-4 py-2 bg-card-alt rounded-full border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all duration-300 text-sm"
+              className="px-4 py-2 bg-card-alt rounded-full border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-[border-color,box-shadow] duration-200 text-sm"
             />
             <input
               type="number"
               placeholder="Max"
               value={filters.maxPrice}
               onChange={(e) => setFilters({ ...filters, maxPrice: e.target.value })}
-              className="px-4 py-2 bg-card-alt rounded-full border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all duration-300 text-sm"
+              className="px-4 py-2 bg-card-alt rounded-full border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-[border-color,box-shadow] duration-200 text-sm"
             />
           </div>
         </div>
@@ -114,7 +114,7 @@ export default function SearchFilters({ onApplyFilters }: SearchFiltersProps) {
           <select
             value={filters.bedrooms}
             onChange={(e) => setFilters({ ...filters, bedrooms: e.target.value })}
-            className="w-full px-4 py-2 bg-card-alt rounded-full border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all duration-300 text-sm"
+            className="w-full px-4 py-2 bg-card-alt rounded-full border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-[border-color,box-shadow] duration-200 text-sm"
           >
             <option value="">Any</option>
             <option value="0">Studio</option>
@@ -132,7 +132,7 @@ export default function SearchFilters({ onApplyFilters }: SearchFiltersProps) {
           <select
             value={filters.bathrooms}
             onChange={(e) => setFilters({ ...filters, bathrooms: e.target.value })}
-            className="w-full px-4 py-2 bg-card-alt rounded-full border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all duration-300 text-sm"
+            className="w-full px-4 py-2 bg-card-alt rounded-full border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-[border-color,box-shadow] duration-200 text-sm"
           >
             <option value="">Any</option>
             <option value="1">1 Bath</option>
@@ -198,7 +198,7 @@ export default function SearchFilters({ onApplyFilters }: SearchFiltersProps) {
         {/* Apply Button */}
         <button 
           onClick={() => onApplyFilters(filters)}
-          className="w-full px-6 py-3 bg-foreground text-background rounded-full text-sm tracking-widest uppercase hover:bg-opacity-90 transition-all duration-300"
+          className="pressable w-full px-6 py-3 bg-foreground text-background rounded-full text-sm tracking-widest uppercase hover:bg-opacity-90 transition-opacity duration-200"
         >
           Apply Filters
         </button>
@@ -206,7 +206,7 @@ export default function SearchFilters({ onApplyFilters }: SearchFiltersProps) {
         {/* Clear Button */}
         <button 
           onClick={handleClearFilters}
-          className="w-full px-6 py-3 bg-transparent text-foreground border border-border rounded-full text-sm tracking-widest uppercase hover:bg-card-alt transition-all duration-300"
+          className="pressable w-full px-6 py-3 bg-transparent text-foreground border border-border rounded-full text-sm tracking-widest uppercase hover:bg-card-alt transition-colors duration-200"
         >
           Clear Filters
         </button>
@@ -215,7 +215,7 @@ export default function SearchFilters({ onApplyFilters }: SearchFiltersProps) {
         {user && (
           <button 
             onClick={() => setShowSaveModal(true)}
-            className="w-full px-6 py-3 bg-primary/10 text-primary border border-primary/20 rounded-full text-sm tracking-widest uppercase hover:bg-primary/20 transition-all duration-300 flex items-center justify-center gap-2"
+            className="pressable w-full px-6 py-3 bg-primary/10 text-primary border border-primary/20 rounded-full text-sm tracking-widest uppercase hover:bg-primary/20 transition-colors duration-200 flex items-center justify-center gap-2"
           >
             <Bell size={16} />
             Save Search & Get Alerts

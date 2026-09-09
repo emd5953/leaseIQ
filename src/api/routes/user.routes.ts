@@ -83,6 +83,7 @@ router.get('/saved-listings', async (req: AuthRequest, res: Response) => {
       ...listingsMap.get(interaction.listingId.toString()),
       savedAt: interaction.timestamp,
       notes: interaction.metadata?.notes,
+      status: interaction.metadata?.status || 'interested',
     }));
 
     res.json(result);
@@ -99,7 +100,7 @@ router.get('/saved-listings', async (req: AuthRequest, res: Response) => {
 router.post('/saved-listings/:listingId', async (req: AuthRequest, res: Response) => {
   try {
     const { listingId } = req.params;
-    const { notes } = req.body;
+    const { notes, status } = req.body;
 
     // Verify listing exists
     const listing = await Listing.findById(listingId);
@@ -119,7 +120,11 @@ router.post('/saved-listings/:listingId', async (req: AuthRequest, res: Response
         listingId: new Types.ObjectId(listingId as string),
         interactionType: 'saved',
         timestamp: new Date(),
-        metadata: { notes: notes || null, viewDurationSeconds: null },
+        metadata: {
+          notes: notes || null,
+          status: status || 'interested',
+          viewDurationSeconds: null,
+        },
       },
       { upsert: true, new: true }
     );
@@ -128,6 +133,44 @@ router.post('/saved-listings/:listingId', async (req: AuthRequest, res: Response
   } catch (error) {
     console.error('Save listing error:', error);
     res.status(500).json({ error: 'Failed to save listing' });
+  }
+});
+
+/**
+ * PATCH /api/user/saved-listings/:listingId
+ * Update saved listing notes or application tracker status
+ */
+router.patch('/saved-listings/:listingId', async (req: AuthRequest, res: Response) => {
+  try {
+    const { listingId } = req.params;
+    const { notes, status } = req.body;
+    const allowedStatuses = ['interested', 'touring', 'applied', 'lease', 'moved'];
+
+    if (status && !allowedStatuses.includes(status)) {
+      return res.status(400).json({ error: 'Invalid tracker status' });
+    }
+
+    const interaction = await ListingInteraction.findOneAndUpdate(
+      {
+        userId: req.userId,
+        listingId: new Types.ObjectId(listingId as string),
+        interactionType: 'saved',
+      },
+      {
+        ...(notes !== undefined ? { 'metadata.notes': notes } : {}),
+        ...(status ? { 'metadata.status': status } : {}),
+      },
+      { new: true, runValidators: true }
+    );
+
+    if (!interaction) {
+      return res.status(404).json({ error: 'Saved listing not found' });
+    }
+
+    res.json({ success: true, interaction });
+  } catch (error) {
+    console.error('Update saved listing error:', error);
+    res.status(500).json({ error: 'Failed to update saved listing' });
   }
 });
 

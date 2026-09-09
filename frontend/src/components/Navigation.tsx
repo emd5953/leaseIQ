@@ -53,7 +53,7 @@ export default function Navigation() {
               href="/search" 
               className="text-foreground hover:text-primary transition-colors duration-300"
             >
-              Search
+              Find an apartment
             </Link>
             <Link 
               href="/how-it-works" 
@@ -71,7 +71,7 @@ export default function Navigation() {
               href="/lease-analyzer" 
               className="text-foreground hover:text-primary transition-colors duration-300"
             >
-              Property Analyzer
+              Lease Analyzer
             </Link>
 
             {/* Auth Section */}
@@ -148,7 +148,7 @@ export default function Navigation() {
               className="block text-lg text-foreground hover:text-primary transition-colors duration-300"
               onClick={() => setMobileMenuOpen(false)}
             >
-              Property Analyzer
+              Lease Analyzer
             </Link>
 
             {/* Mobile Auth */}

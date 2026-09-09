@@ -14,8 +14,8 @@ Finding an apartment in NYC is broken:
 
 LeaseIQ is an all-in-one platform that gives renters an unfair advantage:
 
-### 🔍 One Search, All Listings
-We scrape 13+ rental sites every 15 minutes and deduplicate them. Search once, see everything.
+### 🔍 StreetEasy Search
+We focus on StreetEasy rentals and keep the search experience fast, current, and NYC-specific.
 
 ### 🏢 Research Before You Tour
 Enter any listing ID and get:
@@ -80,11 +80,11 @@ cd frontend && npm run dev
 ## Features
 
 ### 🏢 Automated Listing Scraping
-- **13 rental sites**: StreetEasy, Zillow, Apartments.com, Trulia, Realtor, Zumper, RentHop, Rent.com, HotPads, ApartmentGuide, Rentals.com, ApartmentList, PadMapper
+- **StreetEasy-focused**: One high-quality NYC listing source instead of a noisy multi-site aggregator
 - **NYC focused**: Manhattan, Brooklyn, Queens
 - **Runs every 15 minutes**: Automatic background job
 - **100+ listings per run**: Parallel processing for speed
-- **Smart deduplication**: Merges listings from multiple sources
+- **Reliable refreshes**: Re-checks StreetEasy listings on a recurring schedule
 
 ### 🔍 Intelligent Search
 - Advanced filtering (price, bedrooms, location, amenities)

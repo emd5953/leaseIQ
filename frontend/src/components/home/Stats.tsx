@@ -1,8 +1,8 @@
 export default function Stats() {
   const stats = [
     { value: '500+', label: 'New Listings Daily' },
-    { value: '15', label: 'Data Sources' },
-    { value: '24/7', label: 'Real-time Updates' },
+    { value: '1', label: 'Focused Listing Source' },
+    { value: '24/7', label: 'Freshness Monitoring' },
     { value: '<30s', label: 'AI Lease Analysis' },
   ]
 

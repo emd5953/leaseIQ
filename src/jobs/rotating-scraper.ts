@@ -1,36 +1,19 @@
 import { ListingSource } from '../ingestion/types';
 
 /**
- * High-frequency rotating scraper for competitive apartment alerts
- * PHASE 1: Runs every 15 minutes (conservative start)
- * PHASE 2: Scale to every 10 minutes after 1 week if stable
- * Rotates through source groups to stay within 60-second timeout
+ * High-frequency StreetEasy scraper for competitive apartment alerts.
+ * The source group remains an array so the scheduler contract stays stable
+ * if additional sources are introduced later.
  */
 export class RotatingScraper {
-  // All 13 working sources divided into 13 groups (1 source per run for maximum speed)
-  private sourceGroups: ListingSource[][] = [
-    [ListingSource.STREETEASY],      // NYC-specific, highest priority
-    [ListingSource.RENTHOP],         // NYC-specific
-    [ListingSource.ZILLOW],          // High volume
-    [ListingSource.APARTMENTS_COM],  // High volume
-    [ListingSource.ZUMPER],          // Popular
-    [ListingSource.TRULIA],          // Popular
-    [ListingSource.REALTOR],         // Major platform
-    [ListingSource.HOTPADS],         // Major platform
-    [ListingSource.RENT_COM],        // Additional coverage
-    [ListingSource.APARTMENT_GUIDE], // Additional coverage
-    [ListingSource.RENTALS_COM],     // Additional coverage
-    [ListingSource.APARTMENT_LIST],  // Additional coverage
-    [ListingSource.PADMAPPER],       // Additional coverage
-  ];
+  private sourceGroups: ListingSource[][] = [[ListingSource.STREETEASY]];
 
   // Configuration for different phases
   private readonly INTERVAL_MINUTES = 15; // 15-minute interval for better API stability
 
   /**
    * Get sources to scrape based on current interval
-   * With 96 runs per day (every 15 min), each source runs 7-8 times daily
-   * With 144 runs per day (every 10 min), each source runs 11 times daily
+   * With 96 runs per day (every 15 min), StreetEasy runs every interval.
    */
   getCurrentSources(): ListingSource[] {
     const now = new Date();

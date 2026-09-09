@@ -11,21 +11,7 @@ import { RateLimiter } from './rateLimiter';
 import { ErrorHandler } from './errorHandler';
 import { MetricsTracker } from './metrics';
 import { 
-  StreetEasyScraper, 
-  ZillowScraper, 
-  ApartmentsScraper,
-  TruliaScraper,
-  RealtorScraper,
-  ZumperScraper,
-  RentHopScraper,
-  RentComScraper,
-  HotPadsScraper,
-  ApartmentGuideScraper,
-  RentalsComScraper,
-  ApartmentListScraper,
-  PadMapperScraper,
-  CraigslistScraper, 
-  FacebookScraper 
+  StreetEasyScraper,
 } from '../scrapers';
 import { config } from '../config';
 
@@ -55,22 +41,11 @@ export class ScrapingOrchestrator {
     this.errorHandler = new ErrorHandler();
     this.metricsTracker = new MetricsTracker();
 
-    // Initialize ALL working scrapers (14 total - Craigslist and Facebook are blocklisted by Firecrawl)
+    // LeaseIQ currently focuses on StreetEasy as its sole listing source.
+    // Keep the source abstraction in place so expanding later does not require
+    // changing the ingestion pipeline or stored listing shape.
     this.scrapers = new Map();
     this.scrapers.set(ListingSource.STREETEASY, new StreetEasyScraper(this.firecrawlClient));
-    this.scrapers.set(ListingSource.ZILLOW, new ZillowScraper(this.firecrawlClient));
-    this.scrapers.set(ListingSource.APARTMENTS_COM, new ApartmentsScraper(this.firecrawlClient));
-    this.scrapers.set(ListingSource.TRULIA, new TruliaScraper(this.firecrawlClient));
-    this.scrapers.set(ListingSource.REALTOR, new RealtorScraper(this.firecrawlClient));
-    this.scrapers.set(ListingSource.ZUMPER, new ZumperScraper(this.firecrawlClient));
-    this.scrapers.set(ListingSource.RENTHOP, new RentHopScraper(this.firecrawlClient));
-    this.scrapers.set(ListingSource.RENT_COM, new RentComScraper(this.firecrawlClient));
-    this.scrapers.set(ListingSource.HOTPADS, new HotPadsScraper(this.firecrawlClient));
-    this.scrapers.set(ListingSource.APARTMENT_GUIDE, new ApartmentGuideScraper(this.firecrawlClient));
-    this.scrapers.set(ListingSource.RENTALS_COM, new RentalsComScraper(this.firecrawlClient));
-    this.scrapers.set(ListingSource.APARTMENT_LIST, new ApartmentListScraper(this.firecrawlClient));
-    this.scrapers.set(ListingSource.PADMAPPER, new PadMapperScraper(this.firecrawlClient));
-    // Craigslist and Facebook are disabled (blocklisted by Firecrawl)
 
     // Configure rate limiters
     this.rateLimiter.configure('firecrawl', {
@@ -84,22 +59,12 @@ export class ScrapingOrchestrator {
   }
 
   /**
-   * Run full scrape across all sources
-   * For cron jobs with time limits, only scrape high-value sources
+   * Run the configured full scrape.
+   * The current product scope is StreetEasy only.
    */
   async runFullScrape(): Promise<ScrapingJobResult> {
-    // Prioritize high-volume NYC sources to fit within cron timeout
-    // Scrape top 5 sources per run to stay under 60 second limit
-    const prioritySources = [
-      ListingSource.STREETEASY,    // NYC-specific, highest quality
-      ListingSource.ZILLOW,         // High volume
-      ListingSource.APARTMENTS_COM, // High volume
-      ListingSource.RENTHOP,        // NYC-specific
-      ListingSource.ZUMPER,         // Good coverage
-    ];
-    
-    console.log(`[Orchestrator] Running optimized scrape for ${prioritySources.length} priority sources`);
-    return this.runPartialScrape(prioritySources);
+    console.log('[Orchestrator] Running StreetEasy-only scrape');
+    return this.runPartialScrape([ListingSource.STREETEASY]);
   }
 
   /**

@@ -137,7 +137,7 @@ export default function SearchResults({ filters, triggerSearch }: SearchResultsP
         <p className="text-foreground/70 text-sm">{error}</p>
         <button
           onClick={fetchListings}
-          className="mt-4 px-6 py-2 bg-foreground text-background rounded-full text-sm tracking-widest uppercase hover:bg-opacity-90 transition-all duration-300"
+          className="pressable mt-4 px-6 py-2 bg-foreground text-background rounded-full text-sm tracking-widest uppercase hover:bg-opacity-90 transition-opacity duration-200"
         >
           Try Again
         </button>
@@ -169,7 +169,7 @@ export default function SearchResults({ filters, triggerSearch }: SearchResultsP
           <button
             onClick={handleRefresh}
             disabled={loading}
-            className="text-xs text-primary hover:text-primary/80 underline disabled:opacity-50"
+            className="pressable text-xs text-primary hover:text-primary/80 underline disabled:opacity-50"
           >
             Refresh
           </button>
@@ -177,7 +177,7 @@ export default function SearchResults({ filters, triggerSearch }: SearchResultsP
         <select 
           value={sortOption}
           onChange={(e) => setSortOption(e.target.value as SortOption)}
-          className="px-4 py-2 bg-card rounded-full border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all duration-300 text-sm"
+          className="px-4 py-2 bg-card rounded-full border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-[border-color,box-shadow] duration-200 text-sm"
         >
           <option value="newest">Newest First</option>
           <option value="price-asc">Price: Low to High</option>

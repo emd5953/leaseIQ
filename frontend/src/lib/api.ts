@@ -191,6 +191,16 @@ export const api = {
     return response.json()
   },
 
+  async updateSavedListingStatus(listingId: string, status: 'interested' | 'touring' | 'applied' | 'lease' | 'moved') {
+    const response = await fetch(`${API_URL}/api/user/saved-listings/${listingId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify({ status }),
+    })
+    if (!response.ok) throw new Error('Failed to update listing status')
+    return response.json()
+  },
+
   async unsaveListing(listingId: string) {
     const response = await fetch(`${API_URL}/api/user/saved-listings/${listingId}`, {
       method: 'DELETE',
