@@ -47,6 +47,8 @@ export default function ListingDetail({ listing }: { listing: any }) {
       <div className="flex gap-2"><button onClick={toggleSave} disabled={saving} aria-pressed={saved} className="flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm">{saved ? <Check size={16} /> : <Heart size={16} />}{saved ? 'Saved' : 'Save'}</button><button onClick={share} className="flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm"><Share2 size={16} />Share</button></div>
     </div>
     {message && <p role="status" className="mb-5 rounded-xl bg-primary/10 p-4 text-sm">{message}</p>}
+    {listing.sourceIdentityNeedsReview && <p className="mb-5 rounded-xl bg-amber-50 p-4 text-sm text-amber-950">A source ID was shared by multiple records. The conflicting source association is under review; confirm the exact unit and rent before relying on this listing.</p>}
+    {listing.rentNeedsReview && <p className="mb-5 rounded-xl bg-amber-50 p-4 text-sm text-amber-950">The previous rent was invalid. Current rent is unknown until an exact unit price can be verified.</p>}
     <div className="grid items-start gap-8 lg:grid-cols-[1fr_340px]">
       <div className="min-w-0 space-y-8">
         <div className="relative flex aspect-[16/10] items-center justify-center overflow-hidden rounded-3xl border border-border bg-card-alt">

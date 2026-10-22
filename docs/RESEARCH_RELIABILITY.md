@@ -68,7 +68,7 @@ The browser flow was exercised against real Manhattan and Brooklyn addresses, in
 
 ## Existing-database rollout
 
-No production database or credentials were available, so production records were not modified, merged, or deleted. Run `npm run audit:listings` with the intended database before deployment; it only reads and reports missing source dates, stale observations, ambiguous units, legacy fields, unverified fee fields, and repeated source identities.
+The initial implementation was validated without production credentials. The later authorized database repair is recorded below. Run `npm run audit:listings` with the intended database before deployment; it only reads and reports missing source dates, stale observations, ambiguous units, legacy fields, unverified fee fields, and repeated source identities.
 
 New source keys are sparse, allowing older records without keys to coexist. Existing duplicate source records are not silently collapsed. Review the audit, select survivors, and remap saved listing/alert references before any future merge. Reimports establish keys and observed fields for matched records. Historical documents without normalized unit keys may not deduplicate across sources until normalized. Legacy source-name variants and records whose identity changed require a deliberate migration. Do not invent dates, units, policies, or fees during that process.
 
@@ -76,10 +76,41 @@ The canonical schema preserves legacy root coordinates on reads because an exist
 
 ## Remaining source and access limitations
 
-- Live StreetEasy/Firecrawl ingestion, production MongoDB contents, Google authentication, saved accounts, and real email delivery could not be validated without their credentials. Parser-to-storage-to-search was verified using a disposable database. Research uses genuine public-source responses.
+- Live scheduled StreetEasy/Firecrawl ingestion, Google authentication, account creation, and real email delivery remain unvalidated. Parser-to-storage-to-search was verified using a disposable database. Research uses genuine public-source responses.
 - DOB permits/complaints, HPD complaint details, litigation, rent stabilization, tenant reviews, manager response quality, street noise, flood exposure, grocery access, and market rent comparisons are not collected as verified findings. An exploratory request to the HPD complaints dataset `uwyv-629c` returned HTTP 403; it was not wired into the product as if available.
 - Public source access may throttle, time out, or change schemas. A failed query produces an evidence gap; it never clears a building. Source metadata can be older than a report and may fail independently.
 - Conservative exact matching can miss alternate entrances, house-number ranges, renamed streets, and properties outside HPD jurisdiction. It deliberately does not fuzzy-match these to a different building.
 - PLUTO is tax-lot scoped, not necessarily a single building or unit. MTA inventory is not live service or elevator status. No commute, safety, demographic, or management reputation score is generated.
 - Comparison snapshots live only in the current browser; they are not synced to accounts and become dated. Run a new lookup and choose “Update comparison” to refresh a saved brief. A print/export is a snapshot, not a live monitor.
 - Mobile breakpoints are implemented; this validation used the desktop in-app browser. No device-specific mobile or assistive-technology audit is claimed.
+
+
+## Authorized database repair — October 22, 2026
+
+The local backend authenticated to the LeaseIQ Atlas database using a dedicated
+user restricted to `readWrite` on `leaseiq`. Credentials remain outside Git.
+Private Extended JSON backups were written before a transaction updated the data.
+All 612 listing IDs and the existing saved-listing reference were preserved.
+
+- Converted three zero rents to explicit unknown values, retaining the original
+  values for review. No building-level minimum rent was invented as a unit price.
+- Quarantined four shared source IDs across eight records. These records stay
+  visible with source-identity warnings; their unit ownership still requires
+  evidence. Imports of quarantined IDs are blocked.
+- Backfilled source keys and enabled the sparse unique `sourceKeys` index.
+- Verified five records against exact unit offers and marked them unavailable.
+  Further source checking encountered an access block and stopped. Unverified
+  stale listings remain active with warnings.
+- The follow-up audit reports zero invalid numeric rents, zero duplicate active
+  source associations, three unknown rents, and eight records needing identity
+  review. A second repair dry run proposes zero changes.
+- Backend health reports connected; NYC search returns 283 results. API and
+  browser checks verified unknown-rent warnings, source-identity flags, stale
+  visibility, and inactive status for confirmed unavailable records.
+- All 294 tests across 27 files pass without weakening the existing tests. Backend
+  and frontend production builds pass. Tests use disposable databases, not Atlas.
+
+The remaining 603 stale records and four records with only quarantined source
+associations have not been freshly verified. Quarantine contains ambiguous
+identity data; it does not prove that multiple records represent the same unit.
+See [repair operation and safeguards](listing-repairs.md).

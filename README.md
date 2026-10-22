@@ -57,7 +57,7 @@ npm test                       # full unit, property, and reliability suite
 
 `RESEARCH_VALIDATION_OUTPUT=/tmp/leaseiq-reports npm run validate:research` also saves full dated JSON reports. Source failures or unmatched expected properties produce a nonzero exit status.
 
-The reliability suite exercises ingestion, storage, deduplication, source failure handling, report provenance, HTTP endpoints, search, and email rendering without sending email. The full suite passes 275 tests across 26 files, including the legacy account and listing suites. Database-backed property cases start with isolated data and use the original sample counts. See [validation evidence and remaining limitations](docs/RESEARCH_RELIABILITY.md) for exact results.
+The reliability suite exercises ingestion, storage, deduplication, source failure handling, report provenance, HTTP endpoints, search, and email rendering without sending email. The full suite passes 294 tests across 27 files, including the legacy account and listing suites. Database-backed property cases start with isolated data and use the original sample counts. See [validation evidence and remaining limitations](docs/RESEARCH_RELIABILITY.md) for exact results.
 
 ## Architecture
 

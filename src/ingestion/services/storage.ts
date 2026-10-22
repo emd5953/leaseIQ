@@ -14,6 +14,7 @@ export function listingFields(listing: NormalizedListing, coordinates: Coordinat
 
 export class ListingStorage {
   async insertListing(listing: NormalizedListing, coordinates: Coordinates | null): Promise<string> {
+    await this.assertSourceNotQuarantined(listing);
     try {
       const fields = listingFields(listing, coordinates);
       const fieldObservedAt = observedFields(fields, listing.scrapedAt);
@@ -32,6 +33,7 @@ export class ListingStorage {
   }
 
   async updateListing(id: string, listing: NormalizedListing, coordinates: Coordinates | null): Promise<void> {
+    await this.assertSourceNotQuarantined(listing);
     for (let attempt = 0; attempt < 3; attempt++) {
       const existing = await ListingModel.findById(id);
       if (!existing) throw new Error('Listing disappeared during import');
@@ -40,6 +42,7 @@ export class ListingStorage {
       const latestSeen = Math.max(0, ...existing.sources.map(s => new Date(s.lastSeenAt).getTime()).filter(Number.isFinite));
       if (listing.scrapedAt.getTime() >= latestSeen) {
         const fields = listingFields(listing, coordinates);
+        existing.set('price.status', 'known');
         for (const [key, observedAt] of Object.entries(observedFields(fields, listing.scrapedAt))) existing.set(`fieldObservedAt.${key}`, observedAt);
         // Missing extraction fields must not erase previously observed values.
         for (const [key, value] of Object.entries(fields)) {
@@ -62,6 +65,11 @@ export class ListingStorage {
 
   async findBySourceId(source: ListingSource, sourceId: string): Promise<any | null> {
     return ListingModel.findOne({ sources: { $elemMatch: { source, sourceId } } });
+  }
+  private async assertSourceNotQuarantined(listing: NormalizedListing): Promise<void> {
+    if (await ListingModel.exists({ 'sourceConflicts.sourceKey': sourceKey(listing) })) {
+      throw new Error('Source identity is quarantined; verify the unit before importing this source ID.');
+    }
   }
   async findByAddress(address: string): Promise<any[]> { return ListingModel.find({ 'address.fullAddress': address }); }
   async markInactive(id: string): Promise<void> { await ListingModel.findByIdAndUpdate(id, { isActive: false }); }

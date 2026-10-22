@@ -2,8 +2,9 @@
 export function presentListing(listing: any, now = Date.now()): any {
   if (!listing) return null;
   const address = listing.address || {};
-  const price = typeof listing.price === 'object' ? listing.price?.amount : listing.price;
+  const price = listing.price?.status === 'unknown' ? null : typeof listing.price === 'object' ? listing.price?.amount : listing.price;
   const sources = [...(listing.sources || [])].sort((a, b) => (Date.parse(b.lastSeenAt || b.scrapedAt) || 0) - (Date.parse(a.lastSeenAt || a.scrapedAt) || 0));
+  const sourceIdentityNeedsReview = !!listing.sourceConflicts?.length;
   const observed = Date.parse(sources[0]?.lastSeenAt || sources[0]?.scrapedAt);
   const lastSeenAt = Number.isFinite(observed) && observed <= now ? new Date(observed).toISOString() : null;
   const freshness = !lastSeenAt ? 'unknown' : now - observed > 72 * 3600000 ? 'stale' : 'recent';
@@ -24,7 +25,9 @@ export function presentListing(listing: any, now = Date.now()): any {
     squareFeet: listing.squareFootage ?? listing.squareFeet ?? null,
     source: sources[0]?.source || sources[0]?.sourceName || 'Source unknown',
     sourceUrl: /^https?:\/\//i.test(sources[0]?.sourceUrl) ? sources[0].sourceUrl : null,
-    sources, lastSeenAt, freshness, petsAllowed: petsAllowed === false && !hasEvidence('petPolicy_allowed') ? null : petsAllowed,
+    sources, lastSeenAt, freshness, sourceIdentityNeedsReview,
+    rentNeedsReview: listing.price?.status === 'unknown',
+    petsAllowed: petsAllowed === false && !hasEvidence('petPolicy_allowed') ? null : petsAllowed,
     noFee,
   };
 }

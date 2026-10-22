@@ -33,7 +33,8 @@ export interface IListing extends Document {
   
   // Pricing and availability
   price: {
-    amount: number;
+    amount: number | null;
+    status?: 'known' | 'unknown';
     currency: string;
     period: 'monthly' | 'weekly' | 'daily';
   };
@@ -47,6 +48,8 @@ export interface IListing extends Document {
   squareFootage: number | null;
   squareFeet?: number | null; // legacy ingestion records
   sourceKeys?: string[];
+  sourceConflicts?: { sourceKey: string; source: IListingSource; quarantinedAt: Date; reason: string }[];
+  rentReview?: { originalAmount: number; reason: string; reviewedAt: Date };
   addressKey?: string;
   coordinates?: { type: string; coordinates: [number, number] };
   
@@ -116,6 +119,8 @@ const listingSchema = new Schema<IListing>({
   dataVersion: { type: Number },
   fieldObservedAt: { type: Map, of: Date, default: undefined },
   sourceKeys: { type: [String], default: undefined },
+  sourceConflicts: { type: [Schema.Types.Mixed], default: undefined },
+  rentReview: { type: Schema.Types.Mixed, default: undefined },
   addressKey: { type: String },
   squareFeet: { type: Number, default: undefined },
   coordinates: { type: new Schema({ type: { type: String, enum: ['Point'] }, coordinates: [Number] }, { _id: false }), default: undefined },
@@ -161,9 +166,10 @@ const listingSchema = new Schema<IListing>({
   },
   
   price: {
+    status: { type: String, enum: ['known', 'unknown'], default: undefined },
     amount: {
       type: Number,
-      required: [true, 'Price amount is required'],
+      required: [function(this: IListing) { return this.price?.status !== 'unknown'; }, 'Price amount is required'],
       validate: {
         validator: function(v: number) {
           return v == null || (Number.isFinite(v) && v > 0);

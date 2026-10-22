@@ -69,6 +69,15 @@ describe('Ingestion to MongoDB to search', () => {
     expect(ids[0]).toBe(ids[1]);
     expect(await Listing.countDocuments({})).toBe(1);
   });
+  it('blocks a quarantined source ID from insert and update without losing existing data', async () => {
+    const data = await normalized('quarantined');
+    const id = await storage.insertListing(data, null);
+    await Listing.findByIdAndUpdate(id, { $push: { sourceConflicts: { sourceKey: 'streeteasy:quarantined', reason: 'Ambiguous unit owner' } } });
+    await expect(storage.insertListing(data, null)).rejects.toThrow('quarantined');
+    await expect(storage.updateListing(id, data, null)).rejects.toThrow('quarantined');
+    expect(await Listing.countDocuments({})).toBe(1);
+    expect((await Listing.findById(id))?.price.amount).toBe(4000);
+  });
   it('bases expiry on source evidence even after a maintenance update', async () => {
     const id = await storage.insertListing(await normalized('old', {}, new Date('2020-01-01')), null);
     await Listing.findByIdAndUpdate(id, { description: 'Maintenance edit today' });
