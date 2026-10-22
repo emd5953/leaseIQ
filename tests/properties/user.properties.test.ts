@@ -1,3 +1,4 @@
+import { resetDatabase } from '../helpers/database';
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import mongoose from 'mongoose';
@@ -10,6 +11,7 @@ describe('User Model Property Tests', () => {
   beforeAll(async () => {
     mongoServer = await MongoMemoryServer.create();
     await mongoose.connect(mongoServer.getUri());
+    await Promise.all(Object.values(mongoose.models).map(model => model.init()));
   });
 
   afterAll(async () => {
@@ -74,7 +76,7 @@ describe('User Model Property Tests', () => {
             expect(retrievedUser.updatedAt).toEqual(user.updatedAt);
           }
         }
-      ),
+      ).beforeEach(resetDatabase),
       { numRuns: 100 }
     );
   });
@@ -122,7 +124,7 @@ describe('User Model Property Tests', () => {
             expect(updatedUser.createdAt.getTime()).toBe(user.createdAt.getTime());
           }
         }
-      ),
+      ).beforeEach(resetDatabase),
       { numRuns: 100 }
     );
   });
@@ -182,7 +184,7 @@ describe('User Model Property Tests', () => {
             expect(retrievedUser.createdAt.getTime()).toBe(originalCreatedAt.getTime());
           }
         }
-      ),
+      ).beforeEach(resetDatabase),
       { numRuns: 100 }
     );
   });
@@ -244,7 +246,7 @@ describe('User Model Property Tests', () => {
             expect(queriedUser.displayName).toBe(displayName1);
           }
         }
-      ),
+      ).beforeEach(resetDatabase),
       { numRuns: 100 }
     );
   });

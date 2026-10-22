@@ -53,11 +53,11 @@ export interface ParsedListing {
   applicationFee: number | null;
   availableDate: string | null;
   utilities: {
-    electric: boolean;
-    gas: boolean;
-    water: boolean;
-    internet: boolean;
-    trash: boolean;
+    electric: boolean | null;
+    gas: boolean | null;
+    water: boolean | null;
+    internet: boolean | null;
+    trash: boolean | null;
   } | null;
   laundry: string | null;
   heating: string | null;
@@ -68,6 +68,7 @@ export interface ParsedListing {
 }
 
 export interface Address {
+  unit?: string | null;
   street: string;
   city: string;
   state: string;
@@ -82,13 +83,15 @@ export interface Price {
 }
 
 export interface PetPolicy {
-  allowed: boolean;
+  dogsAllowed?: boolean | null;
+  catsAllowed?: boolean | null;
+  allowed: boolean | null;
   restrictions: string | null;
   deposit: number | null;
 }
 
 export interface BrokerFee {
-  required: boolean;
+  required: boolean | null;
   amount: number | null;
   percentage: number | null;
 }
@@ -123,11 +126,11 @@ export interface NormalizedListing {
   applicationFee: number | null;
   availableDate: Date | null;
   utilities: {
-    electric: boolean;
-    gas: boolean;
-    water: boolean;
-    internet: boolean;
-    trash: boolean;
+    electric: boolean | null;
+    gas: boolean | null;
+    water: boolean | null;
+    internet: boolean | null;
+    trash: boolean | null;
   };
   laundry: string | null;
   heating: string | null;
@@ -162,6 +165,7 @@ export interface ScrapeConfig {
 }
 
 export interface SourceResult {
+  issues?: string[];
   source: ListingSource;
   listingsScraped: number;
   errors: number;

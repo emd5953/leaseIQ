@@ -1,3 +1,4 @@
+import { resetDatabase } from '../helpers/database';
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import mongoose from 'mongoose';
@@ -10,6 +11,7 @@ describe('Listing Model Property Tests', () => {
   beforeAll(async () => {
     mongoServer = await MongoMemoryServer.create();
     await mongoose.connect(mongoServer.getUri());
+    await Promise.all(Object.values(mongoose.models).map(model => model.init()));
   });
 
   afterAll(async () => {
@@ -55,15 +57,15 @@ describe('Listing Model Property Tests', () => {
   });
 
   const sourceArb = fc.record({
-    sourceName: fc.constantFrom('StreetEasy', 'Zillow', 'Apartments.com', 'Craigslist', 'Facebook'),
+    source: fc.constantFrom('StreetEasy', 'Zillow', 'Apartments.com', 'Craigslist', 'Facebook'),
     sourceId: fc.uuid(),
     sourceUrl: fc.webUrl(),
-    scrapedAt: fc.date().filter(d => !isNaN(d.getTime()))
-  });
+    lastSeenAt: fc.date({ noInvalidDate: true })
+  }).map(source => ({ ...source, firstSeenAt: source.lastSeenAt }));
 
   const listingArb = fc.record({
     address: addressArb,
-    price: fc.double({ min: 1, max: 50000, noNaN: true }),
+    price: fc.record({ amount: fc.double({ min: 1, max: 50000, noNaN: true }), currency: fc.constant('USD'), period: fc.constant('monthly' as const) }),
     availableDate: fc.option(fc.date().filter(d => !isNaN(d.getTime())), { nil: null }),
     bedrooms: fc.integer({ min: 0, max: 10 }),
     bathrooms: fc.double({ min: 0.5, max: 10, noNaN: true }),
@@ -114,8 +116,10 @@ describe('Listing Model Property Tests', () => {
           expect(latitude).toBeLessThanOrEqual(90);
 
           // Verify price
-          expect(typeof listing.price).toBe('number');
-          expect(listing.price).toBeGreaterThan(0);
+          expect(typeof listing.price.amount).toBe('number');
+          expect(listing.price.amount).toBeGreaterThan(0);
+          expect(listing.price.currency).toBe('USD');
+          expect(listing.price.period).toBe('monthly');
 
           // Verify bedrooms
           expect(typeof listing.bedrooms).toBe('number');
@@ -160,10 +164,12 @@ describe('Listing Model Property Tests', () => {
           expect(Array.isArray(listing.sources)).toBe(true);
           expect(listing.sources.length).toBeGreaterThan(0);
           listing.sources.forEach(source => {
-            expect(typeof source.sourceName).toBe('string');
+            expect(typeof source.source).toBe('string');
             expect(typeof source.sourceId).toBe('string');
             expect(typeof source.sourceUrl).toBe('string');
-            expect(source.scrapedAt).toBeInstanceOf(Date);
+            expect(source.firstSeenAt).toBeInstanceOf(Date);
+            expect(source.lastSeenAt).toBeInstanceOf(Date);
+            expect(source.firstSeenAt).toEqual(source.lastSeenAt);
           });
 
           // Verify timestamps
@@ -181,7 +187,7 @@ describe('Listing Model Property Tests', () => {
           
           if (retrievedListing) {
             expect(retrievedListing.address.street).toBe(listing.address.street);
-            expect(retrievedListing.price).toBe(listing.price);
+            expect(retrievedListing.price.amount).toBe(listing.price.amount);
             expect(retrievedListing.bedrooms).toBe(listing.bedrooms);
             expect(retrievedListing.bathrooms).toBe(listing.bathrooms);
             expect(retrievedListing.sources.length).toBe(listing.sources.length);
@@ -189,7 +195,7 @@ describe('Listing Model Property Tests', () => {
             expect(retrievedListing.updatedAt).toEqual(listing.updatedAt);
           }
         }
-      ),
+      ).beforeEach(resetDatabase),
       { numRuns: 100 }
     );
   });
@@ -264,7 +270,7 @@ describe('Listing Model Property Tests', () => {
             }
           }
         }
-      ),
+      ).beforeEach(resetDatabase),
       { numRuns: 100 }
     );
   });

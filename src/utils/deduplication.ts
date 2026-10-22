@@ -83,7 +83,9 @@ export function calculateDistance(
             Math.cos(φ1) * Math.cos(φ2) *
             Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
   
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  // Floating-point rounding at antipodal points can put a just above 1.
+  const boundedA = Math.max(0, Math.min(1, a));
+  const c = 2 * Math.atan2(Math.sqrt(boundedA), Math.sqrt(1 - boundedA));
   
   return R * c;
 }
@@ -103,6 +105,7 @@ export async function findDuplicates(
   coordinates: [number, number],
   maxDistanceMeters: number = 50
 ): Promise<IListing[]> {
+  if (!validCoordinates(coordinates)) return [];
   const normalizedStreet = normalizeAddress(street);
   const normalizedUnit = unit ? normalizeAddress(unit) : null;
   
@@ -121,13 +124,19 @@ export async function findDuplicates(
     if (normalizedUnit !== listingUnit) return false;
     
     // Check coordinate proximity
-    const listingCoords = listing.address.coordinates.coordinates as [number, number];
+    const listingCoords = listing.address.coordinates?.coordinates || listing.coordinates?.coordinates;
+    if (!validCoordinates(listingCoords)) return false;
     const distance = calculateDistance(coordinates, listingCoords);
     
     return distance <= maxDistanceMeters;
   });
   
   return duplicates;
+}
+
+function validCoordinates(value: unknown): value is [number, number] {
+  return Array.isArray(value) && value.length === 2 && value.every(Number.isFinite) &&
+    Math.abs(value[0]) <= 180 && Math.abs(value[1]) <= 90;
 }
 
 /**
@@ -148,23 +157,28 @@ export async function mergeListing(
   // Store original createdAt before any modifications
   const originalCreatedAt = existingListing.createdAt;
   
-  // Add new source to sources array if not already present
-  const newSource = newListingData.sources[0];
-  const sourceExists = existingListing.sources.some(
-    s => s.source === newSource.source && s.sourceId === newSource.sourceId
-  );
-  
-  if (!sourceExists) {
-    existingListing.sources.push(newSource);
-  } else {
-    // Update existing source's lastSeenAt timestamp
-    const existingSourceIndex = existingListing.sources.findIndex(
-      s => s.source === newSource.source && s.sourceId === newSource.sourceId
-    );
-    existingListing.sources[existingSourceIndex].lastSeenAt = newSource.lastSeenAt;
+  const incomingSources = newListingData.sources;
+  if (!incomingSources.length || incomingSources.some(source =>
+    !Number.isFinite(source.lastSeenAt?.getTime()) || !Number.isFinite(source.firstSeenAt?.getTime()))) {
+    throw new Error('At least one source with valid observation dates is required');
   }
-  
-  // Update with most recent data
+  const latestExisting = Math.max(-Infinity, ...existingListing.sources.map(source =>
+    source.lastSeenAt?.getTime()).filter(Number.isFinite));
+  const latestIncoming = Math.max(...incomingSources.map(source => source.lastSeenAt.getTime()));
+  for (const source of incomingSources) {
+    const existing = existingListing.sources.find(item => item.source === source.source && item.sourceId === source.sourceId);
+    if (!existing) existingListing.sources.push(source);
+    else if (source.lastSeenAt >= existing.lastSeenAt) {
+      existing.lastSeenAt = source.lastSeenAt;
+      existing.sourceUrl = source.sourceUrl;
+    }
+  }
+
+  // Arrival order is not observation order. Retain historical source evidence
+  // without letting it replace newer rent, availability, or property details.
+  if (latestIncoming < latestExisting) return existingListing.save();
+
+  // Update with the most recently observed data.
   if (newListingData.price !== undefined) {
     existingListing.price = newListingData.price;
   }
@@ -250,21 +264,29 @@ export async function mergeListing(
 export async function processListing(
   listingData: Partial<IListing> & {
     address: IListing['address'];
-    price: number;
+    price: IListing['price'];
     bedrooms: number;
     bathrooms: number;
     sources: IListingSource[];
   }
 ): Promise<IListing> {
+  if (!listingData.sources.length) throw new Error('At least one source is required');
+  const sameSource = await Listing.find({ $or: listingData.sources.map(source => ({
+    sources: { $elemMatch: { source: source.source, sourceId: source.sourceId } }
+  })) }).limit(2);
+  if (sameSource.length === 1) return mergeListing(sameSource[0], listingData);
+  if (sameSource.length > 1) throw new Error('Source identity matches multiple listings; review duplicates before merging');
+
   // Find potential duplicates
-  const duplicates = await findDuplicates(
+  const coordinates = listingData.address.coordinates?.coordinates || listingData.coordinates?.coordinates;
+  const duplicates = coordinates ? await findDuplicates(
     listingData.address.street,
     listingData.address.unit || null,
-    listingData.address.coordinates.coordinates as [number, number]
-  );
+    coordinates
+  ) : [];
   
-  if (duplicates.length > 0) {
-    // Merge with first duplicate found
+  if (duplicates.length === 1) {
+    // Ambiguous address matches must not pick an arbitrary apartment.
     return await mergeListing(duplicates[0], listingData);
   } else {
     // Create new listing

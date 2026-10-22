@@ -10,17 +10,17 @@ const config: Config = {
     extend: {
       colors: {
         background: '#F9F8F4',
-        foreground: '#2D3A31',
-        primary: '#8C9A84',
+        foreground: '#243B34',
+        primary: '#386552',
         secondary: '#DCCFC2',
         border: '#E6E2DA',
-        accent: '#C27B66',
+        accent: '#A34F37',
         card: '#FFFFFF',
         'card-alt': '#F2F0EB',
       },
       fontFamily: {
-        serif: ['var(--font-playfair)', 'Playfair Display', 'serif'],
-        sans: ['var(--font-source)', 'Source Sans 3', 'sans-serif'],
+        serif: ['var(--font-playfair)', 'Georgia', 'serif'],
+        sans: ['var(--font-source)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },
       borderRadius: {
         'arch': '200px 200px 0 0',

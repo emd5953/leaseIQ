@@ -1,7 +1,10 @@
+import { NYC_CITIES } from '../utils/nyc';
 import { Listing } from '../models';
+import { presentListing } from '../utils/listing-presentation';
 import { buildListingQuery } from '../utils/queries';
 
 export interface SearchFilters {
+  q?: string;
   minPrice?: number;
   maxPrice?: number;
   minBedrooms?: number;
@@ -81,52 +84,7 @@ export class SearchService {
   private static transformListing(listing: any): any {
     if (!listing) return null;
 
-    // Format address as a string
-    const addressParts = [
-      listing.address?.street,
-      listing.address?.unit,
-      listing.address?.city,
-      listing.address?.state,
-      listing.address?.zipCode
-    ].filter(Boolean);
-    
-    const addressString = addressParts.join(', ');
-
-    // Flatten price - handle both object and number formats
-    const price = typeof listing.price === 'object' && listing.price !== null
-      ? listing.price.amount
-      : listing.price;
-
-    // Flatten pet policy
-    const petsAllowed = listing.petPolicy?.dogsAllowed || listing.petPolicy?.catsAllowed || false;
-
-    // Flatten broker fee
-    const noFee = !listing.brokerFee?.required;
-
-    // Get primary source
-    const source = listing.sources?.[0]?.source || 'Unknown';
-    const sourceUrl = listing.sources?.[0]?.sourceUrl || null;
-
-    // Get square footage
-    const squareFeet = listing.squareFootage;
-
-    // Generate title from address and bedrooms
-    const bedroomText = listing.bedrooms === 0 ? 'Studio' : `${listing.bedrooms} Bedroom`;
-    const title = `${bedroomText} in ${listing.address?.city || listing.address?.street || 'NYC'}`;
-
-    return {
-      ...listing,
-      title,
-      address: addressString,
-      price,
-      petsAllowed,
-      noFee,
-      source,
-      sourceUrl,
-      squareFeet,
-      // Keep original address object for map functionality if needed
-      addressDetails: listing.address,
-    };
+    return presentListing(listing);
   }
 
   static async search(filters: SearchFilters, options: SearchOptions = {}): Promise<SearchResult> {
@@ -148,11 +106,20 @@ export class SearchService {
     // Build query from filters - OPTIMIZED ORDER for index usage
     const query: any = {
       isActive: true, // Start with indexed field
-      'address.state': { $in: ['NY', 'New York'] } // NYC-only filter
+      'address.state': { $in: ['NY', 'New York'] },
+      'address.city': { $in: NYC_CITIES }
     };
 
     // Add other filters from buildListingQuery
-    const additionalFilters = buildListingQuery(filters);
+    const additionalFilters = buildListingQuery({ ...filters,
+      minSquareFootage: filters.minSquareFeet, maxSquareFootage: filters.maxSquareFeet,
+      noFeeOnly: filters.noFee, requiredAmenities: filters.amenities,
+    });
+    if (filters.petsAllowed) additionalFilters.$or = [{ 'petPolicy.allowed': true }, { 'petPolicy.dogsAllowed': true }, { 'petPolicy.catsAllowed': true }];
+    if (filters.q?.trim()) {
+      const escaped = filters.q.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      additionalFilters.$and = [...(additionalFilters.$and || []), { $or: ['address.street', 'address.city', 'address.neighborhood'].map(field => ({ [field]: { $regex: escaped, $options: 'i' } })) }];
+    }
     Object.assign(query, additionalFilters);
 
     console.log('[SEARCH] Query:', JSON.stringify(query));
@@ -161,7 +128,7 @@ export class SearchService {
     const baseSortField = options.sortBy || 'createdAt';
     const sortField: string = baseSortField === 'price' ? 'price.amount' : baseSortField;
     const sortOrder = options.sortOrder === 'asc' ? 1 : -1;
-    const sort: Record<string, 1 | -1> = { [sortField]: sortOrder };
+    const sort: Record<string, 1 | -1> = { [sortField]: sortOrder, _id: sortOrder };
 
     console.log('[SEARCH] Executing MongoDB query...');
     const queryStartTime = Date.now();
@@ -172,13 +139,13 @@ export class SearchService {
         .sort(sort)
         .skip(skip)
         .limit(limit)
-        .select('address price bedrooms bathrooms squareFootage images sources petPolicy brokerFee amenities createdAt')
+        .select('address price bedrooms bathrooms squareFootage squareFeet images sources petPolicy brokerFee amenities createdAt updatedAt isActive fieldObservedAt dataVersion')
         .lean()
         .maxTimeMS(3000) // Reduced timeout
         .exec(),
       // Use estimatedDocumentCount for faster count on simple queries
       skip === 0 && Object.keys(additionalFilters).length === 0
-        ? Listing.countDocuments({ isActive: true, 'address.state': { $in: ['NY', 'New York'] } }).maxTimeMS(1000).exec()
+        ? Listing.countDocuments(query).maxTimeMS(1000).exec()
         : Listing.countDocuments(query).maxTimeMS(2000).exec(),
     ]);
 
@@ -207,7 +174,7 @@ export class SearchService {
   }
 
   static async getRecentListings(limit: number = 10): Promise<any[]> {
-    const listings = await Listing.find({ isActive: true })
+    const listings = await Listing.find({ isActive: true, 'address.state': { $in: ['NY', 'New York'] }, 'address.city': { $in: NYC_CITIES } })
       .sort({ createdAt: -1 })
       .limit(limit)
       .select('-__v')

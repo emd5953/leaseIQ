@@ -1,7 +1,8 @@
 import { Resend } from 'resend';
 import { config } from '../config';
 
-const resend = new Resend(config.resend.apiKey);
+// Create the email client only when delivery is requested.
+const escapeHtml = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 
 export interface EmailOptions {
   to: string;
@@ -15,6 +16,8 @@ export class EmailService {
 
   static async send(options: EmailOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
+      if (!config.resend.apiKey) return { success: false, error: 'Email delivery is not configured.' };
+      const resend = new Resend(config.resend.apiKey);
       const result = await resend.emails.send({
         from: options.from || this.DEFAULT_FROM,
         to: options.to,
@@ -179,6 +182,15 @@ export class EmailService {
       ? listing.address 
       : `${listing.address?.street || ''}, ${listing.address?.city || ''}, ${listing.address?.state || ''}`;
 
+    if (research.version === 2) {
+      return `<html><body style="font-family:Arial,sans-serif;color:#243b35;max-width:720px;margin:32px auto;line-height:1.6">
+        <h1>LeaseIQ · Rental research</h1><h2>${escapeHtml(research.address)}</h2>
+        <p>Generated ${escapeHtml(research.generatedAt)} · Building match: ${escapeHtml(research.match.status)}</p>
+        <p>${escapeHtml(research.summary)}</p>
+        ${research.sections.map((section: any) => `<h2>${escapeHtml(section.title)}</h2><h3>Source facts</h3><ul>${section.facts.map((f: any) => `<li>${escapeHtml(f.label)}: ${escapeHtml(f.value)} [${f.sourceIds.map(escapeHtml).join(', ')}]</li>`).join('')}</ul><h3>Analysis</h3>${section.analysis.map((x: string) => `<p>${escapeHtml(x)}</p>`).join('')}<h3>Not verified</h3><ul>${section.unknowns.map((x: string) => `<li>${escapeHtml(x)}</li>`).join('')}</ul><h3>Ask before signing</h3><ul>${section.questions.map((x: string) => `<li>${escapeHtml(x)}</li>`).join('')}</ul>`).join('')}
+        <h2>Sources & dates</h2>${research.sources.map((s: any) => `<p><a href="${escapeHtml(s.queryUrl || s.url)}">${escapeHtml(s.name)}</a> [${escapeHtml(s.id)}] · ${escapeHtml(s.status)}<br>Retrieved: ${escapeHtml(s.retrievedAt)}<br>Dataset updated: ${escapeHtml(s.datasetUpdatedAt || 'Unknown')}<br>${escapeHtml(s.detail)}</p>`).join('')}
+        <h2>Limitations</h2><ul>${research.limitations.map((x: string) => `<li>${escapeHtml(x)}</li>`).join('')}</ul></body></html>`;
+    }
     const n = research.neighborhood || {};
 
     // Neighborhood vibe section

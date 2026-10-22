@@ -35,7 +35,7 @@ export default function SearchPage() {
               </p>
             </div>
             <p className="max-w-xs text-sm leading-relaxed text-foreground/55 md:text-right">
-              Listings are refreshed throughout the day so your shortlist stays current.
+              Check each listing’s source observation date. Confirm current price and availability with the original source.
             </p>
           </div>
           

@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { api } from '@/lib/api'
 import { useParams } from 'next/navigation'
 import Navigation from '@/components/Navigation'
 import Footer from '@/components/Footer'
@@ -10,25 +12,16 @@ export default function ListingPage() {
   const params = useParams()
   const [listing, setListing] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    if (params.id) {
-      fetchListing(params.id as string)
-    }
+    let current = true
+    setLoading(true); setError(''); setListing(null)
+    api.getListingById(String(params.id)).then(data => { if (current) setListing(data) })
+      .catch(error => { if (current) setError(error.message) })
+      .finally(() => { if (current) setLoading(false) })
+    return () => { current = false }
   }, [params.id])
-
-  const fetchListing = async (id: string) => {
-    try {
-      const response = await fetch(`/api/search/${id}`)
-      if (!response.ok) throw new Error('Listing not found')
-      const data = await response.json()
-      setListing(data)
-    } catch (error) {
-      console.error('Error fetching listing:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   return (
     <main className="min-h-screen">
@@ -47,9 +40,9 @@ export default function ListingPage() {
         ) : (
           <div className="max-w-7xl mx-auto px-6 lg:px-8 text-center py-16">
             <h1 className="text-3xl font-serif font-bold text-foreground mb-4">
-              Listing not found
+              Property unavailable
             </h1>
-            <p className="text-foreground/70">This listing may have been removed or is no longer available.</p>
+            <p className="text-foreground/70">{error || 'We could not load this property. Please try again.'}</p><Link href="/research" className="mt-5 inline-block text-primary underline">Research a street address instead</Link>
           </div>
         )}
       </div>

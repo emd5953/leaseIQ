@@ -12,6 +12,7 @@ interface SearchFiltersProps {
 export default function SearchFilters({ onApplyFilters }: SearchFiltersProps) {
   const { user } = useAuth()
   const [filters, setFilters] = useState({
+    q: '',
     minPrice: '',
     maxPrice: '',
     bedrooms: '',
@@ -26,7 +27,8 @@ export default function SearchFilters({ onApplyFilters }: SearchFiltersProps) {
 
   const handleClearFilters = () => {
     const clearedFilters = {
-      minPrice: '',
+      q: '',
+    minPrice: '',
       maxPrice: '',
       bedrooms: '',
       bathrooms: '',
@@ -44,6 +46,7 @@ export default function SearchFilters({ onApplyFilters }: SearchFiltersProps) {
       return
     }
 
+    if (filters.q.trim()) { alert('Saved alerts support the filters below. Clear the address text to save an alert.'); return }
     setIsSaving(true)
     try {
       await api.createSavedSearch({
@@ -52,6 +55,8 @@ export default function SearchFilters({ onApplyFilters }: SearchFiltersProps) {
           minPrice: filters.minPrice ? Number(filters.minPrice) : null,
           maxPrice: filters.maxPrice ? Number(filters.maxPrice) : null,
           minBedrooms: filters.bedrooms ? Number(filters.bedrooms) : null,
+          maxBedrooms: filters.bedrooms !== '' && Number(filters.bedrooms) < 3 ? Number(filters.bedrooms) : null,
+          minBathrooms: filters.bathrooms ? Number(filters.bathrooms) : null,
           neighborhoods: filters.neighborhoods,
           requiresDogsAllowed: filters.petsAllowed,
           noFeeOnly: filters.noFee,
@@ -72,7 +77,7 @@ export default function SearchFilters({ onApplyFilters }: SearchFiltersProps) {
 
   const neighborhoods = [
     'Manhattan', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island',
-    'Williamsburg', 'Park Slope', 'Astoria', 'Long Island City'
+
   ]
 
   return (
@@ -83,6 +88,7 @@ export default function SearchFilters({ onApplyFilters }: SearchFiltersProps) {
       </div>
 
       <div className="space-y-6">
+        <div><label htmlFor="rental-query" className="mb-2 block text-sm font-medium">Address or area</label><input id="rental-query" value={filters.q} onChange={e => setFilters({ ...filters, q: e.target.value })} className="field" placeholder="Street, borough, neighborhood" maxLength={160} /></div>
         {/* Price Range */}
         <div>
           <label className="block text-sm font-medium text-foreground mb-2">
@@ -91,17 +97,17 @@ export default function SearchFilters({ onApplyFilters }: SearchFiltersProps) {
           <div className="grid grid-cols-2 gap-3">
             <input
               type="number"
-              placeholder="Min"
+              placeholder="Min" aria-label="Minimum monthly rent" min="0"
               value={filters.minPrice}
               onChange={(e) => setFilters({ ...filters, minPrice: e.target.value })}
-              className="px-4 py-2 bg-card-alt rounded-full border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-[border-color,box-shadow] duration-200 text-sm"
+              className="min-w-0 w-full px-3 py-2 bg-card-alt rounded-xl border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-[border-color,box-shadow] duration-200 text-sm"
             />
             <input
               type="number"
-              placeholder="Max"
+              placeholder="Max" aria-label="Maximum monthly rent" min="0"
               value={filters.maxPrice}
               onChange={(e) => setFilters({ ...filters, maxPrice: e.target.value })}
-              className="px-4 py-2 bg-card-alt rounded-full border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-[border-color,box-shadow] duration-200 text-sm"
+              className="min-w-0 w-full px-3 py-2 bg-card-alt rounded-xl border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-[border-color,box-shadow] duration-200 text-sm"
             />
           </div>
         </div>
@@ -112,9 +118,10 @@ export default function SearchFilters({ onApplyFilters }: SearchFiltersProps) {
             Bedrooms
           </label>
           <select
+            aria-label="Bedrooms"
             value={filters.bedrooms}
             onChange={(e) => setFilters({ ...filters, bedrooms: e.target.value })}
-            className="w-full px-4 py-2 bg-card-alt rounded-full border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-[border-color,box-shadow] duration-200 text-sm"
+            className="w-full min-w-0 w-full px-3 py-2 bg-card-alt rounded-xl border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-[border-color,box-shadow] duration-200 text-sm"
           >
             <option value="">Any</option>
             <option value="0">Studio</option>
@@ -130,9 +137,10 @@ export default function SearchFilters({ onApplyFilters }: SearchFiltersProps) {
             Bathrooms
           </label>
           <select
+            aria-label="Minimum bathrooms"
             value={filters.bathrooms}
             onChange={(e) => setFilters({ ...filters, bathrooms: e.target.value })}
-            className="w-full px-4 py-2 bg-card-alt rounded-full border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-[border-color,box-shadow] duration-200 text-sm"
+            className="w-full min-w-0 w-full px-3 py-2 bg-card-alt rounded-xl border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-[border-color,box-shadow] duration-200 text-sm"
           >
             <option value="">Any</option>
             <option value="1">1 Bath</option>
@@ -144,7 +152,7 @@ export default function SearchFilters({ onApplyFilters }: SearchFiltersProps) {
         {/* Neighborhoods */}
         <div>
           <label className="block text-sm font-medium text-foreground mb-2">
-            Neighborhoods
+            Boroughs
           </label>
           <div className="space-y-2 max-h-40 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
             {neighborhoods.map((neighborhood) => (
@@ -197,7 +205,7 @@ export default function SearchFilters({ onApplyFilters }: SearchFiltersProps) {
 
         {/* Apply Button */}
         <button 
-          onClick={() => onApplyFilters(filters)}
+          onClick={() => { if (filters.minPrice && filters.maxPrice && Number(filters.minPrice) > Number(filters.maxPrice)) { alert('Minimum rent must be less than maximum rent.'); return } onApplyFilters(filters) }}
           className="pressable w-full px-6 py-3 bg-foreground text-background rounded-full text-sm tracking-widest uppercase hover:bg-opacity-90 transition-opacity duration-200"
         >
           Apply Filters

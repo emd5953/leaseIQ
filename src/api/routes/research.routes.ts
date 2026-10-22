@@ -1,55 +1,38 @@
 import { Router, Response } from 'express';
-import { ResearchService } from '../../services/research.service';
+import mongoose from 'mongoose';
+import { ResearchService, validateResearchAddress } from '../../services/research.service';
 import { SearchService } from '../../services/search.service';
 import { validateEmail, validateObjectId } from '../middleware/validation';
-import { requireAuth, AuthRequest } from '../middleware/auth';
+import { optionalAuth, AuthRequest } from '../middleware/auth';
 
 const router = Router();
-
-// Require authentication for all research endpoints
-router.use(requireAuth);
-
-/**
- * POST /api/research/:listingId
- * Research a listing and optionally send email
- */
-router.post('/:listingId', validateObjectId('listingId'), validateEmail, async (req: AuthRequest, res: Response) => {
+// Public records research requires no account. Sending a report requires sign-in.
+router.use(optionalAuth);
+router.post('/address', async (req: AuthRequest, res: Response) => {
+  if (!validateResearchAddress(req.body)) return res.status(400).json({ error: 'Enter a street number, street name, and NYC borough.' });
   try {
-    const { email } = req.body;
-    
-    const listingId = Array.isArray(req.params.listingId) 
-      ? req.params.listingId[0] 
-      : req.params.listingId;
-    
-    console.log(`Research request for listing: ${listingId}`);
-    
-    // Get listing
-    const listing = await SearchService.getListingById(listingId);
-    if (!listing) {
-      console.log(`Listing not found: ${listingId}`);
-      return res.status(404).json({ error: 'Listing not found' });
-    }
-
-    console.log(`Found listing: ${listing.address}`);
-
-    // Perform research
-    const research = await ResearchService.researchListing(listing);
-    console.log(`Research completed, summary length: ${research.summary?.length || 0}`);
-
-    // Send email if requested
-    if (email) {
-      const emailResult = await ResearchService.sendResearchReport(email, listing, research);
-      if (!emailResult.success) {
-        console.log(`Email failed: ${emailResult.error}`);
-        return res.json({ research, emailSent: false, emailError: emailResult.error });
-      }
-    }
-
-    res.json({ research, emailSent: !!email });
-  } catch (error: any) {
-    console.error('Research error:', error?.message || error);
-    res.status(500).json({ error: error?.message || 'Research failed' });
+    const research = await ResearchService.researchAddress(req.body);
+    res.set('Cache-Control', 'no-store').json({ research });
+  } catch {
+    res.status(502).json({ error: 'Research could not be assembled. Please try again.' });
   }
 });
-
+router.post('/:listingId', validateObjectId('listingId'), validateEmail, async (req: AuthRequest, res: Response) => {
+  if (req.body.email && !req.userId) return res.status(401).json({ error: 'Sign in to email a report.' });
+  if (req.body.email && req.body.email !== req.userEmail) return res.status(400).json({ error: 'Reports can be emailed to your signed-in address.' });
+  if (mongoose.connection.readyState !== 1) return res.status(503).json({ error: 'Listing storage is unavailable. Research the street address and borough directly.' });
+  try {
+    const listingId = String(req.params.listingId);
+    const listing = await SearchService.getListingById(listingId);
+    if (!listing) return res.status(404).json({ error: 'Listing not found' });
+    const research = await ResearchService.researchListing(listing);
+    if (req.body.email) {
+      const result = await ResearchService.sendResearchReport(req.body.email, listing, research);
+      return res.json({ research, emailSent: result.success, emailError: result.error });
+    }
+    res.set('Cache-Control', 'no-store').json({ research, emailSent: false });
+  } catch {
+    res.status(502).json({ error: 'Research could not be completed. Try researching the street address and borough directly.' });
+  }
+});
 export default router;

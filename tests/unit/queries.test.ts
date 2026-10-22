@@ -41,7 +41,7 @@ describe('Query Utilities Unit Tests', () => {
 
       const query = buildListingQuery(criteria);
 
-      expect(query.price).toEqual({ $gte: 1000, $lte: 2000 });
+      expect(query['price.amount']).toEqual({ $gte: 1000, $lte: 2000 });
     });
 
     it('should build query with bedroom range', () => {
@@ -62,7 +62,7 @@ describe('Query Utilities Unit Tests', () => {
 
       const query = buildListingQuery(criteria);
 
-      expect(query['address.city']).toEqual({ $in: ['Manhattan', 'Brooklyn'] });
+      expect(query.$and).toEqual([{ $or: [{ 'address.city': { $in: ['Manhattan', 'Brooklyn', 'New York', 'New York City', 'NYC'] } }, { 'address.neighborhood': { $in: ['Manhattan', 'Brooklyn', 'New York', 'New York City', 'NYC'] } }] }]);
     });
 
     it('should build query with pet requirements', () => {
@@ -107,7 +107,7 @@ describe('Query Utilities Unit Tests', () => {
 
       const query = buildListingQuery(criteria);
 
-      expect(query.price).toBeUndefined();
+      expect(query['price.amount']).toBeUndefined();
       expect(query.bedrooms).toBeUndefined();
     });
 
@@ -134,9 +134,9 @@ describe('Query Utilities Unit Tests', () => {
 
       const query = buildListingQuery(criteria);
 
-      expect(query.price).toEqual({ $gte: 1000, $lte: 3000 });
+      expect(query['price.amount']).toEqual({ $gte: 1000, $lte: 3000 });
       expect(query.bedrooms).toEqual({ $gte: 2 });
-      expect(query['address.city']).toEqual({ $in: ['Manhattan'] });
+      expect(query.$and).toBeDefined();
       expect(query['petPolicy.dogsAllowed']).toBe(true);
       expect(query['brokerFee.required']).toBe(false);
     });
@@ -329,7 +329,7 @@ describe('Query Utilities Unit Tests', () => {
               coordinates: [-73.9, 40.7]
             }
           },
-          price: 1000 + (i * 100),
+          price: { amount: 1000 + (i * 100), currency: 'USD', period: 'monthly' },
           bedrooms: 1 + (i % 3),
           bathrooms: 1,
           description: 'Test listing',
@@ -345,10 +345,10 @@ describe('Query Utilities Unit Tests', () => {
             amount: null
           },
           sources: [{
-            sourceName: 'Test',
+            source: 'Test',
             sourceId: `test-${i}`,
             sourceUrl: 'http://test.com',
-            scrapedAt: new Date()
+            firstSeenAt: new Date(), lastSeenAt: new Date()
           }],
           isActive: true
         });

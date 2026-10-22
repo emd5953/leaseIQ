@@ -1,3 +1,4 @@
+import { resetDatabase } from '../helpers/database';
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import mongoose from 'mongoose';
@@ -35,8 +36,8 @@ const listingGenerator = fc.record({
       )
     })
   }),
-  price: fc.integer({ min: 1000, max: 10000 }),
-  availableDate: fc.option(fc.date({ min: new Date('2024-01-01'), max: new Date('2025-12-31') }), { nil: null }),
+  price: fc.record({ amount: fc.integer({ min: 1000, max: 10000 }), currency: fc.constant('USD'), period: fc.constant('monthly' as const) }),
+  availableDate: fc.option(fc.date({ min: new Date('2024-01-01'), max: new Date('2025-12-31'), noInvalidDate: true }), { nil: null }),
   bedrooms: fc.integer({ min: 0, max: 5 }),
   bathrooms: fc.double({ min: 1, max: 4, noNaN: true }),
   squareFootage: fc.option(fc.integer({ min: 300, max: 3000 }), { nil: null }),
@@ -61,13 +62,14 @@ const listingGenerator = fc.record({
     required: fc.boolean(),
     amount: fc.option(fc.integer({ min: 0, max: 5000 }), { nil: null })
   }),
+  fieldObservedAt: fc.option(fc.date({ noInvalidDate: true }).map(date => new Map([['brokerFee_required', date]])), { nil: undefined }),
   sources: fc.array(
     fc.record({
-      sourceName: fc.oneof(fc.constant('StreetEasy'), fc.constant('Zillow')),
+      source: fc.oneof(fc.constant('StreetEasy'), fc.constant('Zillow')),
       sourceId: fc.uuid(),
       sourceUrl: fc.webUrl(),
-      scrapedAt: fc.date()
-    }),
+      lastSeenAt: fc.date({ noInvalidDate: true })
+    }).map(source => ({ ...source, firstSeenAt: source.lastSeenAt })),
     { minLength: 1, maxLength: 2 }
   ),
   isActive: fc.constant(true)
@@ -79,6 +81,7 @@ describe('Query Utilities Property Tests', () => {
   beforeAll(async () => {
     mongoServer = await MongoMemoryServer.create();
     await mongoose.connect(mongoServer.getUri());
+    await Promise.all(Object.values(mongoose.models).map(model => model.init()));
   });
 
   afterAll(async () => {
@@ -112,12 +115,24 @@ describe('Query Utilities Property Tests', () => {
           const query = buildListingQuery(criteria);
           const matchedListings = await Listing.find(query);
 
+          // Assert both inclusion and exclusion, including unknown fee evidence.
+          const expectedIds = listings.filter(listing =>
+            (criteria.minPrice == null || listing.price.amount >= criteria.minPrice) &&
+            (criteria.maxPrice == null || listing.price.amount <= criteria.maxPrice) &&
+            (criteria.minBedrooms == null || listing.bedrooms! >= criteria.minBedrooms) &&
+            (criteria.maxBedrooms == null || listing.bedrooms! <= criteria.maxBedrooms) &&
+            (!criteria.requiresDogsAllowed || listing.petPolicy.dogsAllowed === true) &&
+            (!criteria.requiresCatsAllowed || listing.petPolicy.catsAllowed === true) &&
+            (!criteria.noFeeOnly || (listing.brokerFee.required === false && listing.fieldObservedAt?.has('brokerFee_required')))
+          ).map(listing => String(listing._id)).sort();
+          expect(matchedListings.map(listing => String(listing._id)).sort()).toEqual(expectedIds);
+
           for (const listing of matchedListings) {
             if (criteria.minPrice !== null && criteria.minPrice !== undefined) {
-              expect(listing.price).toBeGreaterThanOrEqual(criteria.minPrice);
+              expect(listing.price.amount).toBeGreaterThanOrEqual(criteria.minPrice);
             }
             if (criteria.maxPrice !== null && criteria.maxPrice !== undefined) {
-              expect(listing.price).toBeLessThanOrEqual(criteria.maxPrice);
+              expect(listing.price.amount).toBeLessThanOrEqual(criteria.maxPrice);
             }
             if (criteria.minBedrooms !== null && criteria.minBedrooms !== undefined) {
               expect(listing.bedrooms).toBeGreaterThanOrEqual(criteria.minBedrooms);
@@ -136,7 +151,7 @@ describe('Query Utilities Property Tests', () => {
             }
           }
         }
-      ),
+      ).beforeEach(resetDatabase),
       { numRuns: 10 }
     );
   }, 15000);
@@ -167,7 +182,7 @@ describe('Query Utilities Property Tests', () => {
             expect(createdAfter || updatedAfter).toBe(true);
           }
         }
-      ),
+      ).beforeEach(resetDatabase),
       { numRuns: 10 }
     );
   }, 15000);
@@ -200,10 +215,10 @@ describe('Query Utilities Property Tests', () => {
               const criteria = searchCriteriaList[i];
               let shouldMatch = true;
 
-              if (criteria.minPrice !== null && criteria.minPrice !== undefined && listing.price < criteria.minPrice) {
+              if (criteria.minPrice !== null && criteria.minPrice !== undefined && listing.price.amount < criteria.minPrice) {
                 shouldMatch = false;
               }
-              if (criteria.maxPrice !== null && criteria.maxPrice !== undefined && listing.price > criteria.maxPrice) {
+              if (criteria.maxPrice !== null && criteria.maxPrice !== undefined && listing.price.amount > criteria.maxPrice) {
                 shouldMatch = false;
               }
 
@@ -218,7 +233,7 @@ describe('Query Utilities Property Tests', () => {
             }
           }
         }
-      ),
+      ).beforeEach(resetDatabase),
       { numRuns: 10 }
     );
   });
@@ -260,7 +275,7 @@ describe('Query Utilities Property Tests', () => {
 
           expect(visibleListings.length).toBe(listings.length - listingsToHide.length);
         }
-      ),
+      ).beforeEach(resetDatabase),
       { numRuns: 10 }
     );
   });
@@ -307,7 +322,7 @@ describe('Query Utilities Property Tests', () => {
           expect(paginatedResult.totalCount).toBe(totalCount);
           expect(paginatedResult.totalPages).toBe(totalPages);
         }
-      ),
+      ).beforeEach(resetDatabase),
       { numRuns: 10 }
     );
   });

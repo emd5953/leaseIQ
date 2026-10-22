@@ -33,7 +33,7 @@ describe('ListingInteraction Model Validation', () => {
           coordinates: [-73.935242, 40.730610]
         }
       },
-      price: 2000,
+      price: { amount: 2000, currency: 'USD', period: 'monthly' as const },
       bedrooms: 2,
       bathrooms: 1,
       squareFootage: 800,
@@ -50,10 +50,11 @@ describe('ListingInteraction Model Validation', () => {
         amount: null
       },
       sources: [{
-        sourceName: 'TestSource',
+        source: 'TestSource',
         sourceId: 'test-123',
         sourceUrl: 'https://test.com/listing',
-        scrapedAt: new Date()
+        firstSeenAt: new Date(),
+        lastSeenAt: new Date()
       }],
       isActive: true
     });

@@ -18,8 +18,8 @@ const sourceSans = Source_Sans_3({
 })
 
 export const metadata: Metadata = {
-  title: 'LeaseIQ — Find your apartment. Make it home.',
-  description: 'Search NYC apartments on StreetEasy, keep track of the places you like, and understand the details before you move in.',
+  title: 'LeaseIQ — Know more before the lease',
+  description: 'Research NYC rental buildings, ownership and management records, and neighborhood context with source dates and clear evidence gaps.',
 }
 
 export default function RootLayout({

@@ -50,3 +50,19 @@
     scroll-behavior: auto !important;
   }
 }
+
+@layer components {
+  .eyebrow { @apply text-[11px] font-semibold uppercase tracking-[0.16em]; }
+  .field { @apply w-full min-w-0 rounded-xl border border-border bg-background px-4 py-3 text-base text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20; }
+}
+@media print {
+  nav, footer, form { display: none !important; }
+  body { background: white; color: #172d26; }
+  main > div { padding-top: 0 !important; }
+  .report header { background: white !important; color: #172d26 !important; border: 1px solid #ddd; }
+  .report header p { color: #172d26 !important; }
+  .report section, .report details { break-inside: avoid; box-shadow: none; }
+  .report a { text-decoration: underline; }
+  .report details::details-content { display: block; }
+}
+nav a[aria-current="page"] { color: #386552; font-weight: 600; text-decoration: underline; text-underline-offset: 8px; text-decoration-thickness: 2px; }

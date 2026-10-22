@@ -4,10 +4,11 @@ import { Schema, model, Document } from 'mongoose';
  * Source information for a listing
  */
 export interface IListingSource {
-  sourceName: string;             // e.g., "StreetEasy", "Zillow"
+  source: string;                 // e.g., "streeteasy", "zillow"
   sourceId: string;               // External listing ID
   sourceUrl: string;              // Direct link to listing
-  scrapedAt: Date;                // When this source was last scraped
+  firstSeenAt: Date;
+  lastSeenAt: Date;
 }
 
 /**
@@ -18,11 +19,13 @@ export interface IListing extends Document {
   // Core listing information
   address: {
     street: string;
+    fullAddress?: string;
+    neighborhood?: string;
     unit: string | null;
     city: string | null;
     state: string | null;
     zipCode: string | null;
-    coordinates: {
+    coordinates?: {
       type: string;
       coordinates: [number, number]; // [longitude, latitude] in GeoJSON format
     };
@@ -37,9 +40,15 @@ export interface IListing extends Document {
   availableDate: Date | null;       // Move-in date
   
   // Property details
-  bedrooms: number;
-  bathrooms: number;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  dataVersion?: number;
+  fieldObservedAt?: Map<string, Date>;
   squareFootage: number | null;
+  squareFeet?: number | null; // legacy ingestion records
+  sourceKeys?: string[];
+  addressKey?: string;
+  coordinates?: { type: string; coordinates: [number, number] };
   
   // Listing content
   description: string;
@@ -49,14 +58,17 @@ export interface IListing extends Document {
   
   // Pet policy
   petPolicy: {
-    dogsAllowed: boolean;
-    catsAllowed: boolean;
+    allowed?: boolean | null;
+    restrictions?: string | null;
+    dogsAllowed: boolean | null;
+    catsAllowed: boolean | null;
     petDeposit: number | null;
   };
   
   // Fee information
   brokerFee: {
-    required: boolean;
+    required: boolean | null;
+    percentage?: number | null;
     amount: number | null;          // Fee amount if known
   };
   
@@ -76,11 +88,11 @@ export interface IListing extends Document {
   
   // Utilities included in rent
   utilities: {
-    electric: boolean;
-    gas: boolean;
-    water: boolean;
-    internet: boolean;
-    trash: boolean;
+    electric: boolean | null;
+    gas: boolean | null;
+    water: boolean | null;
+    internet: boolean | null;
+    trash: boolean | null;
   };
   
   // Contact info
@@ -88,13 +100,7 @@ export interface IListing extends Document {
   contactEmail: string | null;
   
   // Source tracking
-  sources: Array<{
-    source: string;
-    sourceUrl: string;
-    sourceId: string;
-    firstSeenAt: Date;
-    lastSeenAt: Date;
-  }>;
+  sources: IListingSource[];
   
   // Metadata
   createdAt: Date;                  // First ingestion timestamp
@@ -107,7 +113,15 @@ export interface IListing extends Document {
  * Stores normalized apartment listing data from multiple sources with support for deduplication
  */
 const listingSchema = new Schema<IListing>({
+  dataVersion: { type: Number },
+  fieldObservedAt: { type: Map, of: Date, default: undefined },
+  sourceKeys: { type: [String], default: undefined },
+  addressKey: { type: String },
+  squareFeet: { type: Number, default: undefined },
+  coordinates: { type: new Schema({ type: { type: String, enum: ['Point'] }, coordinates: [Number] }, { _id: false }), default: undefined },
   address: {
+    fullAddress: { type: String },
+    neighborhood: { type: String },
     street: {
       type: String,
       required: [true, 'Street address is required'],
@@ -135,27 +149,14 @@ const listingSchema = new Schema<IListing>({
       default: null
     },
     coordinates: {
-      type: {
-        type: String,
-        enum: ['Point'],
-        required: true,
-        default: 'Point'
-      },
-      coordinates: {
-        type: [Number],
-        required: [true, 'Coordinates are required'],
-        validate: {
-          validator: function(v: number[]) {
-            // coordinates array must be [longitude, latitude]
-            // longitude: -180 to 180, latitude: -90 to 90
-            return Array.isArray(v) && 
-                   v.length === 2 && 
-                   v[0] >= -180 && v[0] <= 180 &&
-                   v[1] >= -90 && v[1] <= 90;
-          },
-          message: 'Coordinates must be [longitude, latitude] where longitude is between -180 and 180, and latitude is between -90 and 90'
-        }
-      }
+      type: new Schema({
+        type: { type: String, enum: ['Point'], default: 'Point' },
+        coordinates: { type: [Number], required: true, validate: {
+          validator: (v: number[]) => Array.isArray(v) && v.length === 2 && v.every(Number.isFinite) && v[0] >= -180 && v[0] <= 180 && v[1] >= -90 && v[1] <= 90,
+          message: 'Coordinates must be valid [longitude, latitude]'
+        } }
+      }, { _id: false }),
+      default: undefined
     }
   },
   
@@ -165,7 +166,7 @@ const listingSchema = new Schema<IListing>({
       required: [true, 'Price amount is required'],
       validate: {
         validator: function(v: number) {
-          return v > 0;
+          return v == null || (Number.isFinite(v) && v > 0);
         },
         message: 'Price must be a positive number'
       }
@@ -188,10 +189,10 @@ const listingSchema = new Schema<IListing>({
   
   bedrooms: {
     type: Number,
-    required: [true, 'Number of bedrooms is required'],
+    default: null,
     validate: {
       validator: function(v: number) {
-        return Number.isInteger(v) && v >= 0;
+        return v == null || (Number.isInteger(v) && v >= 0);
       },
       message: 'Bedrooms must be a non-negative integer'
     }
@@ -199,10 +200,10 @@ const listingSchema = new Schema<IListing>({
   
   bathrooms: {
     type: Number,
-    required: [true, 'Number of bathrooms is required'],
+    default: null,
     validate: {
       validator: function(v: number) {
-        return v > 0;
+        return v == null || (Number.isFinite(v) && v > 0);
       },
       message: 'Bathrooms must be a positive number'
     }
@@ -234,15 +235,15 @@ const listingSchema = new Schema<IListing>({
   },
   
   petPolicy: {
+    allowed: { type: Boolean, default: null },
+    restrictions: { type: String, default: null },
     dogsAllowed: {
       type: Boolean,
-      required: true,
-      default: false
+      default: null
     },
     catsAllowed: {
       type: Boolean,
-      required: true,
-      default: false
+      default: null
     },
     petDeposit: {
       type: Number,
@@ -251,10 +252,10 @@ const listingSchema = new Schema<IListing>({
   },
   
   brokerFee: {
+    percentage: { type: Number, default: null },
     required: {
       type: Boolean,
-      required: true,
-      default: false
+      default: null
     },
     amount: {
       type: Number,
@@ -318,23 +319,23 @@ const listingSchema = new Schema<IListing>({
   utilities: {
     electric: {
       type: Boolean,
-      default: false
+      default: null
     },
     gas: {
       type: Boolean,
-      default: false
+      default: null
     },
     water: {
       type: Boolean,
-      default: false
+      default: null
     },
     internet: {
       type: Boolean,
-      default: false
+      default: null
     },
     trash: {
       type: Boolean,
-      default: false
+      default: null
     }
   },
   
@@ -389,7 +390,8 @@ const listingSchema = new Schema<IListing>({
     default: true
   }
 }, {
-  timestamps: true  // Automatically manages createdAt and updatedAt
+  timestamps: true,
+  optimisticConcurrency: true
 });
 
 // Indexes for geospatial queries
@@ -415,7 +417,10 @@ listingSchema.index({ 'petPolicy.dogsAllowed': 1, 'petPolicy.catsAllowed': 1 });
 listingSchema.index({ 'brokerFee.required': 1 });
 
 // Compound index for source lookups
-listingSchema.index({ 'sources.sourceId': 1, 'sources.sourceName': 1 });
+listingSchema.index({ 'sources.source': 1, 'sources.sourceId': 1 });
+listingSchema.index({ sourceKeys: 1 }, { unique: true, sparse: true });
+listingSchema.index({ addressKey: 1 });
+listingSchema.index({ 'sources.lastSeenAt': -1 });
 
 // Index for recent active listings (fast default view)
 listingSchema.index({ isActive: 1, createdAt: -1 });

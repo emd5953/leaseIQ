@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import express, { Express } from 'express';
 import cors from 'cors';
 import searchRoutes from './routes/search.routes';
@@ -50,7 +51,7 @@ export function createApp(): Express {
           }
         },
         credentials: true,
-        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+        methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
         allowedHeaders: ['Content-Type', 'Authorization']
       }
     : undefined; // Allow all in development
@@ -62,7 +63,7 @@ export function createApp(): Express {
 
   // Health check (no rate limiting)
   app.get('/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    res.json({ status: 'ok', database: mongoose.connection.readyState === 1 ? 'connected' : 'unavailable', research: 'public-records', timestamp: new Date().toISOString() });
   });
 
   // Auth routes (standard limiting)
@@ -70,7 +71,10 @@ export function createApp(): Express {
   app.use('/api/user', standardLimiter, userRoutes);
 
   // Routes with rate limiting
-  app.use('/api/search', searchLimiter, searchRoutes);
+  app.use('/api/search', searchLimiter, (_req, res, next) => {
+    if (mongoose.connection.readyState !== 1) return res.status(503).json({ error: 'Listing search is temporarily unavailable. You can still research a NYC street address.' });
+    next();
+  }, searchRoutes);
   app.use('/api/alerts', standardLimiter, alertsRoutes);
   app.use('/api/research', strictLimiter, researchRoutes);
   app.use('/api/lease', strictLimiter, leaseRoutes);

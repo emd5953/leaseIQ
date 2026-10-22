@@ -1,3 +1,4 @@
+import { resetDatabase } from '../helpers/database';
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import mongoose from 'mongoose';
@@ -12,6 +13,7 @@ describe('ListingInteraction Model Property Tests', () => {
   beforeAll(async () => {
     mongoServer = await MongoMemoryServer.create();
     await mongoose.connect(mongoServer.getUri());
+    await Promise.all(Object.values(mongoose.models).map(model => model.init()));
   });
 
   afterAll(async () => {
@@ -56,7 +58,7 @@ describe('ListingInteraction Model Property Tests', () => {
                 coordinates: [-73.935242, 40.730610]
               }
             },
-            price: 2000,
+            price: { amount: 2000, currency: 'USD', period: 'monthly' as const },
             bedrooms: 2,
             bathrooms: 1,
             squareFootage: 800,
@@ -73,10 +75,11 @@ describe('ListingInteraction Model Property Tests', () => {
               amount: null
             },
             sources: [{
-              sourceName: 'TestSource',
+              source: 'TestSource',
               sourceId: 'test-123',
               sourceUrl: 'https://test.com/listing',
-              scrapedAt: new Date()
+              firstSeenAt: new Date(),
+              lastSeenAt: new Date()
             }],
             isActive: true
           });
@@ -131,7 +134,7 @@ describe('ListingInteraction Model Property Tests', () => {
             expect(retrievedInteraction.metadata.notes).toBe(interaction.metadata.notes);
           }
         }
-      ),
+      ).beforeEach(resetDatabase),
       { numRuns: 100 }
     );
   });
@@ -161,7 +164,7 @@ describe('ListingInteraction Model Property Tests', () => {
                 coordinates: [-74.006, 40.7128]
               }
             },
-            price: 2500,
+            price: { amount: 2500, currency: 'USD', period: 'monthly' as const },
             bedrooms: 1,
             bathrooms: 1,
             squareFootage: 600,
@@ -178,10 +181,11 @@ describe('ListingInteraction Model Property Tests', () => {
               amount: null
             },
             sources: [{
-              sourceName: 'TestSource',
+              source: 'TestSource',
               sourceId: 'test-456',
               sourceUrl: 'https://test.com/listing2',
-              scrapedAt: new Date()
+              firstSeenAt: new Date(),
+              lastSeenAt: new Date()
             }],
             isActive: true
           });
@@ -256,7 +260,7 @@ describe('ListingInteraction Model Property Tests', () => {
             expect(retrievedInteraction.interactionType).toBe(actionType);
           }
         }
-      ),
+      ).beforeEach(resetDatabase),
       { numRuns: 100 }
     );
   });
@@ -293,7 +297,7 @@ describe('ListingInteraction Model Property Tests', () => {
                   coordinates: [-73.9 - i * 0.01, 40.7 + i * 0.01]
                 }
               },
-              price: 2000 + i * 100,
+              price: { amount: 2000 + i * 100, currency: 'USD', period: 'monthly' as const },
               bedrooms: 1,
               bathrooms: 1,
               squareFootage: 700,
@@ -310,10 +314,11 @@ describe('ListingInteraction Model Property Tests', () => {
                 amount: null
               },
               sources: [{
-                sourceName: 'TestSource',
+                source: 'TestSource',
                 sourceId: `target-${i}`,
                 sourceUrl: `https://test.com/target-${i}`,
-                scrapedAt: new Date()
+                firstSeenAt: new Date(),
+                lastSeenAt: new Date()
               }],
               isActive: true
             });
@@ -346,7 +351,7 @@ describe('ListingInteraction Model Property Tests', () => {
                   coordinates: [-74.0 - i * 0.01, 40.8 + i * 0.01]
                 }
               },
-              price: 3000 + i * 100,
+              price: { amount: 3000 + i * 100, currency: 'USD', period: 'monthly' as const },
               bedrooms: 2,
               bathrooms: 1,
               squareFootage: 900,
@@ -363,10 +368,11 @@ describe('ListingInteraction Model Property Tests', () => {
                 amount: null
               },
               sources: [{
-                sourceName: 'TestSource',
+                source: 'TestSource',
                 sourceId: `other-${i}`,
                 sourceUrl: `https://test.com/other-${i}`,
-                scrapedAt: new Date()
+                firstSeenAt: new Date(),
+                lastSeenAt: new Date()
               }],
               isActive: true
             });
@@ -411,7 +417,7 @@ describe('ListingInteraction Model Property Tests', () => {
             expect(interaction.userId.toString()).toBe(user._id.toString());
           }
         }
-      ),
+      ).beforeEach(resetDatabase),
       { numRuns: 100 }
     );
   });

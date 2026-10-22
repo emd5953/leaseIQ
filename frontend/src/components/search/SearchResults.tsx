@@ -1,196 +1,50 @@
 'use client'
-
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { ArrowLeft, ArrowRight, RefreshCw, Search } from 'lucide-react'
 import ListingCard from './ListingCard'
-import { api, SearchOptions } from '@/lib/api'
+import { api, SearchFilters, SearchOptions } from '@/lib/api'
 
-interface Listing {
-  _id: string
-  title: string
-  price: number
-  bedrooms: number
-  bathrooms: number
-  squareFeet?: number
-  address: string
-  neighborhood?: string
-  images: string[]
-  source: string
-  petsAllowed?: boolean
-  noFee?: boolean
-  amenities?: string[]
-}
-
-interface SearchResultsProps {
-  filters: any
-  triggerSearch: number
-}
-
-type SortOption = 'newest' | 'price-asc' | 'price-desc' | 'bedrooms'
-
-export default function SearchResults({ filters, triggerSearch }: SearchResultsProps) {
-  const [listings, setListings] = useState<Listing[]>([])
+type SortOption = 'newest' | 'price-asc' | 'price-desc'
+export default function SearchResults({ filters, triggerSearch }: { filters: any; triggerSearch: number }) {
+  const [listings, setListings] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState('')
   const [total, setTotal] = useState(0)
-  const [sortOption, setSortOption] = useState<SortOption>('newest')
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
-
+  const [pages, setPages] = useState(0)
+  const [page, setPage] = useState(1)
+  const [sort, setSort] = useState<SortOption>('newest')
+  const [refresh, setRefresh] = useState(0)
+  const [queryTime, setQueryTime] = useState<string | null>(null)
+  useEffect(() => { setPage(1) }, [triggerSearch])
   useEffect(() => {
-    fetchListings()
-  }, [triggerSearch, sortOption])
-
-  // Auto-refresh every 30 seconds to show new listings
-  useEffect(() => {
-    const interval = setInterval(() => {
-      fetchListings()
-    }, 30 * 1000) // 30 seconds
-
-    return () => clearInterval(interval)
-  }, [filters, sortOption])
-
-  const getSortOptions = (): SearchOptions => {
-    switch (sortOption) {
-      case 'price-asc':
-        return { sortBy: 'price', sortOrder: 'asc' }
-      case 'price-desc':
-        return { sortBy: 'price', sortOrder: 'desc' }
-      case 'bedrooms':
-        return { sortBy: 'bedrooms', sortOrder: 'desc' }
-      case 'newest':
-      default:
-        return { sortBy: 'createdAt', sortOrder: 'desc' }
+    const controller = new AbortController()
+    setLoading(true); setError('')
+    const apiFilters: SearchFilters = {
+      q: filters.q,
+      minPrice: filters.minPrice !== '' && filters.minPrice != null ? Number(filters.minPrice) : undefined,
+      maxPrice: filters.maxPrice !== '' && filters.maxPrice != null ? Number(filters.maxPrice) : undefined,
+      minBedrooms: filters.bedrooms !== '' && filters.bedrooms != null ? Number(filters.bedrooms) : undefined,
+      maxBedrooms: filters.bedrooms !== '' && filters.bedrooms != null && Number(filters.bedrooms) < 3 ? Number(filters.bedrooms) : undefined,
+      minBathrooms: filters.bathrooms ? Number(filters.bathrooms) : undefined,
+      neighborhoods: filters.neighborhoods, petsAllowed: filters.petsAllowed || undefined, noFee: filters.noFee || undefined,
     }
-  }
-
-  const fetchListings = async () => {
-    try {
-      // Only show loading on initial load, not on refreshes
-      if (listings.length === 0) {
-        setLoading(true)
-      }
-      setError(null)
-      
-      const sortOptions = getSortOptions()
-      
-      // Build filter object for API
-      const apiFilters: any = {}
-      
-      if (filters.minPrice) apiFilters.minPrice = parseInt(filters.minPrice)
-      if (filters.maxPrice) apiFilters.maxPrice = parseInt(filters.maxPrice)
-      if (filters.bedrooms) apiFilters.minBedrooms = parseInt(filters.bedrooms)
-      if (filters.bathrooms) apiFilters.minBathrooms = parseInt(filters.bathrooms)
-      if (filters.neighborhoods?.length > 0) apiFilters.neighborhoods = filters.neighborhoods
-      if (filters.petsAllowed) apiFilters.petsAllowed = true
-      if (filters.noFee) apiFilters.noFee = true
-      
-      const result = await api.searchListings(apiFilters, { limit: 100, ...sortOptions })
-      setListings(result.listings || [])
-      setTotal(result.total || 0)
-      setLastUpdated(new Date())
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load listings')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleRefresh = () => {
-    fetchListings()
-  }
-
-  if (loading) {
-    return (
-      <div>
-        <div className="bg-primary/10 rounded-2xl p-6 mb-6 border border-primary/20">
-          <div className="flex items-start gap-3">
-            <div className="flex-shrink-0">
-              <svg className="w-5 h-5 text-primary animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-foreground mb-1">Loading listings...</p>
-              <p className="text-xs text-foreground/60">
-                First load may take 30-60 seconds as our free tier server wakes up. Subsequent searches will be instant!
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="bg-card rounded-3xl p-6 shadow-soft border border-border animate-pulse">
-              <div className="h-48 bg-card-alt rounded-2xl mb-4" />
-              <div className="h-6 bg-card-alt rounded w-3/4 mb-2" />
-              <div className="h-4 bg-card-alt rounded w-1/2" />
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="bg-accent/10 rounded-3xl p-8 text-center border border-accent/20">
-        <p className="text-accent font-medium mb-2">Unable to load listings</p>
-        <p className="text-foreground/70 text-sm">{error}</p>
-        <button
-          onClick={fetchListings}
-          className="pressable mt-4 px-6 py-2 bg-foreground text-background rounded-full text-sm tracking-widest uppercase hover:bg-opacity-90 transition-opacity duration-200"
-        >
-          Try Again
-        </button>
-      </div>
-    )
-  }
-
-  if (listings.length === 0) {
-    return (
-      <div className="bg-card rounded-3xl p-12 text-center shadow-soft border border-border">
-        <p className="text-xl font-serif text-foreground mb-2">No listings found</p>
-        <p className="text-foreground/70">Try adjusting your filters</p>
-      </div>
-    )
-  }
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <p className="text-foreground/70">
-            <span className="font-semibold text-foreground">{total}</span> listings found
-          </p>
-          {lastUpdated && (
-            <p className="text-xs text-foreground/50">
-              Updated {lastUpdated.toLocaleTimeString()}
-            </p>
-          )}
-          <button
-            onClick={handleRefresh}
-            disabled={loading}
-            className="pressable text-xs text-primary hover:text-primary/80 underline disabled:opacity-50"
-          >
-            Refresh
-          </button>
-        </div>
-        <select 
-          value={sortOption}
-          onChange={(e) => setSortOption(e.target.value as SortOption)}
-          className="px-4 py-2 bg-card rounded-full border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-[border-color,box-shadow] duration-200 text-sm"
-        >
-          <option value="newest">Newest First</option>
-          <option value="price-asc">Price: Low to High</option>
-          <option value="price-desc">Price: High to Low</option>
-          <option value="bedrooms">Bedrooms</option>
-        </select>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {listings.map((listing) => (
-          <ListingCard key={listing._id} listing={listing} />
-        ))}
-      </div>
+    const options: SearchOptions = { page, limit: 12, sortBy: sort === 'newest' ? 'createdAt' : 'price', sortOrder: sort === 'price-asc' ? 'asc' : 'desc' }
+    api.searchListings(apiFilters, options, controller.signal).then(result => {
+      if (controller.signal.aborted) return
+      setListings(result.listings); setTotal(result.total); setPages(result.totalPages); setQueryTime(new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }))
+    }).catch(e => { if (!controller.signal.aborted) setError(e.message || 'Search unavailable') })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false) })
+    return () => controller.abort()
+  }, [filters, page, sort, refresh])
+  return <div aria-busy={loading}>
+    <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
+      <div aria-live="polite"><p className="font-semibold">{loading ? 'Finding rentals…' : error ? 'Search unavailable' : `${total.toLocaleString()} rental${total === 1 ? '' : 's'}`}</p>{!loading && queryTime && !error && <p className="mt-1 text-xs text-foreground/60">Results loaded at {queryTime} · Source dates shown on each listing</p>}</div>
+      <div className="flex items-center gap-3"><button onClick={() => setRefresh(refresh + 1)} aria-label="Refresh search results" disabled={loading} className="rounded-full border border-border p-2.5 disabled:opacity-40"><RefreshCw size={16} /></button><label className="sr-only" htmlFor="sort">Sort rentals</label><select id="sort" className="rounded-xl border border-border bg-card px-3 py-2.5 text-sm" value={sort} onChange={e => { setSort(e.target.value as SortOption); setPage(1) }}><option value="newest">Recently added</option><option value="price-asc">Rent: low to high</option><option value="price-desc">Rent: high to low</option></select></div>
     </div>
-  )
+    {loading ? <div role="status" className="grid gap-5 md:grid-cols-2"><span className="sr-only">Loading rental listings</span>{Array.from({ length: 4 }, (_, i) => <div key={i} className="h-96 animate-pulse rounded-3xl border border-border bg-card-alt" />)}</div>
+      : error ? <div role="alert" className="rounded-3xl border border-accent/20 bg-card p-8"><h2 className="font-serif text-2xl">Listings are unavailable right now</h2><p className="mt-3 text-sm text-foreground/75">{error}</p><div className="mt-6 flex flex-wrap gap-4"><button onClick={() => setRefresh(refresh + 1)} className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-white">Retry search</button><Link href="/research" className="inline-flex items-center gap-2 text-sm font-semibold text-primary">Research an address <ArrowRight size={16} /></Link></div></div>
+      : listings.length === 0 ? <div className="rounded-3xl border border-border bg-card p-12 text-center"><Search size={28} className="mx-auto text-primary" /><h2 className="mt-5 font-serif text-2xl">No rentals match these filters</h2><p className="mt-3 text-sm text-foreground/70">Try a broader budget or another borough. You can research any NYC street address without finding a listing here.</p><Link href="/research" className="mt-5 inline-block text-sm font-semibold text-primary underline">Research an address</Link></div>
+      : <><div className="grid gap-5 md:grid-cols-2">{listings.map(listing => <ListingCard listing={listing} key={listing._id} />)}</div><div className="mt-8 flex items-center justify-between gap-3 border-t border-border pt-6"><button disabled={page === 1} onClick={() => setPage(page - 1)} className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm disabled:opacity-30"><ArrowLeft size={16} />Previous</button><span className="text-sm text-foreground/70">Page {page} of {pages}</span><button disabled={page >= pages} onClick={() => setPage(page + 1)} className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm disabled:opacity-30">Next<ArrowRight size={16} /></button></div></>}
+  </div>
 }

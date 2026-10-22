@@ -4,6 +4,7 @@ import { ListingSource, JobStatus, SourceResult, IScrapingJob } from '../types';
 export interface IScrapingJobDocument extends Document, IScrapingJob {}
 
 const SourceResultSchema = new Schema<SourceResult>({
+  issues: { type: [String], default: [] },
   source: {
     type: String,
     enum: Object.values(ListingSource),

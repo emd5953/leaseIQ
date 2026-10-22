@@ -7,11 +7,13 @@ import { config } from '../config';
  */
 export class GeocodingService {
   private client: Client;
+  private apiKey: string;
   private cache: Map<string, Coordinates | null>;
   private maxRetries: number = 3;
   private retryDelay: number = 1000;
 
   constructor(apiKey?: string) {
+    this.apiKey = apiKey || config.geocoding.apiKey;
     this.client = new Client({});
     this.cache = new Map();
   }
@@ -20,6 +22,7 @@ export class GeocodingService {
    * Geocode an address to coordinates
    */
   async geocode(address: string): Promise<Coordinates | null> {
+    if (!this.apiKey) return null;
     // Check cache first
     if (this.cache.has(address)) {
       return this.cache.get(address) || null;
@@ -31,8 +34,9 @@ export class GeocodingService {
         const response = await this.client.geocode({
           params: {
             address,
-            key: config.geocoding.apiKey,
+            key: this.apiKey,
           },
+          timeout: 8000,
         });
 
         if (response.data.results.length === 0) {
@@ -40,7 +44,9 @@ export class GeocodingService {
           return null;
         }
 
-        const location = response.data.results[0].geometry.location;
+        const result = response.data.results[0];
+        if (result.partial_match || !['ROOFTOP', 'RANGE_INTERPOLATED'].includes(result.geometry.location_type || '')) return null;
+        const location = result.geometry.location;
         const coordinates: Coordinates = {
           latitude: location.lat,
           longitude: location.lng,

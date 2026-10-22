@@ -49,11 +49,11 @@ export class DataParser {
       applicationFee: this.extractNumber(data.applicationFee),
       availableDate: this.extractString(data.availableDate),
       utilities: data.utilities ? {
-        electric: Boolean(data.utilities.electric),
-        gas: Boolean(data.utilities.gas),
-        water: Boolean(data.utilities.water),
-        internet: Boolean(data.utilities.internet),
-        trash: Boolean(data.utilities.trash),
+        electric: typeof data.utilities.electric === 'boolean' ? data.utilities.electric : null,
+        gas: typeof data.utilities.gas === 'boolean' ? data.utilities.gas : null,
+        water: typeof data.utilities.water === 'boolean' ? data.utilities.water : null,
+        internet: typeof data.utilities.internet === 'boolean' ? data.utilities.internet : null,
+        trash: typeof data.utilities.trash === 'boolean' ? data.utilities.trash : null,
       } : null,
       laundry: this.extractString(data.laundry),
       heating: this.extractString(data.heating),
@@ -78,7 +78,7 @@ export class DataParser {
   private extractNumber(value: any): number | null {
     if (value === null || value === undefined || value === '') return null;
     const num = Number(value);
-    return isNaN(num) ? null : num;
+    return Number.isFinite(num) ? num : null;
   }
 
   /**
