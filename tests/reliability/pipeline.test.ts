@@ -84,6 +84,30 @@ describe('Ingestion to MongoDB to search', () => {
     expect(await storage.markStaleListingsInactive(3)).toBe(1);
     expect((await Listing.findById(id))!.isActive).toBe(false);
   });
+  it('blocks retired source IDs even after a conflict has been resolved', async () => {
+    const data = await normalized('retired');
+    const id = await storage.insertListing(data, null);
+    await Listing.findByIdAndUpdate(id, { sources: [], retiredSourceKeys: ['streeteasy:retired'], $unset: { sourceKeys: 1 } });
+    await expect(storage.insertListing(data, null)).rejects.toThrow('quarantined');
+    await expect(storage.updateListing(id, data, null)).rejects.toThrow('quarantined');
+    expect(await Listing.countDocuments({})).toBe(1);
+  });
+  it('preserves verified building prices through search and rejects unit imports into the building', async () => {
+    const data = await normalized('building');
+    const id = await storage.insertListing(data, null);
+    const building = await Listing.findById(id);
+    building!.listingScope = 'building';
+    building!.price = { amount: null, status: 'building', currency: 'USD', period: 'monthly' };
+    building!.buildingRent = { status: 'range', minimum: 2500, maximum: 5000, sourceUrl: data.sourceUrl, observedAt: new Date() };
+    await building!.save();
+    await expect(storage.updateListing(id, await normalized('building', { price: 2500 }), null)).rejects.toThrow('unit import');
+    const result = await SearchService.search({}, { page: 1, limit: 10 });
+    expect(result.listings[0]).toMatchObject({ price: null, listingScope: 'building', buildingRent: { minimum: 2500, maximum: 5000 } });
+    const bounded = await SearchService.search({ minPrice: 2000, maxPrice: 3000 }, { page: 1, limit: 10 });
+    expect(bounded.total).toBe(0);
+    await Listing.findByIdAndUpdate(id, { listingScope: 'unit', duplicateOf: 'historical-owner', 'price.status': 'unknown' });
+    await expect(storage.updateListing(id, data, null)).rejects.toThrow('historical duplicate');
+  });
   it('passes exact studio, fee, and search text filters through to MongoDB', async () => {
     await storage.insertListing(await normalized('studio', { brokerFee: 'No fee' }), null);
     await storage.insertListing(await normalized('one-bed', { bedrooms: 1, address: '231 West 55th St #8B, Manhattan, NY 10019' }), null);

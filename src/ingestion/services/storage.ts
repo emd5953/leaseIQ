@@ -37,6 +37,7 @@ export class ListingStorage {
     for (let attempt = 0; attempt < 3; attempt++) {
       const existing = await ListingModel.findById(id);
       if (!existing) throw new Error('Listing disappeared during import');
+      if (existing.listingScope === 'building' || existing.duplicateOf) throw new Error('A unit import cannot overwrite a verified building or historical duplicate.');
       const reference = existing.sources.find(s => s.source === listing.source && s.sourceId === listing.sourceId);
       if (reference && reference.lastSeenAt >= listing.scrapedAt) return; // out-of-order observations cannot overwrite newer evidence
       const latestSeen = Math.max(0, ...existing.sources.map(s => new Date(s.lastSeenAt).getTime()).filter(Number.isFinite));
@@ -67,7 +68,7 @@ export class ListingStorage {
     return ListingModel.findOne({ sources: { $elemMatch: { source, sourceId } } });
   }
   private async assertSourceNotQuarantined(listing: NormalizedListing): Promise<void> {
-    if (await ListingModel.exists({ 'sourceConflicts.sourceKey': sourceKey(listing) })) {
+    if (await ListingModel.exists({ $or: [{ 'sourceConflicts.sourceKey': sourceKey(listing) }, { retiredSourceKeys: sourceKey(listing) }] })) {
       throw new Error('Source identity is quarantined; verify the unit before importing this source ID.');
     }
   }

@@ -29,7 +29,8 @@
     "test:reliability": "vitest run tests/reliability tests/unit/listing-validation.test.ts tests/unit/queries.test.ts tests/properties/schema-conformance.properties.test.ts src/ingestion/models/listing.schema.test.ts",
     "validate:research": "tsx scripts/validate-research.ts",
     "audit:listings": "tsx scripts/audit-listings.ts",
-    "repair:listings": "tsx scripts/repair-listings.ts"
+    "repair:listings": "tsx scripts/repair-listings.ts",
+    "verify:listings": "tsx scripts/verify-listings.ts"
   },
   "keywords": [
     "rental",

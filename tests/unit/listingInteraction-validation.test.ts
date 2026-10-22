@@ -13,6 +13,8 @@ describe('ListingInteraction Model Validation', () => {
   beforeAll(async () => {
     mongoServer = await MongoMemoryServer.create();
     await mongoose.connect(mongoServer.getUri());
+    // Uniqueness is enforced by MongoDB after its asynchronous index build.
+    await ListingInteraction.init();
 
     // Create test user and listing for use in tests
     const user = await User.create({
@@ -113,7 +115,7 @@ describe('ListingInteraction Model Validation', () => {
       interactionType: 'viewed'
     });
 
-    await expect(duplicateInteraction.save()).rejects.toThrow();
+    await expect(duplicateInteraction.save()).rejects.toMatchObject({ code: 11000 });
   });
 
   it('should allow same user to have different interaction types on same listing', async () => {

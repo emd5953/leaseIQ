@@ -34,7 +34,7 @@ export interface IListing extends Document {
   // Pricing and availability
   price: {
     amount: number | null;
-    status?: 'known' | 'unknown';
+    status?: 'known' | 'unknown' | 'building';
     currency: string;
     period: 'monthly' | 'weekly' | 'daily';
   };
@@ -50,6 +50,13 @@ export interface IListing extends Document {
   sourceKeys?: string[];
   sourceConflicts?: { sourceKey: string; source: IListingSource; quarantinedAt: Date; reason: string }[];
   rentReview?: { originalAmount: number; reason: string; reviewedAt: Date };
+  listingScope?: 'building' | 'unit';
+  buildingRent?: { status: 'range' | 'contact'; minimum: number | null; maximum: number | null; sourceUrl: string; observedAt: Date };
+  sourceVerification?: any;
+  sourceResolutions?: any[];
+  retiredSources?: any[];
+  retiredSourceKeys?: string[];
+  duplicateOf?: string;
   addressKey?: string;
   coordinates?: { type: string; coordinates: [number, number] };
   
@@ -121,6 +128,13 @@ const listingSchema = new Schema<IListing>({
   sourceKeys: { type: [String], default: undefined },
   sourceConflicts: { type: [Schema.Types.Mixed], default: undefined },
   rentReview: { type: Schema.Types.Mixed, default: undefined },
+  listingScope: { type: String, enum: ['building', 'unit'] },
+  buildingRent: { type: Schema.Types.Mixed, default: undefined },
+  sourceVerification: { type: Schema.Types.Mixed, default: undefined },
+  sourceResolutions: { type: [Schema.Types.Mixed], default: undefined },
+  retiredSources: { type: [Schema.Types.Mixed], default: undefined },
+  retiredSourceKeys: { type: [String], default: undefined },
+  duplicateOf: { type: String },
   addressKey: { type: String },
   squareFeet: { type: Number, default: undefined },
   coordinates: { type: new Schema({ type: { type: String, enum: ['Point'] }, coordinates: [Number] }, { _id: false }), default: undefined },
@@ -166,10 +180,10 @@ const listingSchema = new Schema<IListing>({
   },
   
   price: {
-    status: { type: String, enum: ['known', 'unknown'], default: undefined },
+    status: { type: String, enum: ['known', 'unknown', 'building'], default: undefined },
     amount: {
       type: Number,
-      required: [function(this: IListing) { return this.price?.status !== 'unknown'; }, 'Price amount is required'],
+      required: [function(this: IListing) { return !['unknown', 'building'].includes(this.price?.status || ''); }, 'Price amount is required'],
       validate: {
         validator: function(v: number) {
           return v == null || (Number.isFinite(v) && v > 0);
@@ -383,8 +397,16 @@ const listingSchema = new Schema<IListing>({
     }],
     required: [true, 'At least one source is required'],
     validate: {
-      validator: function(v: any[]) {
-        return Array.isArray(v) && v.length > 0;
+      validator: function(this: IListing, v: any[]) {
+        if (!Array.isArray(v)) return false;
+        if (v.length) return true;
+        // A repaired historical record keeps its provenance even when an unsafe
+        // association is removed. Ordinary new listings still require a source.
+        const dated = (value: any) => Number.isFinite(+new Date(value || ''));
+        const provenance = (s: any) => !!s?.source && !!s.sourceId && /^https:\/\//.test(s.sourceUrl || '') && dated(s.firstSeenAt) && dated(s.lastSeenAt);
+        const alias = this.isActive === false && !!this.duplicateOf && this.sourceResolutions?.some(r => r.canonicalListingId === this.duplicateOf && /^https:\/\//.test(r.evidenceUrl || '') && dated(r.checkedAt) && r.originalSources?.length && r.originalSources.every(provenance));
+        const mismatch = this.sourceVerification?.status === 'source_mismatch' && this.price?.status === 'unknown' && this.price.amount == null && this.retiredSources?.some(r => provenance(r.source) && dated(r.checkedAt) && r.reason);
+        return !!(alias || mismatch);
       },
       message: 'Sources array cannot be empty'
     }
@@ -435,4 +457,15 @@ listingSchema.index({ isActive: 1, createdAt: -1 });
  * Listing model
  * Export Mongoose model for Listing collection
  */
+listingSchema.pre('validate', function(next) {
+  if (this.price?.status === 'building') {
+    const r = this.buildingRent;
+    const validRange = r?.status === 'range' && Number.isFinite(r.minimum) && Number.isFinite(r.maximum) && (r.minimum || 0) > 0 && (r.maximum || 0) >= (r.minimum || 0);
+    const contact = r?.status === 'contact' && r.minimum == null && r.maximum == null;
+    if (this.listingScope !== 'building' || this.price.amount != null || !(validRange || contact) || !/^https:\/\//.test(r?.sourceUrl || '') || !Number.isFinite(+new Date(r?.observedAt || ''))) {
+      this.invalidate('buildingRent', 'Building pricing requires dated source evidence and a valid range or explicit contact-for-price status.');
+    }
+  }
+  next();
+});
 export const Listing = model<IListing>('Listing', listingSchema);

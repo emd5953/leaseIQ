@@ -45,5 +45,35 @@ No documents or references are deleted. Keep backups private; never commit them.
 Review `unknownRent` and `sourceIdentityNeedsReview` alongside `invalidRent` and
 duplicate source counts. Quarantine is a containment measure, not proof that
 ambiguous records represent one apartment. Resolve conflicts only after obtaining
-exact unit evidence. Restore backups only after checking that no newer source
+exact unit evidence, or establish one explicitly labeled building record from
+matching building evidence. Restore backups only after checking that no newer source
 updates would be overwritten.
+
+## Verify building sources and resolve identities
+
+`npm run verify:listings -- --documents /private/path/documents.json` previews
+verification against recently retrieved public source documents. Inputs contain
+the requested/final URL, HTTP status, retrieval time, JSON-LD, and (for Realtor)
+the primary property details. Recommendation results must not be supplied as the
+primary property. Parsers reject old/future observations, mismatched addresses,
+search redirects, failed requests, and unsupported page structures.
+
+Building offers are stored separately in `buildingRent`; exact unit rent remains
+null. The UI labels ranges, starting prices, and explicit contact-for-price
+listings. Unidentified unit facts are cleared when converting a building record.
+Price and bedroom filters do not treat building ranges as individual apartments.
+Only exact-unit evidence can refresh a unit's rent or confirm it unavailable.
+
+Shared building IDs may receive one canonical building owner. Historical records
+retain their IDs and original source provenance, become inactive, and link to
+that owner. Sources reassigned to a different address are retired and blocked
+from ingestion. Their records remain visible with an explicit mismatch warning;
+untrusted rent is unknown until replacement evidence exists. A redirect or 404
+alone never proves an apartment unavailable. Ordinary new listings still require
+a valid source; empty-source exceptions require retained repair provenance.
+
+Apply a reviewed preview with `--apply --backup-dir /private/path/new-backup`.
+The same private backup, transaction, concurrency, and ID-preservation safeguards
+apply. Repeat the dry run afterward to verify idempotence, audit source keys and
+prices, and check saved-listing references. Do not commit credentials, database
+backups, or downloaded page bodies. See the [dated verification results](listing-verification-2026-10-22.md).

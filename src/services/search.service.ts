@@ -139,7 +139,7 @@ export class SearchService {
         .sort(sort)
         .skip(skip)
         .limit(limit)
-        .select('address price bedrooms bathrooms squareFootage squareFeet images sources sourceConflicts petPolicy brokerFee amenities createdAt updatedAt isActive fieldObservedAt dataVersion')
+        .select('address price bedrooms bathrooms squareFootage squareFeet images sources sourceConflicts sourceVerification listingScope buildingRent duplicateOf petPolicy brokerFee amenities createdAt updatedAt isActive fieldObservedAt dataVersion')
         .lean()
         .maxTimeMS(3000) // Reduced timeout
         .exec(),
