@@ -329,18 +329,6 @@ export default function LeaseAnalyzerPage() {
           {/* Analysis Results */}
           {analysis && (
             <div className="space-y-6">
-              {/* Debug: Raw API Response */}
-              <details className="bg-amber-50 rounded-2xl border border-amber-200">
-                <summary className="p-4 cursor-pointer text-sm font-medium text-amber-800">
-                  🔍 Debug: View raw API response (click to expand)
-                </summary>
-                <div className="p-4 pt-0">
-                  <pre className="text-xs text-amber-900 whitespace-pre-wrap max-h-64 overflow-auto bg-amber-100 p-4 rounded-xl">
-                    {JSON.stringify(analysis, null, 2)}
-                  </pre>
-                </div>
-              </details>
-
               {/* Combined Analysis Match Score */}
               {analysis.overallAssessment && (
                 <div className="bg-gradient-to-br from-primary/20 to-blue-500/20 rounded-3xl p-8 border-2 border-primary/30">
@@ -569,7 +557,7 @@ export default function LeaseAnalyzerPage() {
               })()}
 
               {/* Financial Summary - Prominent Cards */}
-              {analysis.financialSummary && Object.keys(analysis.financialSummary).some(k => analysis.financialSummary[k]) && (
+              {analysis.financialSummary?.calculationBasis && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {analysis.financialSummary.totalMoveInCost && (
                     <div className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-2xl p-6 border border-primary/20">
@@ -577,7 +565,7 @@ export default function LeaseAnalyzerPage() {
                         <div className="p-2 bg-primary/20 rounded-xl">
                           <Key size={20} className="text-primary" strokeWidth={1.5} />
                         </div>
-                        <span className="text-sm font-medium text-foreground/70 uppercase tracking-wide">Move-in Cost</span>
+                        <span className="text-sm font-medium text-foreground/70 uppercase tracking-wide">Rent + Deposit</span>
                       </div>
                       <p className="text-3xl font-bold text-foreground">{reportValue(analysis.financialSummary.totalMoveInCost)}</p>
                     </div>
@@ -588,7 +576,7 @@ export default function LeaseAnalyzerPage() {
                         <div className="p-2 bg-green-500/20 rounded-xl">
                           <DollarSign size={20} className="text-green-600" strokeWidth={1.5} />
                         </div>
-                        <span className="text-sm font-medium text-foreground/70 uppercase tracking-wide">Monthly Total</span>
+                        <span className="text-sm font-medium text-foreground/70 uppercase tracking-wide">Monthly Rent</span>
                       </div>
                       <p className="text-3xl font-bold text-foreground">{reportValue(analysis.financialSummary.monthlyTotal)}</p>
                     </div>
@@ -599,13 +587,15 @@ export default function LeaseAnalyzerPage() {
                         <div className="p-2 bg-blue-500/20 rounded-xl">
                           <Calendar size={20} className="text-blue-600" strokeWidth={1.5} />
                         </div>
-                        <span className="text-sm font-medium text-foreground/70 uppercase tracking-wide">Annual Cost</span>
+                        <span className="text-sm font-medium text-foreground/70 uppercase tracking-wide">Annualized Rent</span>
                       </div>
                       <p className="text-3xl font-bold text-foreground">{reportValue(analysis.financialSummary.annualCost)}</p>
                     </div>
                   )}
                 </div>
               )}
+
+              {analysis.financialSummary?.calculationBasis && <p className="text-sm text-muted-foreground">{reportValue(analysis.financialSummary.calculationBasis)}</p>}
 
               {/* Red Flags - High Visibility */}
               {analysis.redFlags && analysis.redFlags.length > 0 && (
@@ -773,7 +763,7 @@ export default function LeaseAnalyzerPage() {
                         <Shield size={20} className="text-green-600" strokeWidth={1.5} />
                       </div>
                       <h3 className="text-xl font-serif font-bold text-foreground">
-                        Your Rights
+                        Tenant Terms to Review
                       </h3>
                     </div>
                     <ul className="space-y-3">
@@ -795,7 +785,7 @@ export default function LeaseAnalyzerPage() {
                         <Scale size={20} className="text-blue-600" strokeWidth={1.5} />
                       </div>
                       <h3 className="text-xl font-serif font-bold text-foreground">
-                        Landlord Must
+                        Landlord Terms to Review
                       </h3>
                     </div>
                     <ul className="space-y-3">

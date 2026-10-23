@@ -35,9 +35,18 @@ describe('Structured model values from the real upload regression', () => {
     expect(result.keyTerms.utilities).toBe('heat: included; hot Water: included; electricity: tenant; internet: tenant');
     expect(result.keyTerms.monthlyRent).toBe('3200');
     expect(result.keyTerms.parking).toBe('Not specified');
-    expect(result.financialSummary.totalMoveInCost).toContain('total: 6400');
+    expect(result.financialSummary).toEqual({}); // Bare numeric rent has no explicit currency.
     expect(result.tenantRights).toEqual(['entry: 24 hours notice']);
     expect(result.redFlags).toHaveLength(1);
     expect(result.redFlags[0].description).toBe('clause: Example');
+  });
+});
+
+
+describe('Financial subtotals', () => {
+  it('computes rent plus deposit instead of trusting the model move-in total', async () => {
+    complete.mockResolvedValue({ choices: [{ message: { content: JSON.stringify({ summary: 'Fictional lease', keyTerms: { monthlyRent: '$3,200', securityDeposit: '$3,200' }, financialSummary: { totalMoveInCost: '$3,200' } }) } }] });
+    const result = await LeaseService.analyzeLease('Monthly rent $3,200; security deposit $3,200.');
+    expect(result.financialSummary).toMatchObject({ totalMoveInCost: '$6,400', monthlyTotal: '$3,200', annualCost: '$38,400', calculationBasis: expect.stringContaining('excluded') });
   });
 });
