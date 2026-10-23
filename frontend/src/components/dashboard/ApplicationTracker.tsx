@@ -1,9 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { ArrowRight, Building2, CheckCircle2, FileText, Search } from 'lucide-react'
 import { api } from '@/lib/api'
+import { rentLabel } from '@/lib/listing-rent'
 
 type TrackerStatus = 'interested' | 'touring' | 'applied' | 'lease' | 'moved'
 
@@ -21,6 +22,7 @@ interface TrackerListing {
 interface ApplicationTrackerProps {
   userId: string
   listings: TrackerListing[]
+  onStatusUpdated: (id: string, status: TrackerStatus) => void
 }
 
 const stages: { id: TrackerStatus; label: string; description: string }[] = [
@@ -36,37 +38,19 @@ function listingStreet(listing: TrackerListing) {
   return listing.address?.street || 'Saved apartment'
 }
 
-function listingPrice(listing: TrackerListing) {
-  const price = typeof listing.price === 'number' ? listing.price : listing.price?.amount
-  return price ? `$${price.toLocaleString()}/mo` : 'Price unavailable'
-}
-
-export default function ApplicationTracker({ userId, listings }: ApplicationTrackerProps) {
-  const storageKey = `leaseiq_tracker_${userId}`
-  const [statuses, setStatuses] = useState<Record<string, TrackerStatus>>({})
-
-  useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem(storageKey)
-      if (stored) {
-        setStatuses(JSON.parse(stored))
-      } else {
-        setStatuses(Object.fromEntries(listings.map(listing => [listing._id, listing.status || 'interested'])))
-      }
-    } catch {
-      // Keep the tracker usable if local storage is unavailable.
-    }
-  }, [storageKey, listings])
-
+export default function ApplicationTracker({ userId, listings, onStatusUpdated }: ApplicationTrackerProps) {
+  const [saving, setSaving] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const statuses = Object.fromEntries(listings.map(listing => [listing._id, listing.status || 'interested']))
   const updateStatus = async (listingId: string, status: TrackerStatus) => {
-    const next = { ...statuses, [listingId]: status }
-    setStatuses(next)
-    window.localStorage.setItem(storageKey, JSON.stringify(next))
+    setSaving(listingId)
+    setError(null)
     try {
       await api.updateSavedListingStatus(listingId, status)
-    } catch {
-      // Keep the optimistic local state if the API is temporarily unavailable.
-    }
+      onStatusUpdated(listingId, status)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save this stage. Please retry.')
+    } finally { setSaving(null) }
   }
 
   const grouped = useMemo(() => stages.map(stage => ({
@@ -89,9 +73,10 @@ export default function ApplicationTracker({ userId, listings }: ApplicationTrac
     <div>
       <div className="mb-8 flex flex-col justify-between gap-3 md:flex-row md:items-end">
         <div><p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Your move</p><h2 className="mt-2 text-3xl font-serif font-semibold text-foreground">Keep every apartment in view.</h2></div>
-        <p className="max-w-sm text-sm leading-relaxed text-foreground/55 md:text-right">Statuses are saved on this device for now. Move a listing forward as your search gets real.</p>
+        <p className="max-w-sm text-sm leading-relaxed text-foreground/55 md:text-right">Stages are saved to your account. Move a listing forward as your search gets real.</p>
       </div>
 
+      {error && <p role="alert" className="mb-4 rounded-xl bg-red-50 p-4 text-red-800">{error}</p>}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {grouped.map(stage => (
           <section key={stage.id} className="min-h-[250px] rounded-2xl border border-border bg-card-alt/60 p-4">
@@ -100,7 +85,7 @@ export default function ApplicationTracker({ userId, listings }: ApplicationTrac
               {stage.listings.map(listing => (
                 <article key={listing._id} className="overflow-hidden rounded-xl border border-border bg-card">
                   {listing.images?.[0] && <img src={listing.images[0]} alt="" className="h-24 w-full object-cover" />}
-                  <div className="p-3"><p className="line-clamp-1 text-sm font-semibold text-foreground">{listingStreet(listing)}</p><p className="mt-1 text-xs text-foreground/55">{listingPrice(listing)} · {listing.bedrooms ?? 0} bed · {listing.bathrooms ?? 0} bath</p><div className="mt-3 flex items-center gap-2"><Link href={`/listing/${listing._id}`} className="text-xs font-semibold text-primary hover:text-foreground">Open listing</Link><select aria-label={`Move ${listingStreet(listing)} to another stage`} value={statuses[listing._id] || 'interested'} onChange={event => updateStatus(listing._id, event.target.value as TrackerStatus)} className="min-w-0 flex-1 rounded-lg border border-border bg-card-alt px-2 py-1 text-[11px] text-foreground">{stages.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div></div>
+                  <div className="p-3"><p className="line-clamp-1 text-sm font-semibold text-foreground">{listingStreet(listing)}</p><p className="mt-1 text-xs text-foreground/55">{rentLabel(listing as any)} · {listing.bedrooms ?? '—'} bed · {listing.bathrooms ?? '—'} bath</p><div className="mt-3 flex items-center gap-2"><Link href={`/listing/${listing._id}`} className="text-xs font-semibold text-primary hover:text-foreground">Open listing</Link><select disabled={saving !== null} aria-label={`Move ${listingStreet(listing)} to another stage`} value={statuses[listing._id] || 'interested'} onChange={event => updateStatus(listing._id, event.target.value as TrackerStatus)} className="min-w-0 flex-1 rounded-lg border border-border bg-card-alt px-2 py-1 text-[11px] text-foreground">{stages.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div></div>
                 </article>
               ))}
               {stage.listings.length === 0 && <p className="pt-5 text-xs text-foreground/35">Nothing here yet.</p>}

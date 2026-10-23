@@ -11,6 +11,13 @@ const router = Router();
 
 // All routes require authentication
 router.use(requireAuth);
+for (const parameter of ['id', 'listingId']) {
+  router.param(parameter, (_req, res, next, value) => {
+    if (!Types.ObjectId.isValid(value)) return res.status(400).json({ error: 'Invalid ID' });
+    next();
+  });
+}
+
 
 // ============ PREFERENCES ============
 
@@ -79,7 +86,7 @@ router.get('/saved-listings', async (req: AuthRequest, res: Response) => {
 
     // Map listings with interaction metadata
     const listingsMap = new Map(listings.map((l) => [l._id.toString(), l]));
-    const result = interactions.map((interaction) => ({
+    const result = interactions.filter(i => listingsMap.has(i.listingId.toString())).map((interaction) => ({
       ...listingsMap.get(interaction.listingId.toString()),
       savedAt: interaction.timestamp,
       notes: interaction.metadata?.notes,
@@ -102,6 +109,8 @@ router.post('/saved-listings/:listingId', async (req: AuthRequest, res: Response
     const { listingId } = req.params;
     const { notes, status } = req.body;
 
+    if (status !== undefined && !['interested', 'touring', 'applied', 'lease', 'moved'].includes(status)) return res.status(400).json({ error: 'Invalid tracker status' });
+    if (notes !== undefined && notes !== null && typeof notes !== 'string') return res.status(400).json({ error: 'Notes must be text' });
     // Verify listing exists
     const listing = await Listing.findById(listingId);
     if (!listing) {
@@ -116,17 +125,18 @@ router.post('/saved-listings/:listingId', async (req: AuthRequest, res: Response
         interactionType: 'saved',
       },
       {
-        userId: req.userId,
-        listingId: new Types.ObjectId(listingId as string),
-        interactionType: 'saved',
-        timestamp: new Date(),
-        metadata: {
-          notes: notes || null,
-          status: status || 'interested',
-          viewDurationSeconds: null,
+        $setOnInsert: {
+          userId: req.userId, listingId: new Types.ObjectId(listingId as string),
+          interactionType: 'saved', timestamp: new Date(),
+          ...(notes === undefined ? { 'metadata.notes': null } : {}),
+          ...(status === undefined ? { 'metadata.status': 'interested' } : {}),
+        },
+        $set: {
+          ...(notes !== undefined ? { 'metadata.notes': notes } : {}),
+          ...(status !== undefined ? { 'metadata.status': status } : {}),
         },
       },
-      { upsert: true, new: true }
+      { upsert: true, new: true, runValidators: true }
     );
 
     res.json({ success: true, interaction });
@@ -144,9 +154,10 @@ router.patch('/saved-listings/:listingId', async (req: AuthRequest, res: Respons
   try {
     const { listingId } = req.params;
     const { notes, status } = req.body;
+    if (notes !== undefined && notes !== null && typeof notes !== 'string') return res.status(400).json({ error: 'Notes must be text' });
     const allowedStatuses = ['interested', 'touring', 'applied', 'lease', 'moved'];
 
-    if (status && !allowedStatuses.includes(status)) {
+    if (status !== undefined && !allowedStatuses.includes(status)) {
       return res.status(400).json({ error: 'Invalid tracker status' });
     }
 
@@ -252,9 +263,8 @@ router.post('/saved-searches', async (req: AuthRequest, res: Response) => {
 router.put('/saved-searches/:id', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const updateData = { ...req.body };
-    delete updateData._id;
-    delete updateData.userId;
+    const allowed = ['name', 'criteria', 'alertsEnabled', 'alertFrequency', 'alertMethod', 'isActive'];
+    const updateData = Object.fromEntries(Object.entries(req.body).filter(([key]) => allowed.includes(key)));
 
     const savedSearch = await SavedSearch.findOneAndUpdate(
       { _id: id, userId: req.userId },
@@ -308,8 +318,8 @@ router.post('/saved-searches/:id/test-alert', async (req: AuthRequest, res: Resp
       return res.status(404).json({ error: 'Saved search not found' });
     }
 
-    const result = await AlertService.sendImmediateAlert(id as string);
-    res.json(result);
+    const result = await AlertService.sendImmediateAlert(id as string, { test: true });
+    res.status(result.success ? 200 : 400).json(result);
   } catch (error) {
     console.error('Test alert error:', error);
     res.status(500).json({ error: 'Failed to send test alert' });

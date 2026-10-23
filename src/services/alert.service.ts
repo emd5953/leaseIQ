@@ -1,8 +1,15 @@
+import { NYC_CITIES } from '../utils/nyc';
 import { SavedSearch, Listing, User, AlertHistory } from '../models';
 import { buildListingQuery } from '../utils/queries';
 import { updateAlertTimestamp, createAlertHistory } from '../utils/alerts';
 import { EmailService } from './email.service';
 import { Types } from 'mongoose';
+
+export function alertIsDue(search: { alertFrequency: string; lastAlertSentAt?: Date | null }, now = Date.now()): boolean {
+  if (!search.lastAlertSentAt || search.alertFrequency === 'immediate') return true;
+  const interval = search.alertFrequency === 'weekly' ? 7 * 86400000 : 86400000;
+  return now - new Date(search.lastAlertSentAt).getTime() >= interval;
+}
 
 export class AlertService {
   /**
@@ -23,6 +30,7 @@ export class AlertService {
       console.log(`[AlertService] Found ${savedSearches.length} active saved searches`);
 
       for (const search of savedSearches) {
+        if (!alertIsDue(search)) continue;
         processed++;
         console.log(`[AlertService] Processing search ${processed}/${savedSearches.length}: ${search._id}`);
 
@@ -41,13 +49,7 @@ export class AlertService {
           
           // Add NYC-only filter
           query.$and = query.$and || [];
-          query.$and.push({
-            $or: [
-              { 'address.state': 'NY' },
-              { 'address.state': 'New York' },
-              { 'address.city': { $in: ['New York', 'Manhattan', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island'] } },
-            ]
-          });
+          query.$and.push({ 'address.city': { $in: NYC_CITIES }, 'address.state': { $in: ['NY', 'New York'] } });
           
           // Only get listings created after last alert
           if (search.lastAlertSentAt) {
@@ -88,7 +90,7 @@ export class AlertService {
               savedSearchId: search._id as Types.ObjectId,
               sentAt: new Date(),
               listingIds: newListings.map((l) => l._id as Types.ObjectId),
-              alertMethod: (search.alertMethod === 'both' ? 'email' : search.alertMethod) as 'email' | 'in-app',
+              alertMethod: 'email',
               deliveryStatus: 'sent',
             });
 
@@ -103,7 +105,7 @@ export class AlertService {
               savedSearchId: search._id as Types.ObjectId,
               sentAt: new Date(),
               listingIds: newListings.map((l) => l._id as Types.ObjectId),
-              alertMethod: (search.alertMethod === 'both' ? 'email' : search.alertMethod) as 'email' | 'in-app',
+              alertMethod: 'email',
               deliveryStatus: 'failed',
             });
           }
@@ -115,6 +117,7 @@ export class AlertService {
 
       console.log(`[AlertService] Completed processing all searches`);
     } catch (error) {
+      errors++;
       console.error('Error in processAlerts:', error);
     }
 
@@ -124,7 +127,7 @@ export class AlertService {
   /**
    * Send immediate alert for a specific saved search
    */
-  static async sendImmediateAlert(savedSearchId: string): Promise<{ success: boolean; error?: string }> {
+  static async sendImmediateAlert(savedSearchId: string, options: { test?: boolean } = {}): Promise<{ success: boolean; error?: string }> {
     try {
       const search = await SavedSearch.findById(savedSearchId).lean().exec();
       if (!search) {
@@ -143,13 +146,7 @@ export class AlertService {
       
       // Add NYC-only filter
       query.$and = query.$and || [];
-      query.$and.push({
-        $or: [
-          { 'address.state': 'NY' },
-          { 'address.state': 'New York' },
-          { 'address.city': { $in: ['New York', 'Manhattan', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island'] } },
-        ]
-      });
+      query.$and.push({ 'address.city': { $in: NYC_CITIES }, 'address.state': { $in: ['NY', 'New York'] } });
       
       const listings = await Listing.find(query)
         .sort({ createdAt: -1 })
@@ -165,17 +162,23 @@ export class AlertService {
       const emailResult = await EmailService.sendListingAlert(user.email, listings, search.name);
 
       if (emailResult.success) {
-        await updateAlertTimestamp(new Types.ObjectId(savedSearchId));
+        if (!options.test) await updateAlertTimestamp(new Types.ObjectId(savedSearchId));
         await createAlertHistory({
           userId: search.userId as Types.ObjectId,
           savedSearchId: new Types.ObjectId(savedSearchId),
           sentAt: new Date(),
           listingIds: listings.map((l) => l._id as Types.ObjectId),
-          alertMethod: (search.alertMethod === 'both' ? 'email' : search.alertMethod) as 'email' | 'in-app',
+          alertMethod: 'email',
           deliveryStatus: 'sent',
         });
       }
 
+      if (!emailResult.success) await createAlertHistory({
+        userId: search.userId as Types.ObjectId,
+        savedSearchId: new Types.ObjectId(savedSearchId),
+        sentAt: new Date(), listingIds: listings.map(l => l._id as Types.ObjectId),
+        alertMethod: 'email', deliveryStatus: 'failed', errorMessage: emailResult.error,
+      });
       return emailResult;
     } catch (error) {
       console.error('Error in sendImmediateAlert:', error);

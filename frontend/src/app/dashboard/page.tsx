@@ -28,6 +28,9 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [showNewSearchModal, setShowNewSearchModal] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [sendingAlert, setSendingAlert] = useState<string | null>(null)
   const [preferencesLoaded, setPreferencesLoaded] = useState(false)
 
   // Redirect if not logged in
@@ -53,8 +56,9 @@ export default function DashboardPage() {
 
   const loadData = async () => {
     setIsLoading(true)
+    setError(null)
     try {
-      if (activeTab === 'saved') {
+      if (activeTab === 'saved' || activeTab === 'tracker') {
         const listings = await api.getSavedListings()
         setSavedListings(listings)
       } else if (activeTab === 'alerts') {
@@ -67,6 +71,7 @@ export default function DashboardPage() {
       }
     } catch (error) {
       console.error('Failed to load data:', error)
+      setError(error instanceof Error ? error.message : 'Something went wrong. Please retry.')
     }
     setIsLoading(false)
   }
@@ -78,6 +83,7 @@ export default function DashboardPage() {
       setSavedListings(prev => prev.filter(l => l._id !== listingId))
     } catch (error) {
       console.error('Failed to unsave listing:', error)
+      setError(error instanceof Error ? error.message : 'Something went wrong. Please retry.')
     }
   }
 
@@ -87,6 +93,7 @@ export default function DashboardPage() {
       setSavedSearches(prev => prev.filter(s => s._id !== searchId))
     } catch (error) {
       console.error('Failed to delete search:', error)
+      setError(error instanceof Error ? error.message : 'Something went wrong. Please retry.')
     }
   }
 
@@ -98,17 +105,22 @@ export default function DashboardPage() {
       setSavedSearches(prev => prev.map(s => s._id === search._id ? updated : s))
     } catch (error) {
       console.error('Failed to toggle alerts:', error)
+      setError(error instanceof Error ? error.message : 'Something went wrong. Please retry.')
     }
   }
 
   const handleTestAlert = async (searchId: string) => {
+    setError(null)
+    setNotice(null)
+    setSendingAlert(searchId)
     try {
       await api.testSavedSearchAlert(searchId)
-      alert('Test alert sent to your email!')
+      setNotice('Test email sent. Check your inbox.')
     } catch (error) {
       console.error('Failed to send test alert:', error)
-      alert('Failed to send test alert')
-    }
+      setError(error instanceof Error ? error.message : 'Something went wrong. Please retry.')
+
+    } finally { setSendingAlert(null) }
   }
 
   const handleSavePreferences = async () => {
@@ -119,6 +131,7 @@ export default function DashboardPage() {
       alert('Preferences saved!')
     } catch (error) {
       console.error('Failed to save preferences:', error)
+      setError(error instanceof Error ? error.message : 'Something went wrong. Please retry.')
       alert('Failed to save preferences')
     }
     setIsSaving(false)
@@ -148,11 +161,13 @@ export default function DashboardPage() {
             </p>
           </div>
 
+          {error && <div role="alert" className="mb-6 rounded-2xl border border-red-200 bg-red-50 text-red-900 p-4">{error} <button className="underline ml-3" onClick={loadData}>Reload data</button></div>}
+          {notice && <p role="status" className="mb-6 rounded-2xl border border-border p-4">{notice}</p>}
           {/* Tabs */}
-          <div className="flex gap-4 mb-8 border-b border-border">
+          <div className="flex gap-4 mb-8 overflow-x-auto border-b border-border">
             <button
               onClick={() => setActiveTab('tracker')}
-              className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
+              className={`flex shrink-0 items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
                 activeTab === 'tracker'
                   ? 'border-primary text-primary'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -163,7 +178,7 @@ export default function DashboardPage() {
             </button>
             <button
               onClick={() => setActiveTab('saved')}
-              className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
+              className={`flex shrink-0 items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
                 activeTab === 'saved'
                   ? 'border-primary text-primary'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -174,7 +189,7 @@ export default function DashboardPage() {
             </button>
             <button
               onClick={() => setActiveTab('alerts')}
-              className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
+              className={`flex shrink-0 items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
                 activeTab === 'alerts'
                   ? 'border-primary text-primary'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -185,7 +200,7 @@ export default function DashboardPage() {
             </button>
             <button
               onClick={() => setActiveTab('preferences')}
-              className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
+              className={`flex shrink-0 items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
                 activeTab === 'preferences'
                   ? 'border-primary text-primary'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -203,7 +218,7 @@ export default function DashboardPage() {
             <>
               {/* Apartment Tracker Tab */}
               {activeTab === 'tracker' && (
-                <ApplicationTracker userId={user.id} listings={savedListings} />
+                <ApplicationTracker userId={user.id} listings={savedListings} onStatusUpdated={(id, status) => setSavedListings(rows => rows.map(row => row._id === id ? { ...row, status } : row))} />
               )}
 
               {/* Saved Listings Tab */}
@@ -343,6 +358,7 @@ export default function DashboardPage() {
                                 onClick={() => handleTestAlert(search._id!)}
                                 className="p-2 text-primary hover:bg-primary/10 rounded-full transition-colors"
                                 title="Send test alert"
+                          disabled={sendingAlert !== null}
                               >
                                 <Send size={18} />
                               </button>
@@ -551,13 +567,15 @@ function NewSearchModal({
   const [criteria, setCriteria] = useState<UserPreferences>({})
   const [alertFrequency, setAlertFrequency] = useState<'immediate' | 'daily' | 'weekly'>('daily')
   const [isCreating, setIsCreating] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const handleCreate = async () => {
     if (!name.trim()) {
-      alert('Please enter a name for this alert')
+      setError('Please enter a name for this alert')
       return
     }
 
+    setError(null)
     setIsCreating(true)
     try {
       const search = await api.createSavedSearch({
@@ -570,25 +588,27 @@ function NewSearchModal({
       onCreated(search)
     } catch (error) {
       console.error('Failed to create search:', error)
-      alert('Failed to create alert')
+      setError(error instanceof Error ? error.message : 'Something went wrong. Please retry.')
+
     }
     setIsCreating(false)
   }
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-background rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+      <div role="dialog" aria-modal="true" aria-label="Create Search Alert" className="bg-background rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center p-4 border-b border-border">
           <h2 className="text-xl font-semibold">Create Search Alert</h2>
-          <button onClick={onClose} className="p-2 hover:bg-muted rounded-full">
+          <button aria-label="Close alert form" onClick={onClose} className="p-2 hover:bg-muted rounded-full">
             <X size={20} />
           </button>
         </div>
 
         <div className="p-4 space-y-4">
+          {error && <p role="alert" className="text-red-700">{error}</p>}
           <div>
-            <label className="text-sm font-medium mb-1 block">Alert Name</label>
-            <input
+            <label htmlFor="alert-name" className="text-sm font-medium mb-1 block">Alert Name</label>
+            <input id="alert-name"
               type="text"
               placeholder="e.g., 2BR in Brooklyn under $3k"
               value={name}
@@ -599,8 +619,8 @@ function NewSearchModal({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-sm font-medium mb-1 block">Max Price</label>
-              <input
+              <label htmlFor="alert-price" className="text-sm font-medium mb-1 block">Max Price</label>
+              <input id="alert-price"
                 type="number"
                 placeholder="e.g., 3000"
                 value={criteria.maxPrice || ''}
@@ -609,8 +629,8 @@ function NewSearchModal({
               />
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block">Min Bedrooms</label>
-              <input
+              <label htmlFor="alert-beds" className="text-sm font-medium mb-1 block">Min Bedrooms</label>
+              <input id="alert-beds"
                 type="number"
                 placeholder="e.g., 2"
                 value={criteria.minBedrooms || ''}
@@ -675,13 +695,13 @@ function NewSearchModal({
           </div>
 
           <div>
-            <label className="text-sm font-medium mb-1 block">Alert Frequency</label>
-            <select
+            <label htmlFor="alert-frequency" className="text-sm font-medium mb-1 block">Alert Frequency</label>
+            <select id="alert-frequency"
               value={alertFrequency}
               onChange={(e) => setAlertFrequency(e.target.value as any)}
               className="w-full px-3 py-2 border border-border rounded-lg bg-background"
             >
-              <option value="immediate">Immediate (as soon as found)</option>
+              <option value="immediate">At the next scheduled check</option>
               <option value="daily">Daily digest</option>
               <option value="weekly">Weekly digest</option>
             </select>
