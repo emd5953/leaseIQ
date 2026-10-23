@@ -1,4 +1,7 @@
-import { ParsedListing, NormalizedListing, Address, Price, PetPolicy, BrokerFee } from '../types';
+import { splitUnit } from '../../utils/address';
+import { parseRent } from '../../utils/rent';
+import { canonicalSourceUrl } from '../../utils/source-identity';
+import { ParsedListing, NormalizedListing, Address, PetPolicy, BrokerFee } from '../types';
 
 /**
  * Data normalizer that transforms parsed listings into unified schema
@@ -8,14 +11,29 @@ export class DataNormalizer {
    * Normalize parsed listing into unified schema
    */
   async normalize(parsed: ParsedListing): Promise<NormalizedListing> {
+    if (!parsed.address?.trim() || !parsed.sourceId?.trim() || !canonicalSourceUrl(parsed.source, parsed.sourceUrl)) {
+      throw new Error('Import requires a street address, stable source ID, and a URL on the named source.');
+    }
+    if (!Number.isFinite(+parsed.scrapedAt) || +parsed.scrapedAt > Date.now() + 60000) throw new Error('Invalid source observation date');
+    const price = parseRent(parsed.rawPrice === undefined ? parsed.price : parsed.rawPrice, parsed.pricePeriod, parsed.priceCurrency);
+    let buildingRent: NormalizedListing['buildingRent'];
+    if (parsed.listingScope === 'building') {
+      const low = parseRent(parsed.rentMinimum, parsed.pricePeriod, parsed.priceCurrency);
+      const high = parseRent(parsed.rentMaximum, parsed.pricePeriod, parsed.priceCurrency);
+      if (low.amount && high.amount && low.amount <= high.amount && low.period === 'monthly') buildingRent = { status: 'range', minimum: low.amount, maximum: high.amount, sourceUrl: parsed.sourceUrl, observedAt: parsed.scrapedAt };
+      else if (parsed.contactForPrice) buildingRent = { status: 'contact', minimum: null, maximum: null, sourceUrl: parsed.sourceUrl, observedAt: parsed.scrapedAt };
+    }
     return {
       source: parsed.source,
       sourceUrl: parsed.sourceUrl,
       sourceId: parsed.sourceId,
       address: this.normalizeAddress(parsed.address),
-      price: this.normalizePrice(parsed.price),
-      bedrooms: parsed.bedrooms,
-      bathrooms: parsed.bathrooms,
+      price: parsed.listingScope === 'building' ? { ...price, amount: null, status: buildingRent ? 'building' : 'unknown' } : price,
+      listingScope: parsed.listingScope,
+      buildingRent,
+      rentEvidence: { raw: typeof parsed.rawPrice === 'string' || typeof parsed.rawPrice === 'number' ? parsed.rawPrice : parsed.price, period: String(parsed.pricePeriod || 'monthly (extraction default)'), sourceUrl: parsed.sourceUrl, observedAt: parsed.scrapedAt },
+      bedrooms: parsed.bedrooms != null && Number.isInteger(parsed.bedrooms) && parsed.bedrooms >= 0 ? parsed.bedrooms : null,
+      bathrooms: parsed.bathrooms != null && parsed.bathrooms > 0 ? parsed.bathrooms : null,
       squareFeet: parsed.squareFeet,
       description: parsed.description,
       images: parsed.images,
@@ -31,13 +49,13 @@ export class DataNormalizer {
       leaseLength: parsed.leaseLength,
       securityDeposit: parsed.securityDeposit,
       applicationFee: parsed.applicationFee,
-      availableDate: parsed.availableDate ? new Date(parsed.availableDate) : null,
+      availableDate: parsed.availableDate && Number.isFinite(Date.parse(parsed.availableDate)) ? new Date(parsed.availableDate) : null,
       utilities: parsed.utilities || {
-        electric: false,
-        gas: false,
-        water: false,
-        internet: false,
-        trash: false,
+        electric: null,
+        gas: null,
+        water: null,
+        internet: null,
+        trash: null,
       },
       laundry: parsed.laundry,
       heating: parsed.heating,
@@ -64,7 +82,7 @@ export class DataNormalizer {
     }
 
     // Simple address parsing - split by comma
-    const parts = addressStr.split(',').map(p => p.trim());
+    const parts = addressStr.replace(/,\s*((?:apt\.?|unit|#)\s*[\w-]+)/i, ' $1').split(',').map(p => p.trim());
     
     let street = '';
     let city = '';
@@ -76,9 +94,9 @@ export class DataNormalizer {
     if (parts.length >= 3) {
       // Last part might be "State ZIP"
       const lastPart = parts[parts.length - 1];
-      const stateZipMatch = lastPart.match(/([A-Z]{2})\s*(\d{5})/);
+      const stateZipMatch = lastPart.match(/([A-Z]{2})\s*(\d{5})/i);
       if (stateZipMatch) {
-        state = stateZipMatch[1];
+        state = stateZipMatch[1].toUpperCase();
         zipCode = stateZipMatch[2];
       } else {
         state = lastPart;
@@ -86,7 +104,7 @@ export class DataNormalizer {
     }
 
     // Normalize state variations
-    if (state === 'New York' || state === 'new york') {
+    if (/^(new york|ny)$/i.test(state)) {
       state = 'NY';
     }
 
@@ -94,7 +112,7 @@ export class DataNormalizer {
     const cityLower = city.toLowerCase();
     if (cityLower === 'manhattan' || cityLower === 'brooklyn' || 
         cityLower === 'queens' || cityLower === 'bronx' || 
-        cityLower === 'staten island') {
+        cityLower === 'staten island' || cityLower === 'new york' || cityLower === 'new york city' || cityLower === 'nyc') {
       // Keep borough name but ensure state is NY
       if (!state) state = 'NY';
     }
@@ -105,7 +123,7 @@ export class DataNormalizer {
     }
 
     return {
-      street,
+      ...splitUnit(street),
       city,
       state,
       zipCode,
@@ -130,27 +148,6 @@ export class DataNormalizer {
   }
 
   /**
-   * Standardize price format (convert to monthly USD)
-   */
-  private normalizePrice(price: number | null): Price {
-    if (!price) {
-      return {
-        amount: 0,
-        currency: 'USD',
-        period: 'monthly',
-      };
-    }
-
-    // Assume all prices are monthly by default
-    // In a real implementation, you'd detect weekly/daily and convert
-    return {
-      amount: price,
-      currency: 'USD',
-      period: 'monthly',
-    };
-  }
-
-  /**
    * Normalize amenity names
    */
   private normalizeAmenities(amenities: string[]): string[] {
@@ -159,7 +156,8 @@ export class DataNormalizer {
       // Standardize common variations
       if (lower.includes('a/c') || lower.includes('air conditioning')) return 'Air Conditioning';
       if (lower.includes('dishwasher')) return 'Dishwasher';
-      if (lower.includes('washer') || lower.includes('laundry')) return 'Washer/Dryer';
+      if (lower.includes('in-unit') && /washer|laundry/.test(lower)) return 'In-unit Laundry';
+      if (lower.includes('laundry')) return 'Laundry';
       if (lower.includes('parking') || lower.includes('garage')) return 'Parking';
       if (lower.includes('gym') || lower.includes('fitness')) return 'Fitness Center';
       if (lower.includes('pool')) return 'Pool';
@@ -181,14 +179,18 @@ export class DataNormalizer {
     if (!policyStr) return null;
 
     const lower = policyStr.toLowerCase();
-    const allowed = lower.includes('allowed') || lower.includes('friendly') || lower.includes('ok');
+    const species = (name: string) => new RegExp(`${name} (?:are )?(?:not allowed|prohibited)|no ${name}`).test(lower) ? false : new RegExp(`${name} (?:are )?(?:allowed|welcome|ok)`).test(lower) ? true : null;
+    const dogsAllowed = species('dogs');
+    const catsAllowed = species('cats');
+    const allowed = /no pets|pets (?:are )?(?:not allowed|prohibited)/.test(lower) ? false
+      : /pet[s -]*(?:friendly|allowed|welcome|ok)/.test(lower) || dogsAllowed === true || catsAllowed === true ? true : null;
     
     // Extract deposit amount
-    const depositMatch = policyStr.match(/\$(\d+)/);
-    const deposit = depositMatch ? parseInt(depositMatch[1]) : null;
+    const depositMatch = policyStr.match(/\$([\d,]+(?:\.\d+)?)/);
+    const deposit = depositMatch ? Number(depositMatch[1].replace(/,/g, '')) : null;
 
     return {
-      allowed,
+      allowed, dogsAllowed, catsAllowed,
       restrictions: policyStr,
       deposit,
     };
@@ -201,15 +203,15 @@ export class DataNormalizer {
     if (!feeStr) return null;
 
     const lower = feeStr.toLowerCase();
-    const required = !lower.includes('no fee') && !lower.includes('no broker');
+    const required = /unknown|not (?:provided|specified)|ask|contact|information/.test(lower) ? null : /no[- ](?:broker )?fee|fee free/.test(lower) ? false : /fee required|broker fee|\$|%/.test(lower) ? true : null;
 
     // Extract percentage
-    const percentMatch = feeStr.match(/(\d+)%/);
-    const percentage = percentMatch ? parseInt(percentMatch[1]) : null;
+    const percentMatch = feeStr.match(/(\d+(?:\.\d+)?)%/);
+    const percentage = percentMatch ? Number(percentMatch[1]) : null;
 
     // Extract fixed amount
-    const amountMatch = feeStr.match(/\$(\d+)/);
-    const amount = amountMatch ? parseInt(amountMatch[1]) : null;
+    const amountMatch = feeStr.match(/\$([\d,]+(?:\.\d+)?)/);
+    const amount = amountMatch ? Number(amountMatch[1].replace(/,/g, '')) : null;
 
     return {
       required,

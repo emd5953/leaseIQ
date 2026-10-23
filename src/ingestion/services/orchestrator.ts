@@ -1,3 +1,4 @@
+import { isNYCAddress } from '../../utils/nyc';
 import { v4 as uuidv4 } from 'uuid';
 import { ListingSource, ScrapingJobResult, SourceResult, ScrapeConfig } from '../types';
 import { ScrapingJobModel } from '../models';
@@ -93,13 +94,9 @@ export class ScrapingOrchestrator {
     // Process sources sequentially (not in parallel) to avoid overwhelming the system
     for (const source of sources) {
       try {
-        // Add timeout protection per source (50 seconds max per source)
-        const result = await Promise.race([
-          this.processSingleSource(source),
-          new Promise<SourceResult & { newAdded?: number; duplicates?: number }>((_, reject) =>
-            setTimeout(() => reject(new Error(`Source ${source} timeout after 50 seconds`)), 50000)
-          )
-        ]);
+        // HTTP clients own their deadlines. Racing this work against a timer lets
+        // timed-out imports continue writing after the job has been marked done.
+        const result = await this.processSingleSource(source);
         
         if (result) {
           sourceResults.push(result);
@@ -126,7 +123,7 @@ export class ScrapingOrchestrator {
     await ScrapingJobModel.findOneAndUpdate(
       { jobId },
       {
-        status: 'completed',
+        status: errorsEncountered > 0 ? 'failed' : 'completed',
         endTime,
         totalListingsScraped,
         newListingsAdded,
@@ -167,6 +164,7 @@ export class ScrapingOrchestrator {
     const sourceStart = Date.now();
     let sourceListings = 0;
     let sourceErrors = 0;
+    const issues: string[] = [];
     let newAdded = 0;
     let duplicates = 0;
 
@@ -202,6 +200,7 @@ export class ScrapingOrchestrator {
           const scrapeDuration = Date.now() - scrapeStart;
           console.error(`[Orchestrator] Scrape failed for ${source} after ${scrapeDuration}ms:`, scrapeError);
           sourceErrors++;
+          issues.push(scrapeError instanceof Error ? scrapeError.message : 'Source scrape failed');
           // Continue to next URL instead of failing entire source
         }
       }
@@ -213,7 +212,8 @@ export class ScrapingOrchestrator {
         return {
           source,
           listingsScraped: 0,
-          errors: sourceErrors,
+          errors: sourceErrors || 1,
+          issues: issues.length ? issues.slice(0, 20) : ['Source returned no usable listings; coverage was not refreshed.'],
           duration: Date.now() - sourceStart,
           newAdded: 0,
           duplicates: 0,
@@ -232,13 +232,16 @@ export class ScrapingOrchestrator {
           if (result.status === 'fulfilled') {
             if (result.value === 'new') newAdded++;
             else if (result.value === 'duplicate') duplicates++;
+            else { sourceErrors++; issues.push('Listing was rejected during processing'); }
           } else {
             sourceErrors++;
+            issues.push(result.reason instanceof Error ? result.reason.message : 'Listing import failed');
           }
         }
       }
     } catch (error) {
       sourceErrors++;
+      issues.push(error instanceof Error ? error.message : 'Source failed');
       await this.errorHandler.handleError(error as Error, {
         operation: 'scrape_source',
         source,
@@ -251,6 +254,7 @@ export class ScrapingOrchestrator {
       source,
       listingsScraped: sourceListings,
       errors: sourceErrors,
+      issues: issues.slice(0, 20),
       duration: sourceDuration,
       newAdded,
       duplicates,
@@ -317,11 +321,13 @@ export class ScrapingOrchestrator {
       // Parse
       const parsed = await this.parser.parse(rawListing);
       if (!parsed) {
-        return 'error';
+        throw new Error('Listing could not be parsed');
       }
 
       // Normalize
       const normalized = await this.normalizer.normalize(parsed);
+
+      if (!this.isNYCListing(normalized.address, null)) throw new Error('Address is outside supported NYC coverage');
 
       // Check for duplicates BEFORE geocoding (saves API calls)
       const duplicateId = await this.deduplicator.findDuplicate(normalized);
@@ -337,7 +343,7 @@ export class ScrapingOrchestrator {
       // Validate NYC location - reject listings outside NYC
       if (!this.isNYCListing(normalized.address, coordinates)) {
         console.log(`[Orchestrator] Rejected non-NYC listing: ${normalized.address.fullAddress}`);
-        return 'error';
+        throw new Error('Listing coordinates are outside supported NYC coverage');
       }
 
       // Store new listing
@@ -348,7 +354,7 @@ export class ScrapingOrchestrator {
         operation: 'process_listing',
         source,
       });
-      return 'error';
+      throw error;
     }
   }
 
@@ -357,104 +363,7 @@ export class ScrapingOrchestrator {
    * Uses both address validation and coordinate boundaries
    */
   private isNYCListing(address: any, coordinates: any): boolean {
-    // NYC coordinate boundaries (approximate)
-    const NYC_BOUNDS = {
-      minLat: 40.4774,  // Southern tip of Staten Island
-      maxLat: 40.9176,  // Northern Bronx
-      minLng: -74.2591, // Western Staten Island
-      maxLng: -73.7004, // Eastern Queens
-    };
-
-    // Valid NYC states
-    const validStates = ['NY', 'New York'];
-    
-    // Valid NYC cities/boroughs
-    const validCities = [
-      'New York',
-      'Manhattan',
-      'Brooklyn',
-      'Queens',
-      'Bronx',
-      'Staten Island',
-      'New York City',
-      'NYC',
-    ];
-
-    // NYC zip code ranges (more reliable than city names)
-    const nycZipRanges = [
-      { min: 10001, max: 10282 }, // Manhattan
-      { min: 10301, max: 10314 }, // Staten Island
-      { min: 10451, max: 10475 }, // Bronx
-      { min: 11004, max: 11109 }, // Queens
-      { min: 11201, max: 11256 }, // Brooklyn
-      { min: 11351, max: 11697 }, // Queens (extended)
-    ];
-
-    // Check state - must be NY
-    if (address.state && !validStates.includes(address.state)) {
-      return false;
-    }
-
-    // Check zip code first (most reliable for NYC)
-    if (address.zipCode) {
-      const zip = parseInt(address.zipCode.toString().substring(0, 5));
-      const isNYCZip = nycZipRanges.some(range => zip >= range.min && zip <= range.max);
-      if (isNYCZip) {
-        // If zip is NYC, validate with coordinates if available
-        if (coordinates && coordinates.latitude && coordinates.longitude) {
-          const { latitude, longitude } = coordinates;
-          if (
-            latitude >= NYC_BOUNDS.minLat &&
-            latitude <= NYC_BOUNDS.maxLat &&
-            longitude >= NYC_BOUNDS.minLng &&
-            longitude <= NYC_BOUNDS.maxLng
-          ) {
-            return true;
-          }
-        } else {
-          // No coordinates, trust the zip code
-          return true;
-        }
-      }
-    }
-
-    // Fallback: Check city name (case-insensitive)
-    if (address.city) {
-      const cityLower = address.city.toLowerCase();
-      const isValidCity = validCities.some(c => cityLower.includes(c.toLowerCase()));
-      if (isValidCity) {
-        // Validate with coordinates if available
-        if (coordinates && coordinates.latitude && coordinates.longitude) {
-          const { latitude, longitude } = coordinates;
-          if (
-            latitude >= NYC_BOUNDS.minLat &&
-            latitude <= NYC_BOUNDS.maxLat &&
-            longitude >= NYC_BOUNDS.minLng &&
-            longitude <= NYC_BOUNDS.maxLng
-          ) {
-            return true;
-          }
-        } else {
-          // No coordinates, trust the city name
-          return true;
-        }
-      }
-    }
-
-    // If we have coordinates but no valid city/zip, check coordinates alone
-    if (coordinates && coordinates.latitude && coordinates.longitude) {
-      const { latitude, longitude } = coordinates;
-      if (
-        latitude >= NYC_BOUNDS.minLat &&
-        latitude <= NYC_BOUNDS.maxLat &&
-        longitude >= NYC_BOUNDS.minLng &&
-        longitude <= NYC_BOUNDS.maxLng
-      ) {
-        return true;
-      }
-    }
-
-    return false;
+    return isNYCAddress(address, coordinates);
   }
 
   /**

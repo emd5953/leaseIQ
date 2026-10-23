@@ -1,527 +1,101 @@
 'use client'
-
-import { useState, useEffect, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
+import { ArrowRight, Building2, MapPin, Users, Search, Loader2, X, Scale } from 'lucide-react'
 import Navigation from '@/components/Navigation'
 import Footer from '@/components/Footer'
-import { Shield, AlertTriangle, CheckCircle, Mail, Link, MapPin, Star, Loader2, Lightbulb, ExternalLink, Utensils, Music, Trees, ShoppingBag, Users, Bike } from 'lucide-react'
+import ResearchReport, { displayDate } from '@/components/research/ResearchReport'
+import { api } from '@/lib/api'
+import type { ResearchResult } from '@/lib/research-types'
 
-interface LandlordReview {
-  source: string;
-  rating?: number;
-  comment: string;
-}
-
-interface BuildingViolation {
-  type: string;
-  description: string;
-  status?: string;
-}
-
-interface NeighborhoodInfo {
-  crimeLevel?: string;
-  crimeDetails?: string;
-  walkScore?: number;
-  transitScore?: number;
-  bikeScore?: number;
-  nearbyAmenities?: string[];
-  dining?: string[];
-  nightlife?: string;
-  culture?: string[];
-  parks?: string[];
-  groceryStores?: string[];
-  vibe?: string;
-  demographics?: string;
-}
-
-interface ResourceLink {
-  name: string;
-  url: string;
-}
-
-interface ResearchData {
-  summary: string;
-  landlordReviews?: LandlordReview[];
-  violations?: BuildingViolation[];
-  neighborhood?: NeighborhoodInfo;
-  tips?: string[];
-  resourceLinks?: ResourceLink[];
-}
-
+const BOROUGHS = ['Manhattan', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island']
+const examples = [{ street: '230 West 55 Street', borough: 'Manhattan' }, { street: '125 Court Street', borough: 'Brooklyn' }]
+const comparisonKey = 'leaseiq-research-comparison-v2'
+const reportKey = (report: ResearchResult) => report.match.buildingId || report.address.trim().toLowerCase()
 export default function ResearchPage() {
-  return (
-    <Suspense fallback={<ResearchPageLoading />}>
-      <ResearchPageContent />
-    </Suspense>
-  )
-}
-
-function ResearchPageLoading() {
-  return (
-    <main className="min-h-screen">
-      <Navigation />
-      <div className="pt-32 pb-16 px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto text-center">
-          <Loader2 size={32} className="animate-spin mx-auto text-primary" />
-        </div>
-      </div>
-      <Footer />
-    </main>
-  )
-}
-
-function ResearchPageContent() {
-  const searchParams = useSearchParams()
-  const listingIdFromUrl = searchParams.get('listingId')
-  
-  const [listingInput, setListingInput] = useState('')
-  const [email, setEmail] = useState('')
+  const [street, setStreet] = useState('')
+  const [borough, setBorough] = useState('Manhattan')
+  const [report, setReport] = useState<ResearchResult | null>(null)
+  const [comparison, setComparison] = useState<ResearchResult[]>([])
   const [loading, setLoading] = useState(false)
-  const [research, setResearch] = useState<ResearchData | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+  const controller = useRef<AbortController | null>(null)
+  const resultRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    if (listingIdFromUrl) {
-      setListingInput(listingIdFromUrl)
-    }
-  }, [listingIdFromUrl])
-
-  const extractListingId = (input: string): string | null => {
-    if (!input.trim()) return null
-    if (input.includes('/listing/')) {
-      const match = input.match(/\/listing\/([a-zA-Z0-9]+)/)
-      return match ? match[1] : null
-    }
-    return input.trim()
-  }
-
-  const handleResearch = async () => {
-    const listingId = extractListingId(listingInput)
-    if (!listingId) {
-      setError('Please enter a listing ID or URL')
-      return
-    }
-
+  async function run(address = street, area = borough, listingId?: string) {
+    controller.current?.abort()
+    const request = new AbortController()
+    controller.current = request
+    setLoading(true); setError(''); setNotice(''); setReport(null)
     try {
-      setLoading(true)
-      setError(null)
-      
-      const response = await fetch(`/api/research/${listingId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email || undefined }),
-      })
-
-      if (!response.ok) throw new Error('Research failed')
-      
-      const data = await response.json()
-      setResearch(data.research)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to research listing')
-    } finally {
-      setLoading(false)
-    }
+      const result = listingId ? await api.researchListing(listingId, undefined, request.signal) : await api.researchAddress(address, area, request.signal)
+      if (request.signal.aborted) return
+      setReport(result.research)
+      requestAnimationFrame(() => resultRef.current?.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }))
+    } catch (e) {
+      if (!request.signal.aborted) setError(e instanceof Error ? e.message : 'Research failed. Try again.')
+    } finally { if (!request.signal.aborted) setLoading(false) }
   }
-
-  const getRatingColor = (rating?: number) => {
-    if (!rating) return 'text-foreground/50'
-    if (rating >= 4) return 'text-green-600'
-    if (rating >= 3) return 'text-yellow-600'
-    return 'text-red-600'
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(comparisonKey) || '[]')
+      if (Array.isArray(saved)) setComparison(saved.filter(r => r?.version === 2 && typeof r.address === 'string' && Array.isArray(r.metrics) && Array.isArray(r.sections) && r.sections.every((s: any) => ['building', 'neighborhood', 'management'].includes(s?.id) && ['facts', 'analysis', 'unknowns', 'questions'].every(key => Array.isArray(s[key]))) && Array.isArray(r.sources) && Array.isArray(r.violations) && Array.isArray(r.limitations) && Array.isArray(r.resourceLinks) && r.match?.status).slice(0, 3))
+    } catch { /* A blocked or outdated local store should not block research. */ }
+    const params = new URLSearchParams(window.location.search)
+    const listingId = params.get('listingId')
+    const address = params.get('address')
+    const area = params.get('borough') || 'Manhattan'
+    if (address) { setStreet(address); setBorough(BOROUGHS.includes(area) ? area : 'Manhattan'); void run(address, BOROUGHS.includes(area) ? area : 'Manhattan') }
+    else if (listingId && /^[a-f\d]{24}$/i.test(listingId)) void run('', '', listingId)
+    return () => controller.current?.abort()
+    // URL input is intentionally read once; editing the form does not run research.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  function updateComparison(next: ResearchResult[]) {
+    setComparison(next)
+    try { localStorage.setItem(comparisonKey, JSON.stringify(next)) } catch { setNotice('Comparison is available for this visit; browser storage is unavailable.') }
   }
-
-  return (
-    <main className="min-h-screen">
-      <Navigation />
-      <div className="pt-32 pb-16 px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto">
-          {/* Header */}
-          <div className="text-center mb-12">
-            <h1 className="text-4xl md:text-6xl font-serif font-bold text-foreground mb-4">
-              Research <span className="italic">before</span> you tour
-            </h1>
-            <p className="text-lg text-foreground/70 max-w-2xl mx-auto">
-              Get landlord reviews, building violations, and neighborhood insights.
-            </p>
-          </div>
-
-          {/* Research Form */}
-          {!research && (
-            <div className="bg-card rounded-3xl p-8 md:p-12 shadow-soft border border-border">
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
-                    <span className="flex items-center gap-2">
-                      <Link size={16} strokeWidth={1.5} />
-                      Listing ID
-                    </span>
-                  </label>
-                  <input
-                    type="text"
-                    value={listingInput}
-                    onChange={(e) => setListingInput(e.target.value)}
-                    placeholder="Paste listing ID (use Copy ID button from listing page)"
-                    className="w-full px-6 py-4 bg-card-alt rounded-full border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all duration-300"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
-                    Email (optional)
-                  </label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="your@email.com"
-                    className="w-full px-6 py-4 bg-card-alt rounded-full border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all duration-300"
-                  />
-                </div>
-
-                <button
-                  onClick={handleResearch}
-                  disabled={loading || !listingInput.trim()}
-                  className="w-full px-8 py-4 bg-foreground text-background rounded-full text-sm tracking-widest uppercase hover:bg-opacity-90 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 size={18} className="animate-spin" />
-                      Researching (this may take a minute)...
-                    </>
-                  ) : (
-                    'Start Research'
-                  )}
-                </button>
-
-                {error && (
-                  <div className="bg-accent/10 rounded-2xl p-4 border border-accent/20">
-                    <p className="text-accent text-sm">{error}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Research Results */}
-          {research && (
-            <div className="space-y-8">
-              {/* Summary */}
-              <div className="bg-card rounded-3xl p-8 shadow-soft border border-border">
-                <div className="flex items-start gap-4">
-                  <Shield size={32} className="text-primary flex-shrink-0" strokeWidth={1.5} />
-                  <div>
-                    <h2 className="text-2xl font-serif font-bold text-foreground mb-3">
-                      Research Summary
-                    </h2>
-                    <p className="text-foreground/80 leading-relaxed whitespace-pre-line">
-                      {research.summary}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Landlord Reviews */}
-              {research.landlordReviews && research.landlordReviews.length > 0 && (
-                <div className="bg-card rounded-3xl p-8 shadow-soft border border-border">
-                  <h3 className="text-xl font-serif font-bold text-foreground mb-4 flex items-center gap-2">
-                    <Star size={20} strokeWidth={1.5} />
-                    Landlord Reviews ({research.landlordReviews.length})
-                  </h3>
-                  <div className="space-y-4">
-                    {research.landlordReviews.map((review, index) => (
-                      <div key={index} className="p-4 bg-card-alt rounded-2xl">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-medium text-foreground/60">
-                            {review.source}
-                          </span>
-                          {review.rating && (
-                            <span className={`font-semibold ${getRatingColor(review.rating)}`}>
-                              {review.rating}/5 ★
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-foreground/80">{review.comment}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Building Violations */}
-              {research.violations && research.violations.length > 0 && (
-                <div className="bg-red-50 rounded-3xl p-8 border border-red-200">
-                  <h3 className="text-xl font-serif font-bold text-foreground mb-4 flex items-center gap-2">
-                    <AlertTriangle size={20} className="text-red-600" strokeWidth={1.5} />
-                    Building Violations ({research.violations.length})
-                  </h3>
-                  <div className="space-y-3">
-                    {research.violations.map((violation, index) => (
-                      <div key={index} className="p-4 bg-white rounded-2xl border border-red-100">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="font-medium text-foreground">{violation.type}</span>
-                          {violation.status && (
-                            <span className={`text-xs px-2 py-1 rounded-full ${
-                              violation.status.toLowerCase() === 'resolved' 
-                                ? 'bg-green-100 text-green-700'
-                                : 'bg-red-100 text-red-700'
-                            }`}>
-                              {violation.status}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-foreground/70 text-sm">{violation.description}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* No Violations Found */}
-              {(!research.violations || research.violations.length === 0) && (
-                <div className="bg-green-50 rounded-3xl p-8 border border-green-200">
-                  <div className="flex items-center gap-3">
-                    <CheckCircle size={24} className="text-green-600" strokeWidth={1.5} />
-                    <div>
-                      <h3 className="text-lg font-semibold text-foreground">No Violations Found</h3>
-                      <p className="text-foreground/70 text-sm">
-                        No building violations were found in our search.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Neighborhood Info */}
-              {research.neighborhood && (
-                <div className="bg-card rounded-3xl p-8 shadow-soft border border-border">
-                  <h3 className="text-xl font-serif font-bold text-foreground mb-6 flex items-center gap-2">
-                    <MapPin size={20} strokeWidth={1.5} />
-                    Neighborhood Guide
-                  </h3>
-                  
-                  {/* Vibe & Demographics */}
-                  {(research.neighborhood.vibe || research.neighborhood.demographics) && (
-                    <div className="mb-6 p-4 bg-primary/5 rounded-2xl">
-                      {research.neighborhood.vibe && (
-                        <p className="text-foreground/80 mb-2">{research.neighborhood.vibe}</p>
-                      )}
-                      {research.neighborhood.demographics && (
-                        <p className="text-foreground/60 text-sm flex items-center gap-2">
-                          <Users size={14} />
-                          {research.neighborhood.demographics}
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Scores Grid */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                    {research.neighborhood.crimeLevel && (
-                      <div className="p-4 bg-card-alt rounded-2xl text-center">
-                        <p className="text-sm text-foreground/60 mb-1">Safety</p>
-                        <p className={`font-semibold ${
-                          research.neighborhood.crimeLevel === 'low' ? 'text-green-600' :
-                          research.neighborhood.crimeLevel === 'medium' ? 'text-yellow-600' : 'text-red-600'
-                        }`}>
-                          {research.neighborhood.crimeLevel.charAt(0).toUpperCase() + 
-                           research.neighborhood.crimeLevel.slice(1)} Crime
-                        </p>
-                      </div>
-                    )}
-                    {research.neighborhood.walkScore && (
-                      <div className="p-4 bg-card-alt rounded-2xl text-center">
-                        <p className="text-sm text-foreground/60 mb-1">Walk Score</p>
-                        <p className="font-semibold text-foreground">{research.neighborhood.walkScore}</p>
-                      </div>
-                    )}
-                    {research.neighborhood.transitScore && (
-                      <div className="p-4 bg-card-alt rounded-2xl text-center">
-                        <p className="text-sm text-foreground/60 mb-1">Transit Score</p>
-                        <p className="font-semibold text-foreground">{research.neighborhood.transitScore}</p>
-                      </div>
-                    )}
-                    {research.neighborhood.bikeScore && (
-                      <div className="p-4 bg-card-alt rounded-2xl text-center">
-                        <p className="text-sm text-foreground/60 mb-1">Bike Score</p>
-                        <p className="font-semibold text-foreground flex items-center justify-center gap-1">
-                          <Bike size={14} /> {research.neighborhood.bikeScore}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Crime Details */}
-                  {research.neighborhood.crimeDetails && (
-                    <div className="mb-6 p-4 bg-amber-50 rounded-2xl border border-amber-200">
-                      <p className="text-sm font-medium text-amber-800 mb-1 flex items-center gap-2">
-                        <AlertTriangle size={14} /> Safety Details
-                      </p>
-                      <p className="text-amber-700 text-sm">{research.neighborhood.crimeDetails}</p>
-                    </div>
-                  )}
-
-                  {/* Culture & Dining */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    {research.neighborhood.dining && research.neighborhood.dining.length > 0 && (
-                      <div className="p-4 bg-card-alt rounded-2xl">
-                        <p className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
-                          <Utensils size={14} className="text-primary" /> Dining
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          {research.neighborhood.dining.map((item, i) => (
-                            <span key={i} className="px-2 py-1 bg-white rounded-full text-xs text-foreground/70">
-                              {item}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {research.neighborhood.culture && research.neighborhood.culture.length > 0 && (
-                      <div className="p-4 bg-card-alt rounded-2xl">
-                        <p className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
-                          <Star size={14} className="text-primary" /> Culture
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          {research.neighborhood.culture.map((item, i) => (
-                            <span key={i} className="px-2 py-1 bg-white rounded-full text-xs text-foreground/70">
-                              {item}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Nightlife */}
-                  {research.neighborhood.nightlife && (
-                    <div className="mb-4 p-4 bg-card-alt rounded-2xl">
-                      <p className="text-sm font-medium text-foreground mb-1 flex items-center gap-2">
-                        <Music size={14} className="text-primary" /> Nightlife
-                      </p>
-                      <p className="text-foreground/70 text-sm">{research.neighborhood.nightlife}</p>
-                    </div>
-                  )}
-
-                  {/* Parks & Grocery */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {research.neighborhood.parks && research.neighborhood.parks.length > 0 && (
-                      <div className="p-4 bg-green-50 rounded-2xl">
-                        <p className="text-sm font-medium text-green-800 mb-2 flex items-center gap-2">
-                          <Trees size={14} /> Parks & Green Space
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          {research.neighborhood.parks.map((item, i) => (
-                            <span key={i} className="px-2 py-1 bg-white rounded-full text-xs text-green-700">
-                              {item}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {research.neighborhood.groceryStores && research.neighborhood.groceryStores.length > 0 && (
-                      <div className="p-4 bg-card-alt rounded-2xl">
-                        <p className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
-                          <ShoppingBag size={14} className="text-primary" /> Grocery
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          {research.neighborhood.groceryStores.map((item, i) => (
-                            <span key={i} className="px-2 py-1 bg-white rounded-full text-xs text-foreground/70">
-                              {item}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Other Amenities */}
-                  {research.neighborhood.nearbyAmenities && research.neighborhood.nearbyAmenities.length > 0 && (
-                    <div className="mt-4">
-                      <p className="text-sm text-foreground/60 mb-2">Other Nearby</p>
-                      <div className="flex flex-wrap gap-2">
-                        {research.neighborhood.nearbyAmenities.map((amenity, index) => (
-                          <span key={index} className="px-3 py-1 bg-primary/10 text-primary text-sm rounded-full">
-                            {amenity}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Tips */}
-              {research.tips && research.tips.length > 0 && (
-                <div className="bg-card rounded-3xl p-8 shadow-soft border border-border">
-                  <h3 className="text-xl font-serif font-bold text-foreground mb-4 flex items-center gap-2">
-                    <Lightbulb size={20} strokeWidth={1.5} />
-                    Tips for This Rental
-                  </h3>
-                  <ul className="space-y-3">
-                    {research.tips.map((tip, index) => (
-                      <li key={index} className="flex items-start gap-3">
-                        <CheckCircle size={18} className="text-primary flex-shrink-0 mt-0.5" strokeWidth={1.5} />
-                        <span className="text-foreground/80">{tip}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Resource Links */}
-              {research.resourceLinks && research.resourceLinks.length > 0 && (
-                <div className="bg-primary/5 rounded-3xl p-8 border border-primary/10">
-                  <h3 className="text-xl font-serif font-bold text-foreground mb-4 flex items-center gap-2">
-                    <ExternalLink size={20} strokeWidth={1.5} />
-                    Verify This Building
-                  </h3>
-                  <p className="text-foreground/60 text-sm mb-4">
-                    Use these official resources to check building history, violations, and ownership:
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {research.resourceLinks.map((link, index) => (
-                      <a
-                        key={index}
-                        href={link.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 p-3 bg-white rounded-xl border border-primary/20 hover:border-primary hover:bg-primary/5 transition-all"
-                      >
-                        <ExternalLink size={16} className="text-primary" strokeWidth={1.5} />
-                        <span className="text-foreground font-medium">{link.name}</span>
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Email Confirmation */}
-              {email && (
-                <div className="bg-primary/5 rounded-3xl p-6 border border-primary/10 text-center">
-                  <Mail size={24} className="text-primary mx-auto mb-2" strokeWidth={1.5} />
-                  <p className="text-foreground/70">
-                    Report sent to <span className="font-semibold text-foreground">{email}</span>
-                  </p>
-                </div>
-              )}
-
-              <button
-                onClick={() => {
-                  setResearch(null)
-                  setEmail('')
-                  setListingInput('')
-                }}
-                className="w-full px-8 py-4 bg-transparent text-primary border border-primary rounded-full text-sm tracking-widest uppercase hover:bg-primary hover:text-background transition-all duration-300"
-              >
-                Research Another Listing
-              </button>
-            </div>
-          )}
+  function addComparison() {
+    if (!report) return
+    const existing = comparison.findIndex(item => reportKey(item) === reportKey(report))
+    if (existing >= 0) { updateComparison(comparison.map((item, i) => i === existing ? report : item)); setNotice('Updated the saved comparison with this report.'); return }
+    if (comparison.length === 3) { setNotice('Remove a property below to compare another. You can compare up to three.'); return }
+    updateComparison([...comparison, report]); setNotice('Added to your comparison below. Saved only in this browser.')
+  }
+  return <main className="min-h-screen">
+    <Navigation />
+    <div className="mx-auto max-w-7xl px-5 pb-20 pt-32 sm:px-8">
+      <div className="print:hidden">
+        <div className="mb-10 flex flex-col justify-between gap-5 md:flex-row md:items-end">
+          <div><p className="eyebrow text-primary">NYC rental research</p><h1 className="mt-4 font-serif text-4xl leading-tight md:text-6xl">A better look <span className="italic">before the lease.</span></h1><p className="mt-5 max-w-2xl text-lg leading-relaxed text-foreground/70">Understand the building, the neighborhood, and who manages it. Start with an address. Follow the evidence.</p></div>
+          <Link href="/search" className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-primary">Browse rentals <ArrowRight size={16} /></Link>
         </div>
+        <form onSubmit={e => { e.preventDefault(); void run() }} className="rounded-3xl border border-border bg-card p-5 shadow-soft-md md:p-7">
+          <div className="grid items-end gap-4 md:grid-cols-[1fr_200px_auto]">
+            <div><label htmlFor="research-street" className="mb-2 block text-sm font-semibold">Street address</label><div className="relative"><MapPin size={18} className="absolute left-4 top-4 text-primary" /><input id="research-street" required maxLength={160} value={street} onChange={e => setStreet(e.target.value)} placeholder="e.g. 230 West 55 Street" autoComplete="street-address" className="field pl-11" /></div></div>
+            <div><label htmlFor="research-borough" className="mb-2 block text-sm font-semibold">Borough</label><select id="research-borough" className="field" value={borough} onChange={e => setBorough(e.target.value)}>{BOROUGHS.map(b => <option key={b}>{b}</option>)}</select></div>
+            <button disabled={loading} type="submit" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 font-semibold text-white hover:bg-foreground disabled:opacity-60">{loading ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}{loading ? 'Researching…' : 'Research property'}</button>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs text-foreground/65"><span>Public records · All five boroughs · No account needed</span><span>Try {examples.map((example, i) => <span key={example.street}>{i > 0 && ' or '}<button type="button" disabled={loading} className="underline underline-offset-2 hover:text-primary" onClick={() => { setStreet(example.street); setBorough(example.borough); void run(example.street, example.borough) }}>{example.street}</button></span>)}</span></div>
+        </form>
+        {loading && <div role="status" className="my-8 flex items-start gap-4 rounded-2xl bg-primary/10 p-6"><Loader2 size={22} className="shrink-0 animate-spin text-primary" /><div><p className="font-semibold">Checking the address and public records</p><p className="mt-1 text-sm text-foreground/70">Each source is checked separately. This can take up to a minute; unavailable records will be clearly marked.</p></div></div>}
+        {error && <div role="alert" className="my-6 rounded-2xl border border-accent/20 bg-accent/5 p-5"><p className="font-semibold">We couldn’t complete this report</p><p className="mt-1 text-sm">{error}</p><p className="mt-2 text-sm text-foreground/70">Check the address and borough, then retry. You can also verify records directly in <a href="https://hpdonline.nyc.gov/hpdonline/building/search" className="underline" target="_blank" rel="noreferrer">HPD Online</a>.</p></div>}
+        {!report && !loading && <div className="my-12 grid gap-6 md:grid-cols-3">{[{ Icon: Building2, title: 'The building', text: 'Open housing violations, recorded history, and questions about repairs.' }, { Icon: MapPin, title: 'The neighborhood', text: 'Available local context, plus the commute and daily-life checks still to make.' }, { Icon: Users, title: 'The management', text: 'Registered owners and agents, with clear limits on reputation evidence.' }].map(({ Icon, title, text }, i) => <div className="border-t border-border pt-6" key={title}><div className="flex justify-between text-primary"><Icon size={24} strokeWidth={1.5} /><span className="text-xs text-foreground/40">0{i + 1}</span></div><h2 className="mt-6 font-serif text-2xl">{title}</h2><p className="mt-3 text-sm leading-relaxed text-foreground/70">{text}</p></div>)}</div>}
       </div>
-      <Footer />
-    </main>
-  )
+      {notice && <p role="status" className="my-6 rounded-xl bg-primary/10 p-4 text-sm print:hidden">{notice}</p>}
+      <div ref={resultRef} className="scroll-mt-24 pt-8">{report && <ResearchReport report={report} onCompare={addComparison} added={comparison.some(r => reportKey(r) === reportKey(report))} />}</div>
+      {!!comparison.length && <section className="mt-12 rounded-3xl border border-border bg-card p-6 md:p-8 print:hidden" aria-label="Property comparison">
+        <div className="flex flex-wrap justify-between gap-4"><h2 className="flex items-center gap-3 font-serif text-2xl"><Scale size={22} />Your comparison</h2><button onClick={() => updateComparison([])} className="text-sm text-foreground/65 underline">Clear comparison</button></div>
+        <p className="mt-3 text-sm text-foreground/70">Up to three properties, saved in this browser. Compare source dates and building size; raw counts alone do not rank rental quality.</p>
+        <div className="mt-6 overflow-x-auto"><table className="w-full text-left text-sm"><caption className="sr-only">Comparison of public records for saved properties</caption><thead><tr><th className="min-w-40 p-3">Evidence</th>{comparison.map(r => <th key={r.address} className="min-w-56 p-3 align-top"><div className="flex justify-between gap-3"><span>{r.address}</span><button onClick={() => updateComparison(comparison.filter(item => item.address !== r.address))} aria-label={`Remove ${r.address}`}><X size={16} /></button></div><button onClick={() => { setReport(r); setNotice('Viewing a saved report. Run address research again for a fresh lookup.'); resultRef.current?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }) }} className="mt-2 font-normal text-primary underline">View saved report</button></th>)}</tr></thead><tbody>
+          <tr className="border-t border-border"><th className="p-3 font-normal text-foreground/65">Report date</th>{comparison.map(r => <td key={r.address} className="p-3">{displayDate(r.generatedAt)}</td>)}</tr>
+          <tr className="border-t border-border"><th className="p-3 font-normal text-foreground/65">Address match</th>{comparison.map(r => <td key={r.address} className="p-3">{r.match.status.replace('_', ' ')}</td>)}</tr>
+          {['Open HPD violations', 'Open class C', 'Total recorded violations'].map(label => <tr className="border-t border-border" key={label}><th className="p-3 font-normal text-foreground/65">{label}</th>{comparison.map(r => <td key={r.address} className="p-3 font-semibold tabular-nums">{r.metrics.find(m => m.label === label)?.value ?? 'Unknown'}</td>)}</tr>)}
+          <tr className="border-t border-border"><th className="p-3 font-normal text-foreground/65">Violation dataset updated</th>{comparison.map(r => <td key={r.address} className="p-3">{displayDate(r.sources?.find(s => s.id === 'violations')?.datasetUpdatedAt)}</td>)}</tr>
+          <tr className="border-t border-border"><th className="p-3 font-normal text-foreground/65">Management reputation</th>{comparison.map(r => <td key={r.address} className="p-3">Not verified</td>)}</tr>
+        </tbody></table></div>
+      </section>}
+    </div><Footer />
+  </main>
 }

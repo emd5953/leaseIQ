@@ -16,14 +16,8 @@ async function runScrapingJob() {
     console.log(`[${new Date().toISOString()}] Each source runs ${rotator.getRunsPerDay()} times per day`);
     console.log(`[${new Date().toISOString()}] Max listing age: ${rotator.getMaxFreshness()} hours`);
     
-    // Run with timeout protection (55 seconds to allow cleanup time)
-    const timeoutMs = 55000; // 55 seconds
-    const result = await Promise.race([
-      orchestrator.runPartialScrape(sources),
-      new Promise<any>((_, reject) => 
-        setTimeout(() => reject(new Error('Scraping timeout - job exceeded 55 seconds')), timeoutMs)
-      )
-    ]);
+    const result = await orchestrator.runPartialScrape(sources);
+    if (result.errorsEncountered > 0) throw new Error(`Import completed with ${result.errorsEncountered} errors; see scrapingJobs for details.`);
     
     console.log(`[${new Date().toISOString()}] Scraping job complete:`, {
       totalListingsScraped: result.totalListingsScraped,

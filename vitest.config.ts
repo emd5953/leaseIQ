@@ -4,6 +4,10 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    // Each integration file starts MongoDB. Bound concurrency rather than
+    // exhausting the host or reducing property samples / increasing timeouts.
+    maxWorkers: 4,
+    minWorkers: 1,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

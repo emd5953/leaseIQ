@@ -70,6 +70,15 @@ export function buildListingQuery(criteria: SearchCriteria): FilterQuery<IListin
     if (!query['price.amount']) query['price.amount'] = {};
     query['price.amount'].$lte = criteria.maxPrice;
   }
+  // Budget filters describe exact monthly USD unit rents. A daily rate or a
+  // building minimum must never silently qualify as an affordable monthly unit.
+  if (query['price.amount']) {
+    query['price.status'] = { $nin: ['unknown', 'building'] };
+    query['price.period'] = { $in: ['monthly', null] };
+    query['price.currency'] = { $in: ['USD', null] };
+    query['listingScope'] = { $ne: 'building' };
+    query['price.amount'].$gt = 0;
+  }
 
   // Bedroom range filter
   if (criteria.minBedrooms !== null && criteria.minBedrooms !== undefined) {
@@ -98,7 +107,9 @@ export function buildListingQuery(criteria: SearchCriteria): FilterQuery<IListin
   // Neighborhoods filter - optimized to use index
   if (criteria.neighborhoods && criteria.neighborhoods.length > 0) {
     // Use simple $in query on city field for better index usage
-    query['address.city'] = { $in: criteria.neighborhoods };
+    const places = [...criteria.neighborhoods];
+    if (places.includes('Manhattan')) places.push('New York', 'New York City', 'NYC');
+    query.$and = [{ $or: [{ 'address.city': { $in: places } }, { 'address.neighborhood': { $in: places } }] }];
   }
 
   // Move-in date range filter
@@ -120,6 +131,7 @@ export function buildListingQuery(criteria: SearchCriteria): FilterQuery<IListin
   // No fee filter
   if (criteria.noFeeOnly === true) {
     query['brokerFee.required'] = false;
+    query['fieldObservedAt.brokerFee_required'] = { $exists: true };
   }
 
   // Required amenities filter (listing must have ALL required amenities)

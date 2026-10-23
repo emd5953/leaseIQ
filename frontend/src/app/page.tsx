@@ -1,98 +1,26 @@
 import Link from 'next/link'
-import { ArrowRight, Bell, ClipboardList, FileText, Home as HomeIcon, Search, ShieldCheck } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, Building2, MapPin, Users, Search } from 'lucide-react'
 import Navigation from '@/components/Navigation'
 import Footer from '@/components/Footer'
 
-const steps = [
-  { icon: Search, number: '01', title: 'Find it', description: 'Search NYC rentals from StreetEasy in one calm, focused workspace.' },
-  { icon: ClipboardList, number: '02', title: 'Keep track', description: 'Save the places you care about and keep every next step together.' },
-  { icon: ShieldCheck, number: '03', title: 'Know what you’re signing', description: 'Review the building, landlord, and lease before you commit.' },
-]
-
-const tools = [
-  { icon: Search, title: 'StreetEasy search', copy: 'A focused NYC apartment search without the tab overload.' },
-  { icon: Bell, title: 'Your shortlist', copy: 'Save listings, set alerts, and keep the places you like in one view.' },
-  { icon: HomeIcon, title: 'Building & landlord checks', copy: 'Put the practical details beside the apartment, where they belong.' },
-  { icon: FileText, title: 'Lease review', copy: 'Understand the important terms before you put your name on them.' },
-]
-
+function Facade() {
+  return <div className="relative mx-auto w-full max-w-lg" aria-label="Illustration of a New York apartment building">
+    <div className="overflow-hidden rounded-t-[14rem] bg-[#e8e9dd] px-9 pt-14 sm:px-16">
+      <svg viewBox="0 0 320 360" role="img" aria-label="Architectural illustration, not a listing photo" className="w-full"><title>A New York brownstone</title><path d="M15 360V60L25 50H295L305 60V360" fill="#c5b8a2" /><path d="M7 50H313V65H7ZM18 32H302V46H18ZM25 24H295V32H25Z" fill="#344e40" /><path d="M25 71H295V360H25Z" fill="#d9cbbb" />{[85, 153, 221].flatMap(y => [43, 125, 207].map(x => <g key={`${x}-${y}`}><path d={`M${x} ${y + 50}V${y + 12}Q${x + 28} ${y - 12} ${x + 56} ${y + 12}V${y + 50}Z`} fill="#344e40" /><path d={`M${x + 28} ${y + 2}V${y + 49}M${x + 2} ${y + 25}H${x + 54}`} stroke="#d9cbbb" strokeWidth="3" /><rect x={x - 4} y={y + 50} width="64" height="5" fill="#a3927d" /></g>))}<rect x="125" y="292" width="56" height="68" rx="27" fill="#344e40" /><path d="M116 350H190V357H116ZM104 358H202" stroke="#a3927d" strokeWidth="7" /><rect x="43" y="297" width="56" height="39" fill="#344e40" /><rect x="207" y="297" width="56" height="39" fill="#344e40" /><path d="M4 280H316M25 75H295M25 145H295M25 214H295" stroke="#a3927d" strokeWidth="3" /><path d="M82 96H108V274H82M82 142H108M82 211H108M83 143L106 208M83 213L106 269" stroke="#243b34" strokeWidth="3" fill="none" /></svg>
+    </div>
+    <div className="absolute -bottom-5 -left-2 right-8 rounded-2xl border border-border bg-card p-5 shadow-soft-xl sm:-left-8 sm:right-14"><div className="flex items-center justify-between gap-3"><span className="eyebrow text-primary">Look beyond the listing</span><ArrowUpRight size={18} className="text-primary" /></div><p className="mt-3 font-serif text-2xl">Every address has a story.</p><div className="mt-4 flex gap-4 border-t border-border pt-3 text-xs text-foreground/65"><span>Building history</span><span>Ownership</span><span>Source dates</span></div></div>
+  </div>
+}
 export default function Home() {
-  return (
-    <main className="min-h-screen bg-background">
-      <Navigation />
-
-      <section className="px-6 pb-24 pt-36 lg:px-8 lg:pb-32 lg:pt-48">
-        <div className="mx-auto grid max-w-7xl items-end gap-16 lg:grid-cols-[1.15fr_0.85fr]">
-          <div>
-            <p className="mb-7 text-xs font-semibold uppercase tracking-[0.22em] text-primary">New York City apartment hunting</p>
-            <h1 className="max-w-4xl text-5xl font-serif font-semibold leading-[0.98] tracking-[-0.03em] text-foreground md:text-7xl lg:text-8xl">
-              Find your apartment. <span className="italic">Make it home.</span>
-            </h1>
-            <p className="mt-8 max-w-2xl text-lg leading-relaxed text-foreground/65 md:text-xl">
-              Your all-in-one place for finding an apartment on StreetEasy, keeping track of the ones you like, and getting the details you need before you move in.
-            </p>
-            <div className="mt-10 flex flex-col gap-3 sm:flex-row">
-              <Link href="/search" className="pressable inline-flex items-center justify-center gap-2 rounded-full bg-foreground px-7 py-4 text-sm font-semibold text-background transition-opacity duration-200 hover:opacity-90">
-                Start your search <ArrowRight size={17} />
-              </Link>
-              <Link href="/how-it-works" className="pressable inline-flex items-center justify-center rounded-full border border-border bg-card px-7 py-4 text-sm font-semibold text-foreground transition-colors duration-200 hover:bg-card-alt">
-                See how it works
-              </Link>
-            </div>
-          </div>
-
-          <div className="border-l border-border pl-8 lg:mb-2">
-            <p className="max-w-sm text-2xl font-serif leading-snug text-foreground">The search, the shortlist, the fine print — together in one place.</p>
-            <div className="mt-10 grid max-w-sm grid-cols-2 gap-x-8 gap-y-6 border-t border-border pt-6 text-sm">
-              <div><p className="font-semibold text-foreground">StreetEasy</p><p className="mt-1 text-foreground/55">NYC listings</p></div>
-              <div><p className="font-semibold text-foreground">One workspace</p><p className="mt-1 text-foreground/55">Search to move-in</p></div>
-              <div><p className="font-semibold text-foreground">Less guesswork</p><p className="mt-1 text-foreground/55">More useful context</p></div>
-              <div><p className="font-semibold text-foreground">Built for renters</p><p className="mt-1 text-foreground/55">Not listing brokers</p></div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="border-y border-border bg-card-alt px-6 py-20 lg:px-8 lg:py-28">
-        <div className="mx-auto max-w-7xl">
-          <div className="max-w-2xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">A simpler way through it</p>
-            <h2 className="mt-5 text-4xl font-serif font-semibold leading-tight text-foreground md:text-5xl">From the first search to the first night in your new home.</h2>
-          </div>
-          <div className="mt-14 grid gap-px overflow-hidden rounded-3xl border border-border bg-border md:grid-cols-3">
-            {steps.map((step) => (
-              <div key={step.number} className="bg-card p-8 md:p-10">
-                <div className="flex items-center justify-between"><step.icon size={23} className="text-primary" strokeWidth={1.6} /><span className="text-xs font-semibold tracking-[0.2em] text-foreground/35">{step.number}</span></div>
-                <h3 className="mt-16 text-2xl font-serif font-semibold text-foreground">{step.title}</h3>
-                <p className="mt-3 max-w-xs leading-relaxed text-foreground/60">{step.description}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="px-6 py-20 lg:px-8 lg:py-28">
-        <div className="mx-auto max-w-7xl">
-          <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
-            <div className="max-w-xl"><p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">Everything in context</p><h2 className="mt-5 text-4xl font-serif font-semibold leading-tight text-foreground md:text-5xl">The details that help you decide.</h2></div>
-            <p className="max-w-sm text-foreground/60 md:text-right">No more copying addresses between tabs or trying to remember which apartment had the red flag.</p>
-          </div>
-          <div className="mt-14 grid gap-10 border-t border-border pt-10 sm:grid-cols-2 lg:grid-cols-4">
-            {tools.map((tool) => (<div key={tool.title}><tool.icon size={22} className="text-primary" strokeWidth={1.6} /><h3 className="mt-5 text-lg font-semibold text-foreground">{tool.title}</h3><p className="mt-2 leading-relaxed text-foreground/60">{tool.copy}</p></div>))}
-          </div>
-        </div>
-      </section>
-
-      <section className="px-6 pb-24 lg:px-8 lg:pb-32">
-        <div className="mx-auto max-w-7xl rounded-[2rem] bg-foreground px-8 py-14 text-background md:px-14 md:py-16">
-          <div className="flex flex-col items-start justify-between gap-10 md:flex-row md:items-end">
-            <div className="max-w-2xl"><p className="text-xs font-semibold uppercase tracking-[0.22em] text-background/55">Start with the apartment</p><h2 className="mt-5 text-4xl font-serif font-semibold leading-tight md:text-6xl">Keep the whole move in view.</h2></div>
-            <Link href="/search" className="pressable inline-flex items-center gap-2 rounded-full bg-background px-7 py-4 text-sm font-semibold text-foreground transition-opacity duration-200 hover:opacity-90">Search StreetEasy <ArrowRight size={17} /></Link>
-          </div>
-        </div>
-      </section>
-
-      <Footer />
-    </main>
-  )
+  return <main className="min-h-screen"><Navigation />
+    <section className="mx-auto grid max-w-7xl items-center gap-14 px-6 pb-24 pt-32 md:pt-40 lg:grid-cols-[1.15fr_.85fr] lg:gap-20 lg:px-8 lg:pb-32">
+      <div><p className="eyebrow text-primary">For the next New Yorker in you</p><h1 className="mt-6 max-w-2xl font-serif text-5xl leading-[1.06] tracking-tight sm:text-6xl lg:text-7xl">Find your place.<br /><em className="font-normal text-primary">Know its story.</em></h1><p className="mt-6 max-w-md text-lg leading-relaxed text-foreground/65">NYC rentals, with a closer look at the building behind the front door.</p>
+        <form action="/search" className="mt-8 flex max-w-xl items-center gap-2 rounded-2xl border border-border bg-card p-2 shadow-soft"><Search size={20} className="ml-3 shrink-0 text-primary" /><label className="sr-only" htmlFor="home-search">Street, neighborhood or borough</label><input id="home-search" name="q" placeholder="Where do you want to live?" className="min-w-0 flex-1 bg-transparent px-2 py-3 text-base outline-none" maxLength={160} /><button aria-label="Search rentals" className="pressable rounded-xl bg-primary p-3.5 text-white"><ArrowRight size={20} /></button></form>
+        <div className="mt-4 flex flex-wrap gap-2">{['Manhattan', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island'].map(b => <Link href={`/search?neighborhoods=${encodeURIComponent(b)}`} className="rounded-full border border-border px-3 py-1.5 text-xs text-foreground/70 transition-colors hover:border-primary hover:bg-primary/5" key={b}>{b}</Link>)}</div>
+        <Link href="/research" className="mt-8 inline-flex items-center gap-2 border-b border-primary/30 pb-1 text-sm font-semibold text-primary">Already found a place? Research the address <ArrowUpRight size={16} /></Link>
+      </div><Facade />
+    </section>
+    <section className="border-y border-border bg-card-alt px-6 py-16 lg:px-8"><div className="mx-auto max-w-7xl"><div className="flex flex-wrap items-end justify-between gap-5"><div><p className="eyebrow text-primary">Less guesswork. Better questions.</p><h2 className="mt-3 font-serif text-3xl md:text-4xl">A little context changes everything.</h2></div><Link href="/research" className="inline-flex items-center gap-2 text-sm font-semibold text-primary">Explore property research <ArrowRight size={16} /></Link></div><div className="mt-10 grid gap-8 md:grid-cols-3">{[{ Icon: Building2, title: 'Behind the walls', text: 'Housing violations and building records. Know what to ask on your tour.' }, { Icon: Users, title: 'Behind the name', text: 'Registered owners and managing agents, traced to official filings.' }, { Icon: MapPin, title: 'Around the corner', text: 'Neighborhood context and nearby subway stations to help plan your day.' }].map(({ Icon, title, text }) => <div key={title} className="border-t border-foreground/15 pt-5"><Icon size={23} strokeWidth={1.4} className="text-primary" /><h3 className="mt-5 font-serif text-2xl">{title}</h3><p className="mt-3 max-w-sm text-sm leading-relaxed text-foreground/65">{text}</p></div>)}</div></div></section>
+    <section className="mx-auto max-w-7xl px-6 py-16 lg:px-8"><div className="flex flex-col justify-between gap-8 rounded-3xl bg-foreground p-8 text-background md:flex-row md:items-center md:p-12"><div><p className="eyebrow text-background/60">Evidence, with its edges showing</p><h2 className="mt-4 font-serif text-3xl">What we know. What we don’t.</h2><p className="mt-4 max-w-xl text-sm leading-relaxed text-background/75">Source dates, clear warnings, and no invented details. Missing records stay unknown. Your next decision deserves that honesty.</p></div><Link href="/how-it-works" className="inline-flex shrink-0 items-center gap-2 self-start rounded-full bg-background px-5 py-3 text-sm font-semibold text-foreground md:self-auto">How LeaseIQ works <ArrowRight size={16} /></Link></div></section><Footer />
+  </main>
 }

@@ -3,44 +3,15 @@ import { createApp } from './api';
 import { config } from './config';
 
 async function startServer() {
-  try {
-    // Connect to MongoDB
-    console.log('Connecting to MongoDB...');
-    const mongoOptions: any = {
-      serverSelectionTimeoutMS: 5000,
-      socketTimeoutMS: 45000,
-      tls: true,
-    };
-    
-    // Only allow invalid certs in development
-    if (process.env.NODE_ENV !== 'production') {
-      mongoOptions.tlsAllowInvalidCertificates = true;
-    }
-    
-    await mongoose.connect(config.mongodb.uri, mongoOptions);
-    console.log('✓ MongoDB connected');
-
-    // Create Express app
-    const app = createApp();
-
-    // Start server
-    const port = config.server.port;
-    app.listen(port, () => {
-      console.log(`✓ Server running on http://localhost:${port}`);
-      console.log(`✓ Health check: http://localhost:${port}/health`);
-      console.log(`✓ Search API: http://localhost:${port}/api/search`);
-    });
-  } catch (error) {
-    console.error('Failed to start server:', error);
-    process.exit(1);
+  // Address research uses public records and can run independently of listings.
+  if (process.env.MONGODB_URI) {
+    try {
+      await mongoose.connect(config.mongodb.uri, { serverSelectionTimeoutMS: 5000, socketTimeoutMS: 45000 });
+      console.log('MongoDB connected');
+    } catch { console.error('MongoDB unavailable; listing endpoints will report unavailable. Address research remains available.'); }
   }
+  const app = createApp();
+  app.listen(config.server.port, () => console.log(`LeaseIQ API listening on http://localhost:${config.server.port}`));
 }
-
-// Handle shutdown gracefully
-process.on('SIGINT', async () => {
-  console.log('\nShutting down...');
-  await mongoose.connection.close();
-  process.exit(0);
-});
-
-startServer();
+process.on('SIGINT', async () => { await mongoose.connection.close(); process.exit(0); });
+startServer().catch(error => { console.error(error); process.exit(1); });

@@ -16,6 +16,7 @@ describe('Deduplication Utility Unit Tests', () => {
   beforeAll(async () => {
     mongoServer = await MongoMemoryServer.create();
     await mongoose.connect(mongoServer.getUri());
+    await Listing.init();
   });
 
   afterAll(async () => {
@@ -160,7 +161,7 @@ describe('Deduplication Utility Unit Tests', () => {
             coordinates: [-74.006, 40.7128]
           }
         },
-        price: 2000,
+        price: { amount: 2000, currency: 'USD', period: 'monthly' as const },
         bedrooms: 2,
         bathrooms: 1,
         description: 'Test listing',
@@ -176,10 +177,11 @@ describe('Deduplication Utility Unit Tests', () => {
           amount: null
         },
         sources: [{
-          sourceName: 'StreetEasy',
+          source: 'StreetEasy',
           sourceId: 'test-123',
           sourceUrl: 'https://example.com',
-          scrapedAt: new Date()
+          firstSeenAt: new Date(),
+          lastSeenAt: new Date()
         }],
         isActive: true
       });
@@ -209,7 +211,7 @@ describe('Deduplication Utility Unit Tests', () => {
             coordinates: [-74.006, 40.7128]
           }
         },
-        price: 2000,
+        price: { amount: 2000, currency: 'USD', period: 'monthly' as const },
         bedrooms: 2,
         bathrooms: 1,
         description: 'Test listing',
@@ -225,10 +227,11 @@ describe('Deduplication Utility Unit Tests', () => {
           amount: null
         },
         sources: [{
-          sourceName: 'StreetEasy',
+          source: 'StreetEasy',
           sourceId: 'test-123',
           sourceUrl: 'https://example.com',
-          scrapedAt: new Date()
+          firstSeenAt: new Date(),
+          lastSeenAt: new Date()
         }],
         isActive: true
       });
@@ -257,7 +260,7 @@ describe('Deduplication Utility Unit Tests', () => {
             coordinates: [-74.006, 40.7128]
           }
         },
-        price: 2000,
+        price: { amount: 2000, currency: 'USD', period: 'monthly' as const },
         bedrooms: 2,
         bathrooms: 1,
         description: 'Test listing',
@@ -273,10 +276,11 @@ describe('Deduplication Utility Unit Tests', () => {
           amount: null
         },
         sources: [{
-          sourceName: 'StreetEasy',
+          source: 'StreetEasy',
           sourceId: 'test-123',
           sourceUrl: 'https://example.com',
-          scrapedAt: new Date()
+          firstSeenAt: new Date(),
+          lastSeenAt: new Date()
         }],
         isActive: true
       });
@@ -305,7 +309,7 @@ describe('Deduplication Utility Unit Tests', () => {
             coordinates: [-74.006, 40.7128]
           }
         },
-        price: 2000,
+        price: { amount: 2000, currency: 'USD', period: 'monthly' as const },
         bedrooms: 2,
         bathrooms: 1,
         description: 'Test listing',
@@ -321,10 +325,11 @@ describe('Deduplication Utility Unit Tests', () => {
           amount: null
         },
         sources: [{
-          sourceName: 'StreetEasy',
+          source: 'StreetEasy',
           sourceId: 'test-123',
           sourceUrl: 'https://example.com',
-          scrapedAt: new Date()
+          firstSeenAt: new Date(),
+          lastSeenAt: new Date()
         }],
         isActive: true
       });
@@ -353,7 +358,7 @@ describe('Deduplication Utility Unit Tests', () => {
             coordinates: [-74.006, 40.7128]
           }
         },
-        price: 2000,
+        price: { amount: 2000, currency: 'USD', period: 'monthly' as const },
         bedrooms: 2,
         bathrooms: 1,
         description: 'Test listing',
@@ -369,10 +374,11 @@ describe('Deduplication Utility Unit Tests', () => {
           amount: null
         },
         sources: [{
-          sourceName: 'StreetEasy',
+          source: 'StreetEasy',
           sourceId: 'test-123',
           sourceUrl: 'https://example.com',
-          scrapedAt: new Date()
+          firstSeenAt: new Date(),
+          lastSeenAt: new Date()
         }],
         isActive: true
       });
@@ -403,7 +409,7 @@ describe('Deduplication Utility Unit Tests', () => {
             coordinates: [-74.006, 40.7128]
           }
         },
-        price: 2000,
+        price: { amount: 2000, currency: 'USD', period: 'monthly' as const },
         bedrooms: 2,
         bathrooms: 1,
         description: 'Original description',
@@ -419,10 +425,11 @@ describe('Deduplication Utility Unit Tests', () => {
           amount: null
         },
         sources: [{
-          sourceName: 'StreetEasy',
+          source: 'StreetEasy',
           sourceId: 'test-123',
           sourceUrl: 'https://streeteasy.com/listing/123',
-          scrapedAt: new Date('2024-01-01')
+          firstSeenAt: new Date('2024-01-01'),
+          lastSeenAt: new Date('2024-01-01')
         }],
         isActive: true
       });
@@ -430,15 +437,16 @@ describe('Deduplication Utility Unit Tests', () => {
       const originalCreatedAt = listing.createdAt;
 
       const newData = {
-        price: 2100,
+        price: { amount: 2100, currency: 'USD', period: 'monthly' as const },
         description: 'Updated description',
         images: ['https://example.com/image2.jpg'],
         amenities: ['laundry'],
         sources: [{
-          sourceName: 'Zillow',
+          source: 'Zillow',
           sourceId: 'zillow-456',
           sourceUrl: 'https://zillow.com/listing/456',
-          scrapedAt: new Date('2024-01-02')
+          firstSeenAt: new Date('2024-01-02'),
+          lastSeenAt: new Date('2024-01-02')
         }]
       };
 
@@ -446,11 +454,11 @@ describe('Deduplication Utility Unit Tests', () => {
 
       // Verify sources merged
       expect(merged.sources.length).toBe(2);
-      expect(merged.sources.some(s => s.sourceName === 'StreetEasy')).toBe(true);
-      expect(merged.sources.some(s => s.sourceName === 'Zillow')).toBe(true);
+      expect(merged.sources.some(s => s.source === 'StreetEasy')).toBe(true);
+      expect(merged.sources.some(s => s.source === 'Zillow')).toBe(true);
 
       // Verify price updated
-      expect(merged.price).toBe(2100);
+      expect(merged.price.amount).toBe(2100);
 
       // Verify description updated
       expect(merged.description).toBe('Updated description');
@@ -482,7 +490,7 @@ describe('Deduplication Utility Unit Tests', () => {
             coordinates: [-74.006, 40.7128]
           }
         },
-        price: 2000,
+        price: { amount: 2000, currency: 'USD', period: 'monthly' as const },
         bedrooms: 2,
         bathrooms: 1,
         description: 'Test',
@@ -498,10 +506,11 @@ describe('Deduplication Utility Unit Tests', () => {
           amount: null
         },
         sources: [{
-          sourceName: 'StreetEasy',
+          source: 'StreetEasy',
           sourceId: 'test-123',
           sourceUrl: 'https://example.com',
-          scrapedAt: new Date()
+          firstSeenAt: new Date(),
+          lastSeenAt: new Date()
         }],
         isActive: true
       });
@@ -512,12 +521,13 @@ describe('Deduplication Utility Unit Tests', () => {
       await new Promise(resolve => setTimeout(resolve, 10));
 
       const newData = {
-        price: 2100,
+        price: { amount: 2100, currency: 'USD', period: 'monthly' as const },
         sources: [{
-          sourceName: 'Zillow',
+          source: 'Zillow',
           sourceId: 'zillow-456',
           sourceUrl: 'https://zillow.com',
-          scrapedAt: new Date()
+          firstSeenAt: new Date(),
+          lastSeenAt: new Date()
         }]
       };
 
@@ -526,7 +536,7 @@ describe('Deduplication Utility Unit Tests', () => {
       expect(merged.createdAt.getTime()).toBe(originalCreatedAt.getTime());
     });
 
-    it('updates existing source scrapedAt if source already exists', async () => {
+    it('updates existing source lastSeenAt if source already exists', async () => {
       const listing = await Listing.create({
         address: {
           street: '123 Main Street',
@@ -539,7 +549,7 @@ describe('Deduplication Utility Unit Tests', () => {
             coordinates: [-74.006, 40.7128]
           }
         },
-        price: 2000,
+        price: { amount: 2000, currency: 'USD', period: 'monthly' as const },
         bedrooms: 2,
         bathrooms: 1,
         description: 'Test',
@@ -555,22 +565,24 @@ describe('Deduplication Utility Unit Tests', () => {
           amount: null
         },
         sources: [{
-          sourceName: 'StreetEasy',
+          source: 'StreetEasy',
           sourceId: 'test-123',
           sourceUrl: 'https://example.com',
-          scrapedAt: new Date('2024-01-01')
+          firstSeenAt: new Date('2024-01-01'),
+          lastSeenAt: new Date('2024-01-01')
         }],
         isActive: true
       });
 
       const newScrapedAt = new Date('2024-01-02');
       const newData = {
-        price: 2100,
+        price: { amount: 2100, currency: 'USD', period: 'monthly' as const },
         sources: [{
-          sourceName: 'StreetEasy',
+          source: 'StreetEasy',
           sourceId: 'test-123',
           sourceUrl: 'https://example.com',
-          scrapedAt: newScrapedAt
+          firstSeenAt: newScrapedAt,
+          lastSeenAt: newScrapedAt
         }]
       };
 
@@ -580,7 +592,7 @@ describe('Deduplication Utility Unit Tests', () => {
       expect(merged.sources.length).toBe(1);
       
       // ScrapedAt should be updated
-      expect(merged.sources[0].scrapedAt.getTime()).toBe(newScrapedAt.getTime());
+      expect(merged.sources[0].lastSeenAt.getTime()).toBe(newScrapedAt.getTime());
     });
 
     it('handles conflicting data by using most recent', async () => {
@@ -596,7 +608,7 @@ describe('Deduplication Utility Unit Tests', () => {
             coordinates: [-74.006, 40.7128]
           }
         },
-        price: 2000,
+        price: { amount: 2000, currency: 'USD', period: 'monthly' as const },
         availableDate: new Date('2024-01-01'),
         bedrooms: 2,
         bathrooms: 1,
@@ -614,16 +626,17 @@ describe('Deduplication Utility Unit Tests', () => {
           amount: null
         },
         sources: [{
-          sourceName: 'StreetEasy',
+          source: 'StreetEasy',
           sourceId: 'test-123',
           sourceUrl: 'https://example.com',
-          scrapedAt: new Date()
+          firstSeenAt: new Date(),
+          lastSeenAt: new Date()
         }],
         isActive: true
       });
 
       const newData = {
-        price: 2500,
+        price: { amount: 2500, currency: 'USD', period: 'monthly' as const },
         availableDate: new Date('2024-02-01'),
         bedrooms: 3,
         bathrooms: 2,
@@ -640,17 +653,18 @@ describe('Deduplication Utility Unit Tests', () => {
         },
         isActive: false,
         sources: [{
-          sourceName: 'Zillow',
+          source: 'Zillow',
           sourceId: 'zillow-456',
           sourceUrl: 'https://zillow.com',
-          scrapedAt: new Date()
+          firstSeenAt: new Date(),
+          lastSeenAt: new Date()
         }]
       };
 
       const merged = await mergeListing(listing, newData);
 
       // All fields should be updated to new values
-      expect(merged.price).toBe(2500);
+      expect(merged.price.amount).toBe(2500);
       expect(merged.availableDate?.getTime()).toBe(new Date('2024-02-01').getTime());
       expect(merged.bedrooms).toBe(3);
       expect(merged.bathrooms).toBe(2);
@@ -662,6 +676,99 @@ describe('Deduplication Utility Unit Tests', () => {
       expect(merged.brokerFee.required).toBe(true);
       expect(merged.brokerFee.amount).toBe(2000);
       expect(merged.isActive).toBe(false);
+    });
+  });
+
+  describe('observation integrity', () => {
+    const source = (name = 'streeteasy', id = 'one', date = '2026-10-20') => ({
+      source: name, sourceId: id, sourceUrl: `https://example.com/${name}/${id}`,
+      firstSeenAt: new Date(date), lastSeenAt: new Date(date)
+    });
+    const fixture = () => ({
+      address: { street: '123 Main Street', unit: '4B', city: 'New York', state: 'NY', zipCode: '10001',
+        coordinates: { type: 'Point', coordinates: [-74.006, 40.7128] as [number, number] } },
+      price: { amount: 3000, currency: 'USD', period: 'monthly' as const },
+      bedrooms: 2, bathrooms: 1, description: 'Current description',
+      availableDate: new Date('2026-11-01'), sources: [source()]
+    });
+
+    it.each(['streeteasy', 'zillow'])('does not overwrite newer fields with an older %s observation', async name => {
+      const listing = await Listing.create(fixture());
+      const createdAt = listing.createdAt;
+      await mergeListing(listing, { sources: [source(name, 'one', '2026-10-01')],
+        price: { amount: 2000, currency: 'USD', period: 'monthly' }, description: 'Stale description', availableDate: null });
+      const saved = await Listing.findById(listing._id);
+      expect(saved!.price.amount).toBe(3000);
+      expect(saved!.description).toBe('Current description');
+      expect(saved!.availableDate).toEqual(new Date('2026-11-01'));
+      expect(saved!.createdAt).toEqual(createdAt);
+      expect(saved!.sources.find(s => s.source === 'streeteasy')!.lastSeenAt).toEqual(new Date('2026-10-20'));
+      expect(saved!.sources).toHaveLength(name === 'streeteasy' ? 1 : 2);
+    });
+
+    it('updates source URLs and last seen dates while preserving first seen dates', async () => {
+      const listing = await Listing.create(fixture());
+      await mergeListing(listing, { sources: [{ ...source('streeteasy', 'one', '2026-10-22'), sourceUrl: 'https://example.com/refreshed' }] });
+      const saved = await Listing.findById(listing._id);
+      expect(saved!.sources[0].firstSeenAt).toEqual(new Date('2026-10-20'));
+      expect(saved!.sources[0].lastSeenAt).toEqual(new Date('2026-10-22'));
+      expect(saved!.sources[0].sourceUrl).toBe('https://example.com/refreshed');
+    });
+
+    it('retains every incoming source and does not duplicate matching identities', async () => {
+      const listing = await Listing.create(fixture());
+      const sources = [source('streeteasy', 'one', '2026-10-22'), source('zillow', 'two', '2026-10-22'), source('renthop', 'three', '2026-10-21')];
+      await mergeListing(listing, { sources });
+      await mergeListing(listing, { sources });
+      const saved = await Listing.findById(listing._id);
+      expect(saved!.sources.map(s => `${s.source}:${s.sourceId}`).sort()).toEqual(['renthop:three', 'streeteasy:one', 'zillow:two']);
+    });
+
+    it('rejects missing or invalid source dates before mutating stored data', async () => {
+      const listing = await Listing.create(fixture());
+      for (const sources of [[], [{ ...source(), lastSeenAt: new Date(NaN) }]]) {
+        await expect(mergeListing(listing, { sources, price: { amount: 1, currency: 'USD', period: 'monthly' } })).rejects.toThrow(/observation dates/);
+      }
+      expect((await Listing.findById(listing._id))!.price.amount).toBe(3000);
+    });
+
+    it('skips missing geocodes when searching for coordinate matches', async () => {
+      const data = fixture();
+      await Listing.create({ ...data, address: { ...data.address, coordinates: undefined } });
+      expect(await findDuplicates(data.address.street, data.address.unit, data.address.coordinates.coordinates)).toEqual([]);
+    });
+
+    it('creates ungeocoded listings and refreshes them by exact source identity', async () => {
+      const data = fixture();
+      const withoutCoordinates = { ...data, address: { ...data.address, coordinates: undefined } };
+      const first = await processListing(withoutCoordinates);
+      const second = await processListing({ ...withoutCoordinates, price: { ...data.price, amount: 3100 }, sources: [source('streeteasy', 'one', '2026-10-22')] });
+      expect(String(second._id)).toBe(String(first._id));
+      expect(second.price.amount).toBe(3100);
+      expect(await Listing.countDocuments()).toBe(1);
+    });
+
+    it('does not choose an arbitrary record when coordinate/address matches are ambiguous', async () => {
+      const data = fixture();
+      await Listing.create(data);
+      await Listing.create({ ...data, sources: [source('zillow', 'two')] });
+      const result = await processListing({ ...data, sources: [source('renthop', 'three')] });
+      expect(result.sources).toHaveLength(1);
+      expect(await Listing.countDocuments()).toBe(3);
+    });
+
+    it('rejects contradictory exact source identities rather than merging unrelated documents', async () => {
+      const data = fixture();
+      await Listing.create(data);
+      await Listing.create({ ...data, address: { ...data.address, unit: '5B' }, sources: [source('zillow', 'two')] });
+      await expect(processListing({ ...data, sources: [source(), source('zillow', 'two')] })).rejects.toThrow(/multiple listings/);
+      expect(await Listing.countDocuments()).toBe(2);
+    });
+
+    it('returns a finite half-circumference for antipodal coordinates', () => {
+      const distance = calculateDistance([-73.9857, 40.7484], [106.0143, -40.7484]);
+      expect(Number.isFinite(distance)).toBe(true);
+      expect(Math.abs(distance - Math.PI * 6371000)).toBeLessThan(1);
     });
   });
 
@@ -679,7 +786,7 @@ describe('Deduplication Utility Unit Tests', () => {
             coordinates: [-74.006, 40.7128] as [number, number]
           }
         },
-        price: 2000,
+        price: { amount: 2000, currency: 'USD', period: 'monthly' as const },
         bedrooms: 2,
         bathrooms: 1,
         description: 'Test listing',
@@ -695,10 +802,11 @@ describe('Deduplication Utility Unit Tests', () => {
           amount: null
         },
         sources: [{
-          sourceName: 'StreetEasy',
+          source: 'StreetEasy',
           sourceId: 'test-123',
           sourceUrl: 'https://example.com',
-          scrapedAt: new Date()
+          firstSeenAt: new Date(),
+          lastSeenAt: new Date()
         }],
         isActive: true
       };
@@ -728,7 +836,7 @@ describe('Deduplication Utility Unit Tests', () => {
             coordinates: [-74.006, 40.7128]
           }
         },
-        price: 2000,
+        price: { amount: 2000, currency: 'USD', period: 'monthly' as const },
         bedrooms: 2,
         bathrooms: 1,
         description: 'Original',
@@ -744,10 +852,11 @@ describe('Deduplication Utility Unit Tests', () => {
           amount: null
         },
         sources: [{
-          sourceName: 'StreetEasy',
+          source: 'StreetEasy',
           sourceId: 'test-123',
           sourceUrl: 'https://streeteasy.com',
-          scrapedAt: new Date()
+          firstSeenAt: new Date(),
+          lastSeenAt: new Date()
         }],
         isActive: true
       });
@@ -765,7 +874,7 @@ describe('Deduplication Utility Unit Tests', () => {
             coordinates: [-74.006, 40.7128] as [number, number]
           }
         },
-        price: 2100,
+        price: { amount: 2100, currency: 'USD', period: 'monthly' as const },
         bedrooms: 2,
         bathrooms: 1,
         description: 'Updated',
@@ -781,10 +890,11 @@ describe('Deduplication Utility Unit Tests', () => {
           amount: null
         },
         sources: [{
-          sourceName: 'Zillow',
+          source: 'Zillow',
           sourceId: 'zillow-456',
           sourceUrl: 'https://zillow.com',
-          scrapedAt: new Date()
+          firstSeenAt: new Date(),
+          lastSeenAt: new Date()
         }],
         isActive: true
       };
@@ -798,7 +908,7 @@ describe('Deduplication Utility Unit Tests', () => {
       expect(result.sources.length).toBe(2);
 
       // Should have updated price
-      expect(result.price).toBe(2100);
+      expect(result.price.amount).toBe(2100);
 
       // Should still only have one listing in database
       const count = await Listing.countDocuments();

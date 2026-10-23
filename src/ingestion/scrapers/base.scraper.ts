@@ -1,3 +1,5 @@
+import { createHash } from 'crypto';
+import { sourceDetailKey } from '../../utils/source-identity';
 import { FirecrawlClient } from '../services/firecrawl.client';
 import { ListingSource, RawListing, ScrapeConfig } from '../types';
 
@@ -54,7 +56,7 @@ export abstract class AbstractListingScraper {
 
       if (!result.success || !result.data) {
         this.logError(`Scraping failed for ${source}`, result.error);
-        return rawListings;
+        throw new Error(result.error || `Scraping failed for ${source}`);
       }
 
       // Extract listings from the response
@@ -76,6 +78,7 @@ export abstract class AbstractListingScraper {
       this.logInfo(`Scraped ${rawListings.length} listings from ${source}`);
     } catch (error) {
       this.logError(`Error scraping ${source}`, error);
+      throw error;
     }
 
     return rawListings;
@@ -85,17 +88,16 @@ export abstract class AbstractListingScraper {
    * Validate that a listing has minimum required data
    */
   protected isValidListing(listing: any): boolean {
-    return !!(listing && (listing.listingId || listing.address));
+    return !!(listing && listing.address && (listing.listingId || listing.listingUrl || /(?:#|apt|unit)\s*\w+/i.test(listing.address)));
   }
 
   /**
    * Generate a source ID from listing data if not provided
    */
   protected generateSourceId(listing: any): string {
-    // Use address as fallback ID
-    const address = listing.address || '';
-    const price = listing.price || '';
-    return `${address}-${price}`.replace(/\s+/g, '-').toLowerCase();
+    // Price changes must not change identity. A detail URL is the safest fallback.
+    const identity = sourceDetailKey(this.getSource(), listing.listingUrl || '') || listing.address;
+    return createHash('sha256').update(String(identity).trim()).digest('hex');
   }
 
   /**

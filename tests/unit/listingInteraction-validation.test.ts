@@ -13,6 +13,8 @@ describe('ListingInteraction Model Validation', () => {
   beforeAll(async () => {
     mongoServer = await MongoMemoryServer.create();
     await mongoose.connect(mongoServer.getUri());
+    // Uniqueness is enforced by MongoDB after its asynchronous index build.
+    await ListingInteraction.init();
 
     // Create test user and listing for use in tests
     const user = await User.create({
@@ -33,7 +35,7 @@ describe('ListingInteraction Model Validation', () => {
           coordinates: [-73.935242, 40.730610]
         }
       },
-      price: 2000,
+      price: { amount: 2000, currency: 'USD', period: 'monthly' as const },
       bedrooms: 2,
       bathrooms: 1,
       squareFootage: 800,
@@ -50,10 +52,11 @@ describe('ListingInteraction Model Validation', () => {
         amount: null
       },
       sources: [{
-        sourceName: 'TestSource',
+        source: 'TestSource',
         sourceId: 'test-123',
         sourceUrl: 'https://test.com/listing',
-        scrapedAt: new Date()
+        firstSeenAt: new Date(),
+        lastSeenAt: new Date()
       }],
       isActive: true
     });
@@ -112,7 +115,7 @@ describe('ListingInteraction Model Validation', () => {
       interactionType: 'viewed'
     });
 
-    await expect(duplicateInteraction.save()).rejects.toThrow();
+    await expect(duplicateInteraction.save()).rejects.toMatchObject({ code: 11000 });
   });
 
   it('should allow same user to have different interaction types on same listing', async () => {

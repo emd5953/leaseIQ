@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { Menu, X, User, LogOut } from 'lucide-react'
 import { useGoogleLogin } from '@react-oauth/google'
 import { useAuth } from '@/contexts/AuthContext'
@@ -9,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext'
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
 
 export default function Navigation() {
+  const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [isSigningIn, setIsSigningIn] = useState(false)
   const { user, isLoading, loginWithCode, logout } = useAuth()
@@ -48,39 +50,40 @@ export default function Navigation() {
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-8">
-            <Link 
-              href="/search" 
+          <div className="hidden md:flex items-center gap-5 text-sm">
+            <Link
+              href="/search" aria-current={pathname === '/search' ? 'page' : undefined}
               className="text-foreground hover:text-primary transition-colors duration-300"
             >
-              Find an apartment
+              Rentals
             </Link>
-            <Link 
-              href="/how-it-works" 
+            <Link
+              href="/how-it-works" aria-current={pathname === '/how-it-works' ? 'page' : undefined}
               className="text-foreground hover:text-primary transition-colors duration-300"
             >
-              How It Works
+              How it works
             </Link>
-            <Link 
-              href="/research" 
+            <Link
+              href="/research" aria-current={pathname === '/research' ? 'page' : undefined}
               className="text-foreground hover:text-primary transition-colors duration-300"
             >
-              Research
+              Property research
             </Link>
-            <Link 
-              href="/lease-analyzer" 
+            <Link
+              href="/lease-analyzer" aria-current={pathname === '/lease-analyzer' ? 'page' : undefined}
               className="text-foreground hover:text-primary transition-colors duration-300"
             >
               Lease Analyzer
             </Link>
 
+            <Link href="/shortlist" aria-current={pathname === "/shortlist" ? "page" : undefined} className="text-primary">Shortlist</Link>
             {/* Auth Section */}
             {!isLoading && (
               <>
                 {user ? (
                   <div className="flex items-center gap-4">
                     <Link
-                      href="/dashboard"
+                      href="/dashboard" aria-current={pathname === '/dashboard' ? 'page' : undefined}
                       className="flex items-center gap-2 text-foreground hover:text-primary transition-colors duration-300"
                     >
                       <User size={18} />
@@ -111,7 +114,7 @@ export default function Navigation() {
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="md:hidden p-2 text-foreground hover:text-primary transition-colors duration-300"
-            aria-label="Toggle menu"
+            aria-label="Toggle menu" aria-expanded={mobileMenuOpen}
           >
             {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
@@ -123,41 +126,42 @@ export default function Navigation() {
         <div className="md:hidden bg-background border-t border-border">
           <div className="px-6 py-6 space-y-4">
             <Link
-              href="/search"
+              href="/search" aria-current={pathname === '/search' ? 'page' : undefined}
               className="block text-lg text-foreground hover:text-primary transition-colors duration-300"
               onClick={() => setMobileMenuOpen(false)}
             >
               Search
             </Link>
             <Link
-              href="/how-it-works"
+              href="/how-it-works" aria-current={pathname === '/how-it-works' ? 'page' : undefined}
               className="block text-lg text-foreground hover:text-primary transition-colors duration-300"
               onClick={() => setMobileMenuOpen(false)}
             >
-              How It Works
+              How it works
             </Link>
             <Link
-              href="/research"
+              href="/research" aria-current={pathname === '/research' ? 'page' : undefined}
               className="block text-lg text-foreground hover:text-primary transition-colors duration-300"
               onClick={() => setMobileMenuOpen(false)}
             >
-              Research
+              Property research
             </Link>
             <Link
-              href="/lease-analyzer"
+              href="/lease-analyzer" aria-current={pathname === '/lease-analyzer' ? 'page' : undefined}
               className="block text-lg text-foreground hover:text-primary transition-colors duration-300"
               onClick={() => setMobileMenuOpen(false)}
             >
               Lease Analyzer
             </Link>
 
+            <Link href="/shortlist" onClick={() => setMobileMenuOpen(false)} className="block text-lg text-primary">Shortlist</Link>
             {/* Mobile Auth */}
             {!isLoading && (
               <div className="pt-4 border-t border-border">
                 {user ? (
                   <div className="space-y-4">
                     <Link
-                      href="/dashboard"
+                      href="/dashboard" aria-current={pathname === '/dashboard' ? 'page' : undefined}
                       className="flex items-center gap-2 text-lg text-foreground hover:text-primary transition-colors duration-300"
                       onClick={() => setMobileMenuOpen(false)}
                     >

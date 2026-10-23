@@ -1,3 +1,4 @@
+import { resetDatabase } from '../helpers/database';
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import mongoose from 'mongoose';
@@ -17,6 +18,7 @@ describe('Listing Deduplication Property Tests', () => {
   beforeAll(async () => {
     mongoServer = await MongoMemoryServer.create();
     await mongoose.connect(mongoServer.getUri());
+    await Promise.all(Object.values(mongoose.models).map(model => model.init()));
   });
 
   afterAll(async () => {
@@ -62,15 +64,15 @@ describe('Listing Deduplication Property Tests', () => {
   });
 
   const sourceArb = fc.record({
-    sourceName: fc.constantFrom('StreetEasy', 'Zillow', 'Apartments.com', 'Craigslist', 'Facebook'),
+    source: fc.constantFrom('StreetEasy', 'Zillow', 'Apartments.com', 'Craigslist', 'Facebook'),
     sourceId: fc.uuid(),
     sourceUrl: fc.webUrl(),
-    scrapedAt: fc.date().filter(d => !isNaN(d.getTime()))
-  });
+    lastSeenAt: fc.date({ noInvalidDate: true })
+  }).map(source => ({ ...source, firstSeenAt: source.lastSeenAt }));
 
   const listingArb = fc.record({
     address: addressArb,
-    price: fc.double({ min: 1, max: 50000, noNaN: true }),
+    price: fc.record({ amount: fc.double({ min: 1, max: 50000, noNaN: true }), currency: fc.constant('USD'), period: fc.constant('monthly' as const) }),
     availableDate: fc.option(fc.date().filter(d => !isNaN(d.getTime())), { nil: null }),
     bedrooms: fc.integer({ min: 0, max: 10 }),
     bathrooms: fc.double({ min: 0.5, max: 10, noNaN: true }),
@@ -111,7 +113,7 @@ describe('Listing Deduplication Property Tests', () => {
                 coordinates: originalListingData.address.coordinates.coordinates
               }
             },
-            price: newPrice,
+            price: { amount: newPrice, currency: 'USD', period: 'monthly' as const },
             availableDate: newAvailability,
             bedrooms: originalListingData.bedrooms,
             bathrooms: originalListingData.bathrooms,
@@ -148,12 +150,12 @@ describe('Listing Deduplication Property Tests', () => {
           expect(processedListing.createdAt.getTime()).toBe(originalCreatedAt.getTime());
 
           // Verify most recent price is used
-          expect(processedListing.price).toBe(newPrice);
+          const incomingIsLatest = newSource.lastSeenAt >= originalListingData.sources[0].lastSeenAt;
+          expect(processedListing.price.amount).toBe(incomingIsLatest ? newPrice : originalListingData.price.amount);
 
           // Verify most recent availability is used
-          if (newAvailability !== null) {
-            expect(processedListing.availableDate).toEqual(newAvailability);
-          }
+          expect(processedListing.availableDate).toEqual(incomingIsLatest ? newAvailability : originalListingData.availableDate);
+          expect(processedListing.description).toBe(incomingIsLatest ? 'Updated description from new source' : originalListingData.description);
 
           // Verify only one listing exists in database
           const allListings = await Listing.find({
@@ -162,7 +164,7 @@ describe('Listing Deduplication Property Tests', () => {
           });
           expect(allListings.length).toBe(1);
         }
-      ),
+      ).beforeEach(resetDatabase),
       { numRuns: 100 }
     );
   });
@@ -232,12 +234,12 @@ describe('Listing Deduplication Property Tests', () => {
           const original = await Listing.create(originalData);
           const originalId = original._id;
           const originalCreatedAt = original.createdAt;
-          const originalPrice = original.price; // Capture original price before merge
+          const originalPrice = original.price.amount; // Capture original price before merge
 
           // Merge with new source
           const newData = {
             sources: [newSource],
-            price: originalPrice + 100,
+            price: { amount: originalPrice + 100, currency: 'USD', period: 'monthly' as const },
             description: 'New description'
           };
 
@@ -256,10 +258,11 @@ describe('Listing Deduplication Property Tests', () => {
           expect(hasNewSource).toBe(true);
 
           // Verify data updated
-          expect(merged.price).toBe(originalPrice + 100);
-          expect(merged.description).toBe('New description');
+          const incomingIsLatest = newSource.lastSeenAt >= originalData.sources[0].lastSeenAt;
+          expect(merged.price.amount).toBe(incomingIsLatest ? originalPrice + 100 : originalPrice);
+          expect(merged.description).toBe(incomingIsLatest ? 'New description' : originalData.description);
         }
-      ),
+      ).beforeEach(resetDatabase),
       { numRuns: 100 }
     );
   });

@@ -1,261 +1,43 @@
 'use client'
-
 import { useState } from 'react'
-import { SlidersHorizontal, Bell } from 'lucide-react'
+import { SlidersHorizontal, Search, Bell, ChevronDown } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { api } from '@/lib/api'
-
-interface SearchFiltersProps {
-  onApplyFilters: (filters: any) => void
-}
-
-export default function SearchFilters({ onApplyFilters }: SearchFiltersProps) {
+export const emptyFilters = { q: '', minPrice: '', maxPrice: '', bedrooms: '', bathrooms: '', neighborhoods: [] as string[], petsAllowed: false, noFee: false }
+export type RentalFilters = typeof emptyFilters
+export default function SearchFilters({ value, onApplyFilters }: { value: RentalFilters; onApplyFilters: (filters: RentalFilters) => void }) {
   const { user } = useAuth()
-  const [filters, setFilters] = useState({
-    minPrice: '',
-    maxPrice: '',
-    bedrooms: '',
-    bathrooms: '',
-    neighborhoods: [] as string[],
-    petsAllowed: false,
-    noFee: false,
-  })
-  const [showSaveModal, setShowSaveModal] = useState(false)
-  const [searchName, setSearchName] = useState('')
-  const [isSaving, setIsSaving] = useState(false)
-
-  const handleClearFilters = () => {
-    const clearedFilters = {
-      minPrice: '',
-      maxPrice: '',
-      bedrooms: '',
-      bathrooms: '',
-      neighborhoods: [] as string[],
-      petsAllowed: false,
-      noFee: false,
-    }
-    setFilters(clearedFilters)
-    onApplyFilters({})
+  const [draft, setDraft] = useState(value)
+  const [expanded, setExpanded] = useState(false)
+  const [message, setMessage] = useState('')
+  const [name, setName] = useState('')
+  const [saving, setSaving] = useState(false)
+  const count = [draft.minPrice || draft.maxPrice, draft.bedrooms, draft.bathrooms, draft.neighborhoods.length, draft.petsAllowed, draft.noFee].filter(v => v !== '' && v !== false && v !== 0).length
+  const valid = () => !(draft.minPrice && draft.maxPrice && Number(draft.minPrice) > Number(draft.maxPrice))
+  async function saveAlert() {
+    if (!valid()) { setMessage('Minimum rent must be below maximum rent.'); return }
+    if (draft.q.trim()) { setMessage('Alerts use the filters below. Clear address text before saving an alert.'); return }
+    if (!name.trim()) { setMessage('Give your alert a name.'); return }
+    setSaving(true)
+    try { await api.createSavedSearch({ name: name.trim(), criteria: { minPrice: draft.minPrice ? Number(draft.minPrice) : null, maxPrice: draft.maxPrice ? Number(draft.maxPrice) : null, minBedrooms: draft.bedrooms !== '' ? Number(draft.bedrooms) : null, maxBedrooms: draft.bedrooms !== '' && Number(draft.bedrooms) < 3 ? Number(draft.bedrooms) : null, minBathrooms: draft.bathrooms ? Number(draft.bathrooms) : null, neighborhoods: draft.neighborhoods, noFeeOnly: draft.noFee, requiresDogsAllowed: draft.petsAllowed }, alertsEnabled: true, alertFrequency: 'daily', alertMethod: 'email' }); setMessage('Daily alert saved. Manage it in your dashboard.'); setName('') } catch { setMessage('Could not save your alert. Please retry.') } finally { setSaving(false) }
   }
-
-  const handleSaveSearch = async () => {
-    if (!searchName.trim()) {
-      alert('Please enter a name for this search')
-      return
-    }
-
-    setIsSaving(true)
-    try {
-      await api.createSavedSearch({
-        name: searchName,
-        criteria: {
-          minPrice: filters.minPrice ? Number(filters.minPrice) : null,
-          maxPrice: filters.maxPrice ? Number(filters.maxPrice) : null,
-          minBedrooms: filters.bedrooms ? Number(filters.bedrooms) : null,
-          neighborhoods: filters.neighborhoods,
-          requiresDogsAllowed: filters.petsAllowed,
-          noFeeOnly: filters.noFee,
-        },
-        alertsEnabled: true,
-        alertFrequency: 'daily',
-        alertMethod: 'email',
-      })
-      setShowSaveModal(false)
-      setSearchName('')
-      alert('Search saved! You\'ll receive alerts when new listings match.')
-    } catch (error) {
-      console.error('Failed to save search:', error)
-      alert('Failed to save search. Please try again.')
-    }
-    setIsSaving(false)
-  }
-
-  const neighborhoods = [
-    'Manhattan', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island',
-    'Williamsburg', 'Park Slope', 'Astoria', 'Long Island City'
-  ]
-
-  return (
-    <div className="bg-card rounded-3xl p-6 shadow-soft border border-border sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto">
-      <div className="flex items-center gap-2 mb-6">
-        <SlidersHorizontal size={20} className="text-primary" strokeWidth={1.5} />
-        <h2 className="text-xl font-serif font-semibold text-foreground">Filters</h2>
-      </div>
-
-      <div className="space-y-6">
-        {/* Price Range */}
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-2">
-            Price Range
-          </label>
-          <div className="grid grid-cols-2 gap-3">
-            <input
-              type="number"
-              placeholder="Min"
-              value={filters.minPrice}
-              onChange={(e) => setFilters({ ...filters, minPrice: e.target.value })}
-              className="px-4 py-2 bg-card-alt rounded-full border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-[border-color,box-shadow] duration-200 text-sm"
-            />
-            <input
-              type="number"
-              placeholder="Max"
-              value={filters.maxPrice}
-              onChange={(e) => setFilters({ ...filters, maxPrice: e.target.value })}
-              className="px-4 py-2 bg-card-alt rounded-full border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-[border-color,box-shadow] duration-200 text-sm"
-            />
-          </div>
-        </div>
-
-        {/* Bedrooms */}
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-2">
-            Bedrooms
-          </label>
-          <select
-            value={filters.bedrooms}
-            onChange={(e) => setFilters({ ...filters, bedrooms: e.target.value })}
-            className="w-full px-4 py-2 bg-card-alt rounded-full border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-[border-color,box-shadow] duration-200 text-sm"
-          >
-            <option value="">Any</option>
-            <option value="0">Studio</option>
-            <option value="1">1 Bed</option>
-            <option value="2">2 Beds</option>
-            <option value="3">3+ Beds</option>
-          </select>
-        </div>
-
-        {/* Bathrooms */}
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-2">
-            Bathrooms
-          </label>
-          <select
-            value={filters.bathrooms}
-            onChange={(e) => setFilters({ ...filters, bathrooms: e.target.value })}
-            className="w-full px-4 py-2 bg-card-alt rounded-full border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-[border-color,box-shadow] duration-200 text-sm"
-          >
-            <option value="">Any</option>
-            <option value="1">1 Bath</option>
-            <option value="2">2 Baths</option>
-            <option value="3">3+ Baths</option>
-          </select>
-        </div>
-
-        {/* Neighborhoods */}
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-2">
-            Neighborhoods
-          </label>
-          <div className="space-y-2 max-h-40 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
-            {neighborhoods.map((neighborhood) => (
-              <label key={neighborhood} className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={filters.neighborhoods.includes(neighborhood)}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      setFilters({
-                        ...filters,
-                        neighborhoods: [...filters.neighborhoods, neighborhood],
-                      })
-                    } else {
-                      setFilters({
-                        ...filters,
-                        neighborhoods: filters.neighborhoods.filter((n) => n !== neighborhood),
-                      })
-                    }
-                  }}
-                  className="w-4 h-4 text-primary border-border rounded focus:ring-primary"
-                />
-                <span className="text-sm text-foreground/70">{neighborhood}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        {/* Checkboxes */}
-        <div className="space-y-3 pt-4 border-t border-border">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={filters.petsAllowed}
-              onChange={(e) => setFilters({ ...filters, petsAllowed: e.target.checked })}
-              className="w-4 h-4 text-primary border-border rounded focus:ring-primary"
-            />
-            <span className="text-sm text-foreground/70">Pets Allowed</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={filters.noFee}
-              onChange={(e) => setFilters({ ...filters, noFee: e.target.checked })}
-              className="w-4 h-4 text-primary border-border rounded focus:ring-primary"
-            />
-            <span className="text-sm text-foreground/70">No Fee</span>
-          </label>
-        </div>
-
-        {/* Apply Button */}
-        <button 
-          onClick={() => onApplyFilters(filters)}
-          className="pressable w-full px-6 py-3 bg-foreground text-background rounded-full text-sm tracking-widest uppercase hover:bg-opacity-90 transition-opacity duration-200"
-        >
-          Apply Filters
-        </button>
-
-        {/* Clear Button */}
-        <button 
-          onClick={handleClearFilters}
-          className="pressable w-full px-6 py-3 bg-transparent text-foreground border border-border rounded-full text-sm tracking-widest uppercase hover:bg-card-alt transition-colors duration-200"
-        >
-          Clear Filters
-        </button>
-
-        {/* Save Search Button */}
-        {user && (
-          <button 
-            onClick={() => setShowSaveModal(true)}
-            className="pressable w-full px-6 py-3 bg-primary/10 text-primary border border-primary/20 rounded-full text-sm tracking-widest uppercase hover:bg-primary/20 transition-colors duration-200 flex items-center justify-center gap-2"
-          >
-            <Bell size={16} />
-            Save Search & Get Alerts
-          </button>
-        )}
-      </div>
-
-      {/* Save Search Modal */}
-      {showSaveModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background rounded-xl max-w-md w-full p-6">
-            <h3 className="text-xl font-semibold mb-4">Save This Search</h3>
-            <p className="text-muted-foreground text-sm mb-4">
-              Get email alerts when new listings match your criteria.
-            </p>
-            <input
-              type="text"
-              placeholder="Name your search (e.g., '2BR Brooklyn under $3k')"
-              value={searchName}
-              onChange={(e) => setSearchName(e.target.value)}
-              className="w-full px-4 py-3 border border-border rounded-lg bg-background mb-4"
-            />
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowSaveModal(false)}
-                className="flex-1 px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveSearch}
-                disabled={isSaving}
-                className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
-              >
-                {isSaving ? 'Saving...' : 'Save & Enable Alerts'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+  return <form onSubmit={e => { e.preventDefault(); if (!valid()) { setMessage('Minimum rent must be below maximum rent.'); return } setMessage(''); onApplyFilters(draft); setExpanded(false) }} className="rounded-2xl border border-border bg-card p-3 shadow-soft md:p-4">
+    <div className="flex flex-wrap items-center gap-3">
+      <div className="relative min-w-48 flex-1"><Search size={19} className="pointer-events-none absolute left-4 top-3.5 text-primary" /><label htmlFor="rental-query" className="sr-only">Address or area</label><input id="rental-query" value={draft.q} onChange={e => setDraft({ ...draft, q: e.target.value })} placeholder="A street. A neighborhood. Your next home." className="field border-transparent bg-card-alt pl-11" maxLength={160} /></div>
+      <button type="button" aria-expanded={expanded} aria-controls="rental-filters" onClick={() => setExpanded(!expanded)} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-border px-4 text-sm font-medium"><SlidersHorizontal size={16} />Filters{count > 0 && <span className="rounded-full bg-primary px-1.5 text-xs text-white">{count}</span>}<ChevronDown size={14} className={expanded ? 'rotate-180' : ''} /></button>
+      <button className="pressable min-h-12 rounded-xl bg-primary px-6 text-sm font-semibold text-white hover:bg-foreground" type="submit">Find rentals</button>
     </div>
-  )
+    <div id="rental-filters" hidden={!expanded} className="mt-4 border-t border-border px-2 pb-2 pt-5">
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <fieldset><legend className="mb-2 text-sm font-medium">Monthly unit rent</legend><div className="flex gap-2"><input aria-label="Minimum monthly rent" type="number" min="0" max="1000000" placeholder="Min $" className="field px-3" value={draft.minPrice} onChange={e => setDraft({ ...draft, minPrice: e.target.value })} /><input aria-label="Maximum monthly rent" type="number" min="0" max="1000000" placeholder="Max $" className="field px-3" value={draft.maxPrice} onChange={e => setDraft({ ...draft, maxPrice: e.target.value })} /></div></fieldset>
+        <label className="text-sm font-medium">Bedrooms<select className="field mt-2" value={draft.bedrooms} onChange={e => setDraft({ ...draft, bedrooms: e.target.value })}><option value="">Any</option><option value="0">Studio</option><option value="1">1 bed</option><option value="2">2 beds</option><option value="3">3+ beds</option></select></label>
+        <label className="text-sm font-medium">Minimum bathrooms<select className="field mt-2" value={draft.bathrooms} onChange={e => setDraft({ ...draft, bathrooms: e.target.value })}><option value="">Any</option><option value="1">1 bath</option><option value="2">2 baths</option><option value="3">3+ baths</option></select></label>
+        <div className="flex flex-col justify-center gap-3 text-sm"><label className="flex min-h-8 items-center gap-2"><input type="checkbox" checked={draft.petsAllowed} onChange={e => setDraft({ ...draft, petsAllowed: e.target.checked })} />Pets allowed</label><label className="flex min-h-8 items-center gap-2"><input type="checkbox" checked={draft.noFee} onChange={e => setDraft({ ...draft, noFee: e.target.checked })} />Listed no fee</label></div>
+      </div>
+      <fieldset className="mt-5"><legend className="mb-2 text-sm font-medium">Boroughs</legend><div className="flex flex-wrap gap-2">{['Manhattan', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island'].map(b => <label key={b} className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-full border px-4 text-sm ${draft.neighborhoods.includes(b) ? 'border-primary bg-primary/5 text-primary' : 'border-border'}`}><input type="checkbox" checked={draft.neighborhoods.includes(b)} onChange={e => setDraft({ ...draft, neighborhoods: e.target.checked ? [...draft.neighborhoods, b] : draft.neighborhoods.filter(x => x !== b) })} />{b}</label>)}</div></fieldset>
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3"><p className="max-w-xl text-xs text-foreground/60">Budget filters include known monthly unit rents. Building ranges and unknown rents remain in unfiltered results.</p><button type="button" onClick={() => { setDraft(emptyFilters); onApplyFilters(emptyFilters); setMessage('') }} className="min-h-11 text-sm text-primary underline underline-offset-4">Reset filters</button></div>
+      {user && <details className="mt-4 border-t border-border pt-4"><summary className="cursor-pointer text-sm font-medium">Save a daily email alert</summary><div className="mt-3 flex flex-wrap gap-3"><input aria-label="Alert name" value={name} onChange={e => setName(e.target.value)} maxLength={100} placeholder="Name your search" className="field max-w-sm" /><button type="button" disabled={saving} onClick={saveAlert} className="flex items-center gap-2 rounded-xl bg-primary/10 px-4 py-3 text-sm text-primary"><Bell size={16} />{saving ? 'Saving…' : 'Save alert'}</button></div>{draft.petsAllowed && <p className="mt-2 text-xs">Pet alerts match listings that explicitly allow dogs.</p>}</details>}
+    </div>
+    {message && <p role="status" className="px-3 pt-3 text-sm text-accent">{message}</p>}
+  </form>
 }

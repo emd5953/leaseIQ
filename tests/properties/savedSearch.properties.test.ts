@@ -1,3 +1,4 @@
+import { resetDatabase } from '../helpers/database';
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import mongoose from 'mongoose';
@@ -11,6 +12,7 @@ describe('SavedSearch Model Property Tests', () => {
   beforeAll(async () => {
     mongoServer = await MongoMemoryServer.create();
     await mongoose.connect(mongoServer.getUri());
+    await Promise.all(Object.values(mongoose.models).map(model => model.init()));
   });
 
   afterAll(async () => {
@@ -228,7 +230,7 @@ describe('SavedSearch Model Property Tests', () => {
             expect(retrievedSearch.updatedAt).toEqual(search.updatedAt);
           }
         }
-      ),
+      ).beforeEach(resetDatabase),
       { numRuns: 100 }
     );
   });
@@ -276,7 +278,7 @@ describe('SavedSearch Model Property Tests', () => {
             expect(retrievedSearch.isActive).toBe(true);
           }
         }
-      ),
+      ).beforeEach(resetDatabase),
       { numRuns: 100 }
     );
   });
@@ -341,7 +343,7 @@ describe('SavedSearch Model Property Tests', () => {
             expect(retrievedSearchIds).toContain(searchId);
           });
         }
-      ),
+      ).beforeEach(resetDatabase),
       { numRuns: 100 }
     );
   });
@@ -390,7 +392,7 @@ describe('SavedSearch Model Property Tests', () => {
           // Test with alertsEnabled = false
           const searchNoAlerts = await SavedSearch.create({
             userId: user._id,
-            name: `${name.trim() || 'No Alert Test'}-no-alerts`,
+            name: `${(name.trim() || 'No Alert Test').slice(0, 90)}-no-alerts`,
             criteria,
             alertsEnabled: false,
             alertFrequency,
@@ -400,7 +402,7 @@ describe('SavedSearch Model Property Tests', () => {
           // Verify lastAlertSentAt is null when alerts are disabled
           expect(searchNoAlerts.lastAlertSentAt).toBeNull();
         }
-      ),
+      ).beforeEach(resetDatabase),
       { numRuns: 100 }
     );
   });
@@ -456,7 +458,7 @@ describe('SavedSearch Model Property Tests', () => {
             expect(foundSearch.userId.toString()).toBe(user._id.toString());
           }
         }
-      ),
+      ).beforeEach(resetDatabase),
       { numRuns: 100 }
     );
   });

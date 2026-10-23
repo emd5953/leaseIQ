@@ -34,6 +34,13 @@ export interface ParsedListing {
   sourceId: string;
   address: string | null;
   price: number | null;
+  rawPrice?: unknown;
+  pricePeriod?: unknown;
+  priceCurrency?: unknown;
+  listingScope?: 'unit' | 'building';
+  rentMinimum?: number | null;
+  rentMaximum?: number | null;
+  contactForPrice?: boolean;
   bedrooms: number | null;
   bathrooms: number | null;
   squareFeet: number | null;
@@ -53,11 +60,11 @@ export interface ParsedListing {
   applicationFee: number | null;
   availableDate: string | null;
   utilities: {
-    electric: boolean;
-    gas: boolean;
-    water: boolean;
-    internet: boolean;
-    trash: boolean;
+    electric: boolean | null;
+    gas: boolean | null;
+    water: boolean | null;
+    internet: boolean | null;
+    trash: boolean | null;
   } | null;
   laundry: string | null;
   heating: string | null;
@@ -68,6 +75,7 @@ export interface ParsedListing {
 }
 
 export interface Address {
+  unit?: string | null;
   street: string;
   city: string;
   state: string;
@@ -76,19 +84,22 @@ export interface Address {
 }
 
 export interface Price {
-  amount: number;
+  amount: number | null;
+  status?: 'known' | 'unknown' | 'building';
   currency: string;
   period: 'monthly' | 'weekly' | 'daily';
 }
 
 export interface PetPolicy {
-  allowed: boolean;
+  dogsAllowed?: boolean | null;
+  catsAllowed?: boolean | null;
+  allowed: boolean | null;
   restrictions: string | null;
   deposit: number | null;
 }
 
 export interface BrokerFee {
-  required: boolean;
+  required: boolean | null;
   amount: number | null;
   percentage: number | null;
 }
@@ -104,6 +115,9 @@ export interface NormalizedListing {
   sourceId: string;
   address: Address;
   price: Price;
+  listingScope?: 'unit' | 'building';
+  buildingRent?: { status: 'range' | 'contact'; minimum: number | null; maximum: number | null; sourceUrl: string; observedAt: Date };
+  rentEvidence?: { raw: string | number | null; period: string; sourceUrl: string; observedAt: Date };
   bedrooms: number | null;
   bathrooms: number | null;
   squareFeet: number | null;
@@ -123,11 +137,11 @@ export interface NormalizedListing {
   applicationFee: number | null;
   availableDate: Date | null;
   utilities: {
-    electric: boolean;
-    gas: boolean;
-    water: boolean;
-    internet: boolean;
-    trash: boolean;
+    electric: boolean | null;
+    gas: boolean | null;
+    water: boolean | null;
+    internet: boolean | null;
+    trash: boolean | null;
   };
   laundry: string | null;
   heating: string | null;
@@ -162,6 +176,7 @@ export interface ScrapeConfig {
 }
 
 export interface SourceResult {
+  issues?: string[];
   source: ListingSource;
   listingsScraped: number;
   errors: number;
@@ -225,7 +240,13 @@ export const LISTING_EXTRACTION_SCHEMA = {
           listingId: { type: 'string' },
           listingUrl: { type: 'string' },
           address: { type: 'string' },
-          price: { type: 'number' },
+          price: { type: 'number', description: 'Exact gross unit rent only. Never use a building minimum, range or net-effective promotion.' },
+          pricePeriod: { type: 'string', enum: ['monthly', 'weekly', 'daily'] },
+          priceCurrency: { type: 'string', description: 'Reported currency, e.g. USD' },
+          listingScope: { type: 'string', enum: ['unit', 'building'] },
+          rentMinimum: { type: 'number', description: 'Building-wide advertised minimum; never a unit price' },
+          rentMaximum: { type: 'number', description: 'Building-wide advertised maximum' },
+          contactForPrice: { type: 'boolean' },
           bedrooms: { type: 'number' },
           bathrooms: { type: 'number' },
           squareFeet: { type: 'number' },

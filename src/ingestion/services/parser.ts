@@ -30,6 +30,13 @@ export class DataParser {
       sourceId: raw.sourceId,
       address: this.extractString(data.address),
       price: this.extractNumber(data.price),
+      rawPrice: data.price,
+      pricePeriod: data.pricePeriod,
+      priceCurrency: data.priceCurrency,
+      listingScope: ['unit', 'building'].includes(data.listingScope) ? data.listingScope : undefined,
+      rentMinimum: this.extractNumber(data.rentMinimum),
+      rentMaximum: this.extractNumber(data.rentMaximum),
+      contactForPrice: data.contactForPrice === true,
       bedrooms: this.extractNumber(data.bedrooms),
       bathrooms: this.extractNumber(data.bathrooms),
       squareFeet: this.extractNumber(data.squareFeet),
@@ -49,11 +56,11 @@ export class DataParser {
       applicationFee: this.extractNumber(data.applicationFee),
       availableDate: this.extractString(data.availableDate),
       utilities: data.utilities ? {
-        electric: Boolean(data.utilities.electric),
-        gas: Boolean(data.utilities.gas),
-        water: Boolean(data.utilities.water),
-        internet: Boolean(data.utilities.internet),
-        trash: Boolean(data.utilities.trash),
+        electric: typeof data.utilities.electric === 'boolean' ? data.utilities.electric : null,
+        gas: typeof data.utilities.gas === 'boolean' ? data.utilities.gas : null,
+        water: typeof data.utilities.water === 'boolean' ? data.utilities.water : null,
+        internet: typeof data.utilities.internet === 'boolean' ? data.utilities.internet : null,
+        trash: typeof data.utilities.trash === 'boolean' ? data.utilities.trash : null,
       } : null,
       laundry: this.extractString(data.laundry),
       heating: this.extractString(data.heating),
@@ -78,7 +85,7 @@ export class DataParser {
   private extractNumber(value: any): number | null {
     if (value === null || value === undefined || value === '') return null;
     const num = Number(value);
-    return isNaN(num) ? null : num;
+    return Number.isFinite(num) ? num : null;
   }
 
   /**

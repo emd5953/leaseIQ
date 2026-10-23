@@ -1,3 +1,4 @@
+import { resetDatabase } from '../helpers/database';
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import mongoose from 'mongoose';
@@ -11,6 +12,7 @@ describe('UserPreferences Model Property Tests', () => {
   beforeAll(async () => {
     mongoServer = await MongoMemoryServer.create();
     await mongoose.connect(mongoServer.getUri());
+    await Promise.all(Object.values(mongoose.models).map(model => model.init()));
   });
 
   afterAll(async () => {
@@ -190,7 +192,7 @@ describe('UserPreferences Model Property Tests', () => {
             expect(retrievedPrefs.updatedAt).toEqual(prefs.updatedAt);
           }
         }
-      ),
+      ).beforeEach(resetDatabase),
       { numRuns: 100 }
     );
   });
@@ -258,7 +260,7 @@ describe('UserPreferences Model Property Tests', () => {
           const finalPrefsForUser = await UserPreferences.find({ userId: user._id });
           expect(finalPrefsForUser).toHaveLength(1);
         }
-      ),
+      ).beforeEach(resetDatabase),
       { numRuns: 100 }
     );
   });
@@ -358,7 +360,11 @@ describe('UserPreferences Model Property Tests', () => {
 
           // Test 5: Invalid move-in date range (latestMoveIn < earliestMoveIn)
           // Ensure laterDate is actually later than earlierDate
-          const [earliest, latest] = laterDate > earlierDate ? [earlierDate, laterDate] : [laterDate, earlierDate];
+          // Equal generated dates are valid; construct a strictly reversed pair
+          // without mutating generated values, including the maximum JS date.
+          const earlierTime = Math.min(+laterDate, +earlierDate);
+          const earliest = new Date(Math.min(earlierTime, 8640000000000000 - 1));
+          const latest = new Date(Math.max(+laterDate, +earlierDate, +earliest + 1));
           
           let dateError: Error | null = null;
           try {
@@ -398,7 +404,7 @@ describe('UserPreferences Model Property Tests', () => {
           expect(validPrefs.maxSquareFootage).toBeGreaterThanOrEqual(validPrefs.minSquareFootage!);
           expect(validPrefs.latestMoveIn!.getTime()).toBeGreaterThanOrEqual(validPrefs.earliestMoveIn!.getTime());
         }
-      ),
+      ).beforeEach(resetDatabase),
       { numRuns: 100 }
     );
   });
@@ -486,7 +492,7 @@ describe('UserPreferences Model Property Tests', () => {
             expect(finalPrefs.minPrice).toBeNull();
           }
         }
-      ),
+      ).beforeEach(resetDatabase),
       { numRuns: 100 }
     );
   });
@@ -607,7 +613,7 @@ describe('UserPreferences Model Property Tests', () => {
           expect(nullCommutePrefs).toBeDefined();
           expect(nullCommutePrefs.commuteDestination).toBeNull();
         }
-      ),
+      ).beforeEach(resetDatabase),
       { numRuns: 100 }
     );
   });

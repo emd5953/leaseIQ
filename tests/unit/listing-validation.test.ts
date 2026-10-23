@@ -36,7 +36,7 @@ describe('Listing Model Validation', () => {
         coordinates: [-73.935242, 40.730610] as [number, number]
       }
     },
-    price: 2500,
+    price: { amount: 2500, currency: 'USD', period: 'monthly' },
     availableDate: new Date('2024-03-01'),
     bedrooms: 2,
     bathrooms: 1.5,
@@ -54,10 +54,11 @@ describe('Listing Model Validation', () => {
       amount: null
     },
     sources: [{
-      sourceName: 'StreetEasy',
+      source: 'streeteasy',
       sourceId: 'se-12345',
       sourceUrl: 'https://streeteasy.com/listing/12345',
-      scrapedAt: new Date()
+      firstSeenAt: new Date(),
+      lastSeenAt: new Date()
     }],
     isActive: true
   });
@@ -66,7 +67,7 @@ describe('Listing Model Validation', () => {
     it('should reject negative price', async () => {
       const listing = new Listing({
         ...createValidListingData(),
-        price: -100
+        price: { amount: -100, currency: 'USD', period: 'monthly' }
       });
 
       await expect(listing.save()).rejects.toThrow(/price/i);
@@ -75,7 +76,7 @@ describe('Listing Model Validation', () => {
     it('should reject zero price', async () => {
       const listing = new Listing({
         ...createValidListingData(),
-        price: 0
+        price: { amount: 0, currency: 'USD', period: 'monthly' }
       });
 
       await expect(listing.save()).rejects.toThrow(/price/i);
@@ -84,7 +85,7 @@ describe('Listing Model Validation', () => {
     it('should provide descriptive error message for negative price', async () => {
       const listing = new Listing({
         ...createValidListingData(),
-        price: -500
+        price: { amount: -500, currency: 'USD', period: 'monthly' }
       });
 
       try {
@@ -92,19 +93,19 @@ describe('Listing Model Validation', () => {
         expect.fail('Should have thrown validation error');
       } catch (error: any) {
         expect(error.name).toBe('ValidationError');
-        expect(error.errors.price).toBeDefined();
-        expect(error.errors.price.message).toContain('positive');
+        expect(error.errors['price.amount']).toBeDefined();
+        expect(error.errors['price.amount'].message).toContain('positive');
       }
     });
 
     it('should accept positive price', async () => {
       const listing = new Listing({
         ...createValidListingData(),
-        price: 2500
+        price: { amount: 2500, currency: 'USD', period: 'monthly' }
       });
 
       const savedListing = await listing.save();
-      expect(savedListing.price).toBe(2500);
+      expect(savedListing.price.amount).toBe(2500);
     });
   });
 
@@ -282,20 +283,20 @@ describe('Listing Model Validation', () => {
       await expect(listing.save()).rejects.toThrow(/price/i);
     });
 
-    it('should reject missing bedrooms', async () => {
+    it('should preserve missing bedrooms as unknown', async () => {
       const data: any = createValidListingData();
       delete data.bedrooms;
       const listing = new Listing(data);
 
-      await expect(listing.save()).rejects.toThrow(/bedroom/i);
+      expect((await listing.save()).bedrooms).toBeNull();
     });
 
-    it('should reject missing bathrooms', async () => {
+    it('should preserve missing bathrooms as unknown', async () => {
       const data: any = createValidListingData();
       delete data.bathrooms;
       const listing = new Listing(data);
 
-      await expect(listing.save()).rejects.toThrow(/bathroom/i);
+      expect((await listing.save()).bathrooms).toBeNull();
     });
 
     it('should reject empty sources array', async () => {
@@ -385,7 +386,7 @@ describe('Listing Model Validation', () => {
       // Wait a bit to ensure timestamp difference
       await new Promise(resolve => setTimeout(resolve, 10));
 
-      listing.price = 3000;
+      listing.price.amount = 3000;
       await listing.save();
 
       expect(listing.createdAt).toEqual(originalCreatedAt);
@@ -406,11 +407,11 @@ describe('Listing Model Validation', () => {
             coordinates: [-73.935242, 40.730610] as [number, number]
           }
         },
-        price: 2500,
+        price: { amount: 2500, currency: 'USD', period: 'monthly' },
         bedrooms: 2,
         bathrooms: 1,
         sources: [{
-          sourceName: 'StreetEasy',
+          source: 'streeteasy',
           sourceId: 'se-12345',
           sourceUrl: 'https://streeteasy.com/listing/12345'
         }]
@@ -421,9 +422,9 @@ describe('Listing Model Validation', () => {
       expect(listing.description).toBe('');
       expect(listing.images).toEqual([]);
       expect(listing.amenities).toEqual([]);
-      expect(listing.petPolicy.dogsAllowed).toBe(false);
-      expect(listing.petPolicy.catsAllowed).toBe(false);
-      expect(listing.brokerFee.required).toBe(false);
+      expect(listing.petPolicy.dogsAllowed).toBeNull();
+      expect(listing.petPolicy.catsAllowed).toBeNull();
+      expect(listing.brokerFee.required).toBeNull();
       expect(listing.isActive).toBe(true);
     });
   });
@@ -435,7 +436,7 @@ describe('Listing Model Validation', () => {
 
       expect(listing._id).toBeDefined();
       expect(listing.address.street).toBe('123 Main St');
-      expect(listing.price).toBe(2500);
+      expect(listing.price.amount).toBe(2500);
       expect(listing.bedrooms).toBe(2);
       expect(listing.bathrooms).toBe(1.5);
       expect(listing.sources.length).toBe(1);

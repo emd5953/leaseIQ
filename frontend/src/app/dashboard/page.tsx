@@ -5,8 +5,10 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Navigation from '@/components/Navigation'
 import Footer from '@/components/Footer'
+import { useShortlist } from '@/contexts/ShortlistContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { api, UserPreferences, SavedSearch } from '@/lib/api'
+import { rentLabel } from '@/lib/listing-rent'
 import ApplicationTracker from '@/components/dashboard/ApplicationTracker'
 import { 
   Heart, Bell, Settings, Trash2, Send, Plus, X, ClipboardList,
@@ -17,6 +19,7 @@ type TabType = 'tracker' | 'saved' | 'alerts' | 'preferences'
 
 export default function DashboardPage() {
   const router = useRouter()
+  const { retry: reloadShortlist } = useShortlist()
   const { user, isLoading: authLoading } = useAuth()
   const [activeTab, setActiveTab] = useState<TabType>('saved')
   const [savedListings, setSavedListings] = useState<any[]>([])
@@ -71,6 +74,7 @@ export default function DashboardPage() {
   const handleUnsaveListing = async (listingId: string) => {
     try {
       await api.unsaveListing(listingId)
+      reloadShortlist()
       setSavedListings(prev => prev.filter(l => l._id !== listingId))
     } catch (error) {
       console.error('Failed to unsave listing:', error)
@@ -238,13 +242,14 @@ export default function DashboardPage() {
                             <div className="flex justify-between items-start">
                               <div>
                                 <p className="font-semibold text-lg">
-                                  ${listing.price?.amount?.toLocaleString()}/mo
+                                  {rentLabel(listing)}{listing.price?.amount != null || listing.buildingRent?.status === 'range' ? ` / ${listing.price?.period === 'weekly' ? 'week' : listing.price?.period === 'daily' ? 'day' : 'mo'}` : ''}
                                 </p>
                                 <p className="text-sm text-muted-foreground">
                                   {listing.address?.street}
                                 </p>
                                 <p className="text-sm text-muted-foreground">
-                                  {listing.bedrooms} bed • {listing.bathrooms} bath
+                                  {listing.listingScope === 'building' ? 'Building pricing · confirm a unit' : `${listing.bedrooms === 0 ? 'Studio' : listing.bedrooms == null ? 'Beds unknown' : `${listing.bedrooms} bed`} · ${listing.bathrooms == null ? 'Baths unknown' : `${listing.bathrooms} bath`}`}
+                                  <span className="mt-2 block text-xs text-accent">Source-reported · verify availability</span>
                                 </p>
                               </div>
                               <button

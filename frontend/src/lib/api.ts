@@ -1,4 +1,10 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || ''
+
+async function readResponse(response: Response, fallback: string) {
+  const result = await response.json().catch(() => null)
+  if (!response.ok || result == null) throw new Error(typeof result?.error === 'string' ? result.error : fallback)
+  return result
+}
 
 // Helper to get auth headers
 function getAuthHeaders(): HeadersInit {
@@ -7,6 +13,7 @@ function getAuthHeaders(): HeadersInit {
 }
 
 export interface SearchFilters {
+  q?: string
   minPrice?: number
   maxPrice?: number
   minBedrooms?: number
@@ -83,7 +90,7 @@ export const api = {
     this._savedListingsCacheTime = 0
   },
 
-  async searchListings(filters: SearchFilters = {}, options: SearchOptions = {}) {
+  async searchListings(filters: SearchFilters = {}, options: SearchOptions = {}, signal?: AbortSignal) {
     const params = new URLSearchParams()
     
     Object.entries({ ...filters, ...options }).forEach(([key, value]) => {
@@ -99,9 +106,10 @@ export const api = {
     // Add cache-busting timestamp to ensure fresh data
     params.append('_t', Date.now().toString())
 
-    const response = await fetch(`${API_URL}/api/search?${params}`)
-    if (!response.ok) throw new Error('Search failed')
-    return response.json()
+    const response = await fetch(`${API_URL}/api/search?${params}`, { signal })
+    const result = await readResponse(response, 'Listing search is temporarily unavailable. Please retry.')
+    if (!Array.isArray(result.listings)) throw new Error('Listing search returned incomplete results. Please retry.')
+    return result
   },
 
   async getRecentListings(limit: number = 20) {
@@ -112,18 +120,24 @@ export const api = {
 
   async getListingById(id: string) {
     const response = await fetch(`${API_URL}/api/search/${id}`)
-    if (!response.ok) throw new Error('Listing not found')
-    return response.json()
+    return readResponse(response, 'This listing is temporarily unavailable. Please retry.')
   },
 
-  async researchListing(listingId: string, email?: string) {
+  async researchAddress(street: string, borough: string, signal?: AbortSignal) {
+    const response = await fetch(`${API_URL}/api/research/address`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ street, borough }), signal,
+    })
+    return readResponse(response, 'Property research is temporarily unavailable. Please retry.')
+  },
+
+  async researchListing(listingId: string, email?: string, signal?: AbortSignal) {
     const response = await fetch(`${API_URL}/api/research/${listingId}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', signal,
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       body: JSON.stringify({ email }),
     })
-    if (!response.ok) throw new Error('Research failed')
-    return response.json()
+    return readResponse(response, 'Property research is temporarily unavailable. Please retry.')
   },
 
   async analyzeLease(leaseText: string, email?: string) {

@@ -16,7 +16,7 @@ export class AlertService {
     try {
       // Get all active saved searches
       console.log('[AlertService] Fetching active saved searches...');
-      const savedSearches = await SavedSearch.find({ isActive: true })
+      const savedSearches = await SavedSearch.find({ isActive: true, alertsEnabled: true, alertMethod: { $in: ['email', 'both'] } })
         .limit(100) // Safety limit: max 100 searches per run
         .lean()
         .exec();
@@ -36,6 +36,8 @@ export class AlertService {
 
           // Find new listings since last alert
           const query = buildListingQuery(search.criteria);
+          query.isActive = true;
+          query.duplicateOf = { $exists: false };
           
           // Add NYC-only filter
           query.$and = query.$and || [];
@@ -136,6 +138,8 @@ export class AlertService {
 
       // Find matching listings
       const query = buildListingQuery(search.criteria);
+          query.isActive = true;
+          query.duplicateOf = { $exists: false };
       
       // Add NYC-only filter
       query.$and = query.$and || [];

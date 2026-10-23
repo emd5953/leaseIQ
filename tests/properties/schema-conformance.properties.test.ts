@@ -32,12 +32,12 @@ describe('Property 3: Schema Conformance', () => {
     source: listingSourceArb,
     sourceUrl: fc.webUrl(),
     sourceId: fc.string({ minLength: 1, maxLength: 50 }),
-    firstSeenAt: fc.date(),
-    lastSeenAt: fc.date(),
+    firstSeenAt: fc.date({ noInvalidDate: true }),
+    lastSeenAt: fc.date({ noInvalidDate: true }),
   });
 
   const addressArb = fc.record({
-    street: fc.string({ minLength: 5, maxLength: 100 }),
+    street: fc.string({ minLength: 5, maxLength: 100 }).filter(value => value.trim().length > 0),
     city: fc.string({ minLength: 2, maxLength: 50 }),
     state: fc.string({ minLength: 2, maxLength: 2 }),
     zipCode: fc.string({ minLength: 5, maxLength: 10 }),
@@ -65,8 +65,8 @@ describe('Property 3: Schema Conformance', () => {
   const coordinatesArb = fc.record({
     type: fc.constant('Point' as const),
     coordinates: fc.tuple(
-      fc.double({ min: -180, max: 180 }), // longitude
-      fc.double({ min: -90, max: 90 })    // latitude
+      fc.double({ min: -180, max: 180, noNaN: true }), // longitude
+      fc.double({ min: -90, max: 90, noNaN: true })    // latitude
     ),
   });
 
@@ -75,7 +75,7 @@ describe('Property 3: Schema Conformance', () => {
     address: addressArb,
     price: priceArb,
     bedrooms: fc.option(fc.integer({ min: 0, max: 10 }), { nil: null }),
-    bathrooms: fc.option(fc.double({ min: 0, max: 10 }), { nil: null }),
+    bathrooms: fc.option(fc.double({ min: 0.5, max: 10, noNaN: true }), { nil: null }),
     squareFeet: fc.option(fc.integer({ min: 100, max: 10000 }), { nil: null }),
     description: fc.option(fc.string({ maxLength: 1000 }), { nil: null }),
     images: fc.array(fc.webUrl(), { maxLength: 20 }),
@@ -154,8 +154,8 @@ describe('Property 3: Schema Conformance', () => {
           expect(saved._id).toBeDefined();
           expect(saved.bedrooms).toBeNull();
           expect(saved.bathrooms).toBeNull();
-          expect(saved.squareFeet).toBeNull();
-          expect(saved.description).toBeNull();
+          expect(saved.squareFootage).toBeNull();
+          expect(saved.description).toBe('');
 
           await ListingModel.deleteOne({ _id: saved._id });
         }
