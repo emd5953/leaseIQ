@@ -26,7 +26,7 @@ export default function Navigation() {
         setMobileMenuOpen(false)
       } catch (error) {
         console.error('Login failed:', error)
-        alert('Login failed. Please try again.')
+        alert(error instanceof Error ? error.message : 'Sign-in failed. Please try again.')
       } finally {
         setIsSigningIn(false)
       }
