@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { OAuth2Client } from 'google-auth-library';
 import { User } from '../../models/user.model';
 import { config } from '../../config';
+import { googlePopupOrigin } from '../../utils/google-auth-origin';
 import { generateToken, requireAuth, AuthRequest } from '../middleware/auth';
 
 const router = Router();
@@ -69,7 +70,7 @@ router.post('/google', async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('Google auth error:', error);
+    console.error('Google credential sign-in failed');
     res.status(500).json({ error: 'Authentication failed' });
   }
 });
@@ -80,24 +81,22 @@ router.post('/google', async (req: Request, res: Response) => {
  */
 router.post('/google/code', async (req: Request, res: Response) => {
   try {
-    const { code, redirect_uri } = req.body;
+    const { code } = req.body;
 
-    if (!code) {
-      console.error('No authorization code provided');
+    if (typeof code !== 'string' || !code.trim() || code.length > 8192) {
       return res.status(400).json({ error: 'Authorization code required' });
     }
 
-    console.log('Exchanging authorization code for tokens...');
+    const origin = googlePopupOrigin(req.get('origin'));
+    if (!origin) return res.status(403).json({ error: 'Sign in from the LeaseIQ website and try again.' });
+    if (!config.google.oauthClientId || !config.google.oauthClientSecret) {
+      return res.status(503).json({ error: 'Google sign-in is temporarily unavailable. Please try again later.' });
+    }
 
     // Exchange code for tokens with redirect_uri
     const { tokens } = await googleClient.getToken({
       code,
-      redirect_uri: redirect_uri || 'postmessage', // 'postmessage' is used for popup/iframe flows
-    });
-    
-    console.log('Tokens received:', { 
-      hasIdToken: !!tokens.id_token, 
-      hasAccessToken: !!tokens.access_token 
+      redirect_uri: origin, // GIS binds popup codes to the calling page origin.
     });
 
     if (!tokens.id_token) {
@@ -112,10 +111,6 @@ router.post('/google/code', async (req: Request, res: Response) => {
     });
 
     const payload = ticket.getPayload();
-    console.log('Token verified, payload:', { 
-      email: payload?.email, 
-      name: payload?.name 
-    });
 
     if (!payload || !payload.email) {
       console.error('Invalid token payload');
@@ -128,7 +123,6 @@ router.post('/google/code', async (req: Request, res: Response) => {
     let user = await User.findOne({ email: email.toLowerCase() });
 
     if (!user) {
-      console.log('Creating new user:', email);
       user = new User({
         email: email.toLowerCase(),
         displayName: name || null,
@@ -138,7 +132,6 @@ router.post('/google/code', async (req: Request, res: Response) => {
       });
       await user.save();
     } else {
-      console.log('Updating existing user:', email);
       user.lastLoginAt = new Date();
       if (name && !user.displayName) {
         user.displayName = name;
@@ -148,7 +141,6 @@ router.post('/google/code', async (req: Request, res: Response) => {
 
     const token = generateToken(user._id.toString(), user.email);
 
-    console.log('Authentication successful for:', email);
 
     res.json({
       token,
@@ -160,15 +152,13 @@ router.post('/google/code', async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('Google auth code error:', {
-      message: error.message,
-      stack: error.stack,
-      code: error.code,
-    });
-    res.status(500).json({ 
-      error: 'Authentication failed',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+    // Never log authorization codes, tokens, request bodies, or profile details.
+    const providerCode = error?.response?.data?.error;
+    const expired = providerCode === 'invalid_grant';
+    console.error('Google code sign-in failed', { category: expired ? 'expired_code' : error?.code === 11000 ? 'account_index_conflict' : 'provider_or_storage_failure' });
+    res.status(expired ? 401 : 503).json({ error: expired
+      ? 'Your Google sign-in expired. Please try signing in again.'
+      : 'Google sign-in is temporarily unavailable. Please try again later.' });
   }
 });
 

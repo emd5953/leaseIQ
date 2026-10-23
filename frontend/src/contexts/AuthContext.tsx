@@ -20,7 +20,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || ''
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -69,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const response = await fetch(`${API_URL}/api/auth/google/code`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, redirect_uri: 'postmessage' }),
+        body: JSON.stringify({ code }),
       })
 
       if (!response.ok) {
@@ -77,8 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.error('Authentication failed:', errorData)
         
         // Show more detailed error to user
-        const errorMessage = errorData.details || errorData.error || 'Authentication failed'
-        throw new Error(`Authentication failed: ${errorMessage}`)
+        throw new Error(errorData.error || 'Sign-in failed. Please try again.')
       }
 
       const data = await response.json()

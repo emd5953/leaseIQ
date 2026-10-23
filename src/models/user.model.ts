@@ -34,8 +34,6 @@ const userSchema = new Schema<IUser>({
   email: {
     type: String,
     required: [true, 'Email is required'],
-    unique: true,
-    index: true,
     lowercase: true,
     validate: {
       validator: function(v: string) {
@@ -67,7 +65,8 @@ const userSchema = new Schema<IUser>({
 
 // Password/Google accounts have no legacy identity and may coexist. Legacy IDs
 // remain unique; keeping them does not introduce a new authentication endpoint.
-userSchema.index({ supabaseId: 1 }, { unique: true, sparse: true });
+userSchema.index({ email: 1 }, { name: 'user_email_unique', unique: true });
+userSchema.index({ supabaseId: 1 }, { name: 'user_supabase_sparse_unique', unique: true, sparse: true });
 
 // Hash password
 userSchema.methods.setPassword = function(password: string) {
