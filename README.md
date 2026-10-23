@@ -38,6 +38,7 @@ Configure these services as needed in a local `.env` (never commit credentials):
 | `GOOGLE_GEOCODING_API_KEY` | Optional ingestion coordinates; an unsuccessful lookup remains missing |
 | `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `JWT_SECRET` | Account authentication |
 | `RESEND_API_KEY` | Explicit email delivery |
+| `RESEND_FROM_EMAIL` | Production sender on a domain verified in Resend, e.g. `LeaseIQ <alerts@your-domain.com>`; configure on both the API and alert job |
 | `OPENROUTER_API_KEY`, `REDUCTO_API_KEY` | Existing lease/floor-plan analysis |
 | `PORT` | API port (default 3001) |
 | `FRONTEND_URL` | Allowed production frontend origin |

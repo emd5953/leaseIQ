@@ -19,9 +19,13 @@ export class EmailService {
   static async send(options: EmailOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
       if (!config.resend.apiKey) return { success: false, error: 'Email delivery is not configured.' };
+      const from = options.from || config.resend.from || (process.env.NODE_ENV !== 'production' ? this.DEFAULT_FROM : '');
+      if (!from || (process.env.NODE_ENV === 'production' && /@resend\.dev(?:>|\s|$)/i.test(from))) {
+        return { success: false, error: 'Email delivery is unavailable: a verified production sender must be configured.' };
+      }
       const resend = new Resend(config.resend.apiKey);
       const result = await resend.emails.send({
-        from: options.from || this.DEFAULT_FROM,
+        from,
         to: options.to,
         subject: options.subject,
         html: options.html,
@@ -29,7 +33,7 @@ export class EmailService {
 
       if (result.error) {
         console.error('Email send error:', result.error);
-        return { success: false, error: result.error.message };
+        return { success: false, error: /only send testing emails|verify a domain/i.test(result.error.message) ? 'Email delivery is unavailable: the sender domain must be verified.' : 'The email provider could not send this message. Please try again later.' };
       }
 
       return { success: true, messageId: result.data?.id };
