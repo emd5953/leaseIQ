@@ -15,6 +15,8 @@ Every retrieved source has a query link, retrieval time, publisher update date w
 
 ## Run locally
 
+For an isolated Docker environment with test accounts, a captured email outbox, and a fictional lease fixture, see [Local Docker QA](docs/LOCAL_DOCKER.md). Start it with `docker compose up --build -d`, then open http://localhost:3100/local-test.html.
+
 Use Node 22 (see `.nvmrc`).
 
 ```sh
