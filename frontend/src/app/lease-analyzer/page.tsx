@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 
 import { api } from '@/lib/api'
+import { reportValue } from '@/lib/report-value'
 import { useAuth } from '@/contexts/AuthContext'
 
 export default function LeaseAnalyzerPage() {
@@ -373,7 +374,7 @@ export default function LeaseAnalyzerPage() {
                       <div className="flex flex-wrap gap-2">
                         {analysis.overallAssessment.recommendations.map((rec: string, i: number) => (
                           <span key={i} className="px-3 py-1.5 bg-white/50 rounded-full text-sm text-foreground/80">
-                            {rec}
+                            {reportValue(rec)}
                           </span>
                         ))}
                       </div>
@@ -477,7 +478,7 @@ export default function LeaseAnalyzerPage() {
                       <div className="flex flex-wrap gap-2">
                         {(analysis.floorPlan?.features || analysis.features).map((feature: string, i: number) => (
                           <span key={i} className="px-3 py-1.5 bg-white rounded-full text-sm text-foreground/80 border border-blue-100">
-                            {feature}
+                            {reportValue(feature)}
                           </span>
                         ))}
                       </div>
@@ -495,7 +496,7 @@ export default function LeaseAnalyzerPage() {
                           {(analysis.floorPlan?.pros || analysis.pros).map((pro: string, i: number) => (
                             <li key={i} className="flex items-start gap-2 text-sm text-green-800">
                               <CheckCircle size={14} className="flex-shrink-0 mt-0.5" />
-                              {pro}
+                              {reportValue(pro)}
                             </li>
                           ))}
                         </ul>
@@ -510,7 +511,7 @@ export default function LeaseAnalyzerPage() {
                           {(analysis.floorPlan?.cons || analysis.cons).map((con: string, i: number) => (
                             <li key={i} className="flex items-start gap-2 text-sm text-red-800">
                               <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
-                              {con}
+                              {reportValue(con)}
                             </li>
                           ))}
                         </ul>
@@ -530,7 +531,7 @@ export default function LeaseAnalyzerPage() {
                             <span className="flex-shrink-0 w-5 h-5 bg-blue-200 rounded-full flex items-center justify-center text-xs font-semibold">
                               {i + 1}
                             </span>
-                            {rec}
+                            {reportValue(rec)}
                           </li>
                         ))}
                       </ul>
@@ -578,7 +579,7 @@ export default function LeaseAnalyzerPage() {
                         </div>
                         <span className="text-sm font-medium text-foreground/70 uppercase tracking-wide">Move-in Cost</span>
                       </div>
-                      <p className="text-3xl font-bold text-foreground">{analysis.financialSummary.totalMoveInCost}</p>
+                      <p className="text-3xl font-bold text-foreground">{reportValue(analysis.financialSummary.totalMoveInCost)}</p>
                     </div>
                   )}
                   {analysis.financialSummary.monthlyTotal && (
@@ -589,7 +590,7 @@ export default function LeaseAnalyzerPage() {
                         </div>
                         <span className="text-sm font-medium text-foreground/70 uppercase tracking-wide">Monthly Total</span>
                       </div>
-                      <p className="text-3xl font-bold text-foreground">{analysis.financialSummary.monthlyTotal}</p>
+                      <p className="text-3xl font-bold text-foreground">{reportValue(analysis.financialSummary.monthlyTotal)}</p>
                     </div>
                   )}
                   {analysis.financialSummary.annualCost && (
@@ -600,7 +601,7 @@ export default function LeaseAnalyzerPage() {
                         </div>
                         <span className="text-sm font-medium text-foreground/70 uppercase tracking-wide">Annual Cost</span>
                       </div>
-                      <p className="text-3xl font-bold text-foreground">{analysis.financialSummary.annualCost}</p>
+                      <p className="text-3xl font-bold text-foreground">{reportValue(analysis.financialSummary.annualCost)}</p>
                     </div>
                   )}
                 </div>
@@ -639,7 +640,7 @@ export default function LeaseAnalyzerPage() {
                                 )}
                               </div>
                               {typeof flag !== 'string' && flag.description && (
-                                <p className="text-foreground/70">{flag.description}</p>
+                                <p className="text-foreground/70">{reportValue(flag.description)}</p>
                               )}
                             </div>
                           </div>
@@ -668,7 +669,7 @@ export default function LeaseAnalyzerPage() {
                           <DollarSign size={16} className="text-primary" strokeWidth={2} />
                           <span className="text-sm font-medium text-foreground/60 uppercase">Monthly Rent</span>
                         </div>
-                        <p className="text-foreground font-semibold">{analysis.keyTerms.monthlyRent}</p>
+                        <p className="text-foreground font-semibold">{reportValue(analysis.keyTerms.monthlyRent)}</p>
                       </div>
                     )}
                     {analysis.keyTerms.securityDeposit && (
@@ -677,7 +678,7 @@ export default function LeaseAnalyzerPage() {
                           <Shield size={16} className="text-primary" strokeWidth={2} />
                           <span className="text-sm font-medium text-foreground/60 uppercase">Security Deposit</span>
                         </div>
-                        <p className="text-foreground font-semibold">{analysis.keyTerms.securityDeposit}</p>
+                        <p className="text-foreground font-semibold">{reportValue(analysis.keyTerms.securityDeposit)}</p>
                       </div>
                     )}
                     {analysis.keyTerms.leaseTerm && (
@@ -686,7 +687,7 @@ export default function LeaseAnalyzerPage() {
                           <Clock size={16} className="text-primary" strokeWidth={2} />
                           <span className="text-sm font-medium text-foreground/60 uppercase">Lease Term</span>
                         </div>
-                        <p className="text-foreground font-semibold">{analysis.keyTerms.leaseTerm}</p>
+                        <p className="text-foreground font-semibold">{reportValue(analysis.keyTerms.leaseTerm)}</p>
                       </div>
                     )}
                     {analysis.keyTerms.lateFee && (
@@ -695,7 +696,7 @@ export default function LeaseAnalyzerPage() {
                           <AlertCircle size={16} className="text-amber-500" strokeWidth={2} />
                           <span className="text-sm font-medium text-foreground/60 uppercase">Late Fee</span>
                         </div>
-                        <p className="text-foreground font-semibold">{analysis.keyTerms.lateFee}</p>
+                        <p className="text-foreground font-semibold">{reportValue(analysis.keyTerms.lateFee)}</p>
                       </div>
                     )}
                     {analysis.keyTerms.petPolicy && (
@@ -704,7 +705,7 @@ export default function LeaseAnalyzerPage() {
                           <Home size={16} className="text-primary" strokeWidth={2} />
                           <span className="text-sm font-medium text-foreground/60 uppercase">Pet Policy</span>
                         </div>
-                        <p className="text-foreground font-semibold">{analysis.keyTerms.petPolicy}</p>
+                        <p className="text-foreground font-semibold">{reportValue(analysis.keyTerms.petPolicy)}</p>
                       </div>
                     )}
                     {analysis.keyTerms.utilities && (
@@ -713,7 +714,7 @@ export default function LeaseAnalyzerPage() {
                           <Home size={16} className="text-primary" strokeWidth={2} />
                           <span className="text-sm font-medium text-foreground/60 uppercase">Utilities</span>
                         </div>
-                        <p className="text-foreground font-semibold">{analysis.keyTerms.utilities}</p>
+                        <p className="text-foreground font-semibold">{reportValue(analysis.keyTerms.utilities)}</p>
                       </div>
                     )}
                     {analysis.keyTerms.parking && (
@@ -722,7 +723,7 @@ export default function LeaseAnalyzerPage() {
                           <Home size={16} className="text-primary" strokeWidth={2} />
                           <span className="text-sm font-medium text-foreground/60 uppercase">Parking</span>
                         </div>
-                        <p className="text-foreground font-semibold">{analysis.keyTerms.parking}</p>
+                        <p className="text-foreground font-semibold">{reportValue(analysis.keyTerms.parking)}</p>
                       </div>
                     )}
                     {analysis.keyTerms.maintenanceResponsibility && (
@@ -731,7 +732,7 @@ export default function LeaseAnalyzerPage() {
                           <Home size={16} className="text-primary" strokeWidth={2} />
                           <span className="text-sm font-medium text-foreground/60 uppercase">Maintenance</span>
                         </div>
-                        <p className="text-foreground font-semibold">{analysis.keyTerms.maintenanceResponsibility}</p>
+                        <p className="text-foreground font-semibold">{reportValue(analysis.keyTerms.maintenanceResponsibility)}</p>
                       </div>
                     )}
                   </div>
@@ -753,9 +754,9 @@ export default function LeaseAnalyzerPage() {
                     {analysis.importantDates.map((item: any, index: number) => (
                       <div key={index} className="flex items-center gap-4 p-4 bg-card-alt rounded-xl">
                         <div className="px-3 py-1 bg-blue-100 rounded-lg">
-                          <span className="text-blue-700 font-semibold text-sm">{item.date}</span>
+                          <span className="text-blue-700 font-semibold text-sm">{reportValue(item.date)}</span>
                         </div>
-                        <p className="text-foreground">{item.description}</p>
+                        <p className="text-foreground">{reportValue(item.description)}</p>
                       </div>
                     ))}
                   </div>
@@ -779,7 +780,7 @@ export default function LeaseAnalyzerPage() {
                       {analysis.tenantRights.map((right: string, index: number) => (
                         <li key={index} className="flex items-start gap-3">
                           <CheckCircle size={18} className="text-green-600 flex-shrink-0 mt-0.5" strokeWidth={2} />
-                          <span className="text-foreground/80">{right}</span>
+                          <span className="text-foreground/80">{reportValue(right)}</span>
                         </li>
                       ))}
                     </ul>
@@ -801,7 +802,7 @@ export default function LeaseAnalyzerPage() {
                       {analysis.landlordObligations.map((obligation: string, index: number) => (
                         <li key={index} className="flex items-start gap-3">
                           <CheckCircle size={18} className="text-blue-600 flex-shrink-0 mt-0.5" strokeWidth={2} />
-                          <span className="text-foreground/80">{obligation}</span>
+                          <span className="text-foreground/80">{reportValue(obligation)}</span>
                         </li>
                       ))}
                     </ul>
@@ -827,7 +828,7 @@ export default function LeaseAnalyzerPage() {
                     {analysis.terminationClauses.map((clause: string, index: number) => (
                       <div key={index} className="flex items-start gap-3 p-4 bg-white rounded-xl border border-amber-100">
                         <AlertCircle size={18} className="text-amber-600 flex-shrink-0 mt-0.5" strokeWidth={2} />
-                        <span className="text-foreground/80">{clause}</span>
+                        <span className="text-foreground/80">{reportValue(clause)}</span>
                       </div>
                     ))}
                   </div>
@@ -854,7 +855,7 @@ export default function LeaseAnalyzerPage() {
                         <span className="flex-shrink-0 w-6 h-6 bg-primary text-white rounded-full flex items-center justify-center text-sm font-semibold">
                           {index + 1}
                         </span>
-                        <span className="text-foreground/80">{rec}</span>
+                        <span className="text-foreground/80">{reportValue(rec)}</span>
                       </div>
                     ))}
                   </div>
@@ -875,7 +876,7 @@ export default function LeaseAnalyzerPage() {
               {analysis.fullText && (
                 <details className="bg-card-alt rounded-2xl border border-border">
                   <summary className="p-4 cursor-pointer text-sm text-foreground/60 hover:text-foreground">
-                    Debug: View extracted text ({analysis.fullText.length} characters)
+                    View extracted document text ({analysis.fullText.length} characters)
                   </summary>
                   <div className="p-4 pt-0">
                     <pre className="text-xs text-foreground/50 whitespace-pre-wrap max-h-64 overflow-auto bg-card p-4 rounded-xl">

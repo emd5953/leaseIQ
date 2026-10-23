@@ -40,19 +40,18 @@ export default function DashboardPage() {
     }
   }, [user, authLoading, router])
 
-  // Load data only once per tab, not on every tab change
+  // Fetch on tab entry so each view reflects the account, including another device's changes.
   useEffect(() => {
-    if (user) {
-      // Only load if we don't have data for this tab yet
-      if ((activeTab === 'tracker' || activeTab === 'saved') && savedListings.length === 0) {
-        loadData()
-      } else if (activeTab === 'alerts' && savedSearches.length === 0) {
-        loadData()
-      } else if (activeTab === 'preferences' && !preferencesLoaded) {
-        loadData()
-      }
-    }
-  }, [user, activeTab, preferencesLoaded])
+    if (user) loadData()
+  }, [user, activeTab])
+
+  const switchTab = (tab: TabType) => {
+    if (tab === activeTab) return
+    setError(null)
+    setNotice(null)
+    setIsLoading(true)
+    setActiveTab(tab)
+  }
 
   const loadData = async () => {
     setIsLoading(true)
@@ -166,7 +165,7 @@ export default function DashboardPage() {
           {/* Tabs */}
           <div className="flex gap-4 mb-8 overflow-x-auto border-b border-border">
             <button
-              onClick={() => setActiveTab('tracker')}
+              onClick={() => switchTab('tracker')}
               className={`flex shrink-0 items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
                 activeTab === 'tracker'
                   ? 'border-primary text-primary'
@@ -177,7 +176,7 @@ export default function DashboardPage() {
               My Apartment
             </button>
             <button
-              onClick={() => setActiveTab('saved')}
+              onClick={() => switchTab('saved')}
               className={`flex shrink-0 items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
                 activeTab === 'saved'
                   ? 'border-primary text-primary'
@@ -188,7 +187,7 @@ export default function DashboardPage() {
               Saved Listings
             </button>
             <button
-              onClick={() => setActiveTab('alerts')}
+              onClick={() => switchTab('alerts')}
               className={`flex shrink-0 items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
                 activeTab === 'alerts'
                   ? 'border-primary text-primary'
@@ -199,7 +198,7 @@ export default function DashboardPage() {
               Search Alerts
             </button>
             <button
-              onClick={() => setActiveTab('preferences')}
+              onClick={() => switchTab('preferences')}
               className={`flex shrink-0 items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
                 activeTab === 'preferences'
                   ? 'border-primary text-primary'
