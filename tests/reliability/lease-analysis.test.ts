@@ -23,3 +23,21 @@ describe('Evidence-based lease extraction', () => {
     await expect(LeaseService.analyzeLease('test lease')).rejects.toThrow('temporarily unavailable');
   });
 });
+
+describe('Structured model values from the real upload regression', () => {
+  it('renders structured utilities, financial amounts and narrative items as readable text', async () => {
+    complete.mockResolvedValue({ choices: [{ message: { content: JSON.stringify({
+      summary: 'Fictional lease', keyTerms: { utilities: { heat: 'included', hotWater: 'included', electricity: 'tenant', internet: 'tenant' }, monthlyRent: 3200, parking: null },
+      financialSummary: { totalMoveInCost: { rent: 3200, deposit: 3200, total: 6400 } },
+      tenantRights: [{ entry: '24 hours notice' }], redFlags: [null, { title: 'Review', description: { clause: 'Example' }, severity: 'medium' }],
+    }) } }] });
+    const result = await LeaseService.analyzeLease('fictional lease');
+    expect(result.keyTerms.utilities).toBe('heat: included; hot Water: included; electricity: tenant; internet: tenant');
+    expect(result.keyTerms.monthlyRent).toBe('3200');
+    expect(result.keyTerms.parking).toBe('Not specified');
+    expect(result.financialSummary.totalMoveInCost).toContain('total: 6400');
+    expect(result.tenantRights).toEqual(['entry: 24 hours notice']);
+    expect(result.redFlags).toHaveLength(1);
+    expect(result.redFlags[0].description).toBe('clause: Example');
+  });
+});
