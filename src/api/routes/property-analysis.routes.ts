@@ -1,3 +1,4 @@
+import { ownReportEmail, uploadError } from '../middleware/uploads';
 /**
  * Property Analysis API Routes
  * 
@@ -27,6 +28,7 @@ const upload = multer({
   fileFilter: (req, file, cb) => {
     const allowedTypes = [
       'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'image/png',
       'image/jpeg',
       'image/jpg',
@@ -34,10 +36,11 @@ const upload = multer({
       'image/gif',
     ];
     
-    if (allowedTypes.includes(file.mimetype)) {
+    const isLease = file.fieldname === 'lease';
+    if (allowedTypes.includes(file.mimetype) && (isLease ? ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'].includes(file.mimetype) : file.mimetype.startsWith('image/'))) {
       cb(null, true);
     } else {
-      cb(new Error('Invalid file type. Only PDF and image files are allowed.'));
+      cb(new Error('Invalid file type. Use PDF or DOCX for a lease, and PNG, JPEG, WebP or GIF for a floor plan.'));
     }
   },
 });
@@ -51,10 +54,10 @@ const upload = multer({
 router.post('/analyze', upload.fields([
   { name: 'lease', maxCount: 1 },
   { name: 'floorplan', maxCount: 1 },
-]), async (req: AuthRequest, res: Response) => {
+]), ownReportEmail, async (req: AuthRequest, res: Response) => {
   try {
-    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
-    const { email, sendEmail } = req.body;
+    const files = (req.files || {}) as { [fieldname: string]: Express.Multer.File[] };
+    const { email, sendEmail } = req.body || {};
 
     if (!files.lease && !files.floorplan) {
       return res.status(400).json({
@@ -94,20 +97,16 @@ router.post('/analyze', upload.fields([
     res.json({
       success: true,
       analysis: {
-        lease: analysis.lease ? {
-          summary: analysis.lease.summary,
-          redFlags: analysis.lease.redFlags,
-          keyTerms: analysis.lease.keyTerms,
-        } : undefined,
+        lease: analysis.lease,
         floorPlan: analysis.floorPlan,
       },
       emailSent: analysis.emailSent,
     });
   } catch (error) {
     console.error('Property analysis error:', error);
-    res.status(500).json({
+    res.status(502).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to analyze property',
+      error: 'Document analysis is temporarily unavailable. Please retry.',
     });
   }
 });
@@ -117,7 +116,7 @@ router.post('/analyze', upload.fields([
  * 
  * Analyze only the lease PDF
  */
-router.post('/analyze-lease-only', upload.single('lease'), async (req: AuthRequest, res: Response) => {
+router.post('/analyze-lease-only', upload.single('lease'), ownReportEmail, async (req: AuthRequest, res: Response) => {
   try {
     if (!req.file) {
       return res.status(400).json({
@@ -126,27 +125,24 @@ router.post('/analyze-lease-only', upload.single('lease'), async (req: AuthReque
       });
     }
 
-    const { email, sendEmail } = req.body;
+    const { email, sendEmail } = req.body || {};
     const analysis = await LeaseService.analyzeLeasePDF(req.file.buffer, req.file.originalname);
 
-    if (sendEmail && email) {
-      await LeaseService.sendLeaseAnalysis(email, analysis);
+    let emailSent = false;
+    if ((sendEmail === 'true' || sendEmail === true) && email) {
+      emailSent = (await LeaseService.sendLeaseAnalysis(email, analysis)).success;
     }
 
     res.json({
       success: true,
-      analysis: {
-        summary: analysis.summary,
-        redFlags: analysis.redFlags,
-        keyTerms: analysis.keyTerms,
-      },
-      emailSent: sendEmail && email ? true : false,
+      analysis,
+      emailSent,
     });
   } catch (error) {
     console.error('Lease analysis error:', error);
-    res.status(500).json({
+    res.status(502).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to analyze lease',
+      error: 'Document analysis is temporarily unavailable. Please retry.',
     });
   }
 });
@@ -156,7 +152,7 @@ router.post('/analyze-lease-only', upload.single('lease'), async (req: AuthReque
  * 
  * Analyze only the floor plan image
  */
-router.post('/analyze-floorplan-only', upload.single('floorplan'), async (req: AuthRequest, res: Response) => {
+router.post('/analyze-floorplan-only', upload.single('floorplan'), ownReportEmail, async (req: AuthRequest, res: Response) => {
   try {
     if (!req.file) {
       return res.status(400).json({
@@ -172,7 +168,7 @@ router.post('/analyze-floorplan-only', upload.single('floorplan'), async (req: A
       });
     }
 
-    const { email, sendEmail } = req.body;
+    const { email, sendEmail } = req.body || {};
 
     const analysis = await FloorPlanService.analyzeFloorPlan(
       req.file.buffer,
@@ -197,9 +193,9 @@ router.post('/analyze-floorplan-only', upload.single('floorplan'), async (req: A
     });
   } catch (error) {
     console.error('Floor plan analysis error:', error);
-    res.status(500).json({
+    res.status(502).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to analyze floor plan',
+      error: 'Document analysis is temporarily unavailable. Please retry.',
     });
   }
 });
@@ -225,6 +221,7 @@ router.get('/status', async (req: AuthRequest, res: Response) => {
   });
 });
 
+router.use(uploadError);
 export default router;
 
 /**

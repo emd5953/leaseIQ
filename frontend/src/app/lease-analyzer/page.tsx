@@ -10,18 +10,12 @@ import {
   Image, LayoutGrid, Star, Maximize, Lightbulb
 } from 'lucide-react'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
-
-const ANALYSIS_STEPS = [
-  { label: 'Uploading document', duration: 1500 },
-  { label: 'Extracting text from PDF', duration: 2500 },
-  { label: 'Analyzing lease terms', duration: 3000 },
-  { label: 'Identifying red flags', duration: 2000 },
-  { label: 'Calculating financials', duration: 1500 },
-  { label: 'Generating recommendations', duration: 2000 },
-]
+import { api } from '@/lib/api'
+import { useAuth } from '@/contexts/AuthContext'
 
 export default function LeaseAnalyzerPage() {
+  const { user } = useAuth()
+  const [emailNotice, setEmailNotice] = useState<string | null>(null)
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [analysis, setAnalysis] = useState<any>(null)
@@ -31,8 +25,6 @@ export default function LeaseAnalyzerPage() {
   const [floorPlanPreview, setFloorPlanPreview] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [isDraggingFloorPlan, setIsDraggingFloorPlan] = useState(false)
-  const [progress, setProgress] = useState(0)
-  const [currentStep, setCurrentStep] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const floorPlanInputRef = useRef<HTMLInputElement>(null)
 
@@ -98,63 +90,14 @@ export default function LeaseAnalyzerPage() {
     try {
       setLoading(true)
       setError(null)
-      setProgress(0)
-      setCurrentStep(0)
-
-      // Start progress simulation
-      let stepIndex = 0
-      const progressInterval = setInterval(() => {
-        if (stepIndex < ANALYSIS_STEPS.length) {
-          setCurrentStep(stepIndex)
-          const progressPerStep = 100 / ANALYSIS_STEPS.length
-          const targetProgress = Math.min((stepIndex + 1) * progressPerStep, 95)
-          setProgress(prev => Math.min(prev + progressPerStep * 0.8, targetProgress))
-          stepIndex++
-        }
-      }, 2000)
-
-      const formData = new FormData()
-      if (uploadedFile) formData.append('lease', uploadedFile)
-      if (floorPlanFile) formData.append('floorplan', floorPlanFile)
-      if (email) formData.append('email', email)
-      formData.append('sendEmail', email ? 'true' : 'false')
-
-      // Choose endpoint based on what's uploaded
-      let endpoint = `${API_URL}/api/property/analyze`
-      if (uploadedFile && !floorPlanFile) {
-        endpoint = `${API_URL}/api/lease/upload`
-        formData.delete('lease')
-        formData.append('file', uploadedFile)
-      } else if (!uploadedFile && floorPlanFile) {
-        endpoint = `${API_URL}/api/property/analyze-floorplan-only`
-      }
-
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        body: formData,
-      })
-
-      clearInterval(progressInterval)
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}))
-        throw new Error(data.error || 'Analysis failed')
-      }
-
-      setProgress(100)
-      setCurrentStep(ANALYSIS_STEPS.length - 1)
-      
-      const data = await response.json()
-      
-      // Small delay to show 100% before showing results
-      await new Promise(resolve => setTimeout(resolve, 500))
-      setAnalysis(data.analysis || data)
+      setEmailNotice(null)
+      const data = await api.uploadProperty(uploadedFile, floorPlanFile, email || undefined)
+      setAnalysis(data.analysis)
+      if (email) setEmailNotice(data.emailSent ? 'Report email sent.' : 'Analysis complete, but the report email could not be sent.')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to analyze')
     } finally {
       setLoading(false)
-      setProgress(0)
-      setCurrentStep(0)
     }
   }
 
@@ -187,7 +130,7 @@ export default function LeaseAnalyzerPage() {
           color: 'text-amber-600', 
           bg: 'bg-amber-50', 
           border: 'border-amber-200',
-          label: 'Standard Terms'
+          label: 'Review Terms'
         }
     }
   }
@@ -338,10 +281,11 @@ export default function LeaseAnalyzerPage() {
 
                 {/* Email */}
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
+                  <label htmlFor="report-email" className="block text-sm font-medium text-foreground mb-2">
                     Email (optional)
                   </label>
                   <input
+                    id="report-email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -349,7 +293,7 @@ export default function LeaseAnalyzerPage() {
                     className="w-full px-6 py-4 bg-card-alt rounded-full border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all duration-300"
                   />
                   <p className="text-sm text-foreground/60 mt-2">
-                    We'll send the analysis report to your email
+                    Use your signed-in email address for a copy of the report.
                   </p>
                 </div>
 
@@ -362,62 +306,25 @@ export default function LeaseAnalyzerPage() {
                   {loading ? 'Analyzing...' : uploadedFile && floorPlanFile ? 'Analyze Both' : 'Analyze'}
                 </button>
 
-                {/* Progress Indicator */}
                 {loading && (
-                  <div className="space-y-4 animate-in fade-in duration-300">
-                    <div className="relative">
-                      <div className="h-2 bg-card-alt rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
-                          style={{ width: `${progress}%` }}
-                        />
-                      </div>
-                      <div className="flex justify-between mt-2">
-                        <span className="text-sm text-foreground/60">
-                          {ANALYSIS_STEPS[currentStep]?.label || 'Processing...'}
-                        </span>
-                        <span className="text-sm font-medium text-primary">
-                          {Math.round(progress)}%
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <div className="flex flex-wrap gap-2">
-                      {ANALYSIS_STEPS.map((step, index) => (
-                        <div 
-                          key={index}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition-all duration-300 ${
-                            index < currentStep 
-                              ? 'bg-primary/20 text-primary' 
-                              : index === currentStep 
-                                ? 'bg-primary text-white' 
-                                : 'bg-card-alt text-foreground/40'
-                          }`}
-                        >
-                          {index < currentStep ? (
-                            <CheckCircle size={12} strokeWidth={2} />
-                          ) : index === currentStep ? (
-                            <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          ) : (
-                            <div className="w-3 h-3 rounded-full border border-foreground/20" />
-                          )}
-                          <span className="hidden sm:inline">{step.label}</span>
-                          <span className="sm:hidden">Step {index + 1}</span>
-                        </div>
-                      ))}
-                    </div>
+                  <div role="status" className="flex items-center gap-3 text-sm text-muted-foreground">
+                    <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full motion-safe:animate-spin" />
+                    Reading and analyzing your documents. This may take a minute.
                   </div>
                 )}
+                {!user && <p className="text-sm text-muted-foreground">Sign in using the navigation to analyze your documents.</p>}
 
                 {error && (
                   <div className="bg-accent/10 rounded-2xl p-4 border border-accent/20">
-                    <p className="text-accent text-sm">{error}</p>
+                    <p role="alert" className="text-accent text-sm">{error}</p>
                   </div>
                 )}
               </div>
             </div>
           )}
 
+          {emailNotice && <p role="status" className="rounded-2xl border border-border p-4 mb-6">{emailNotice}</p>}
+          {analysis?.limitations?.map((note: string) => <p key={note} role="note" className="rounded-2xl bg-amber-50 text-amber-900 p-4 mb-4">{note}</p>)}
           {/* Analysis Results */}
           {analysis && (
             <div className="space-y-6">

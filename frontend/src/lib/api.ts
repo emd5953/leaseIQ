@@ -62,6 +62,30 @@ export interface SavedSearch {
 }
 
 export const api = {
+  async uploadProperty(lease: File | null, floorplan: File | null, email?: string) {
+    if (!lease && !floorplan) throw new Error('Choose a lease document or floor plan first.')
+    const headers = getAuthHeaders()
+    if (!('Authorization' in headers)) throw new Error('Sign in to analyze your documents.')
+    const form = new FormData()
+    let endpoint = '/api/property/analyze'
+    if (lease && !floorplan) {
+      endpoint = '/api/lease/upload'
+      form.append('file', lease)
+    } else {
+      if (lease) form.append('lease', lease)
+      if (floorplan) form.append('floorplan', floorplan)
+      if (!lease) endpoint = '/api/property/analyze-floorplan-only'
+    }
+    if (email) form.append('email', email)
+    form.append('sendEmail', email ? 'true' : 'false')
+    const response = await fetch(`${API_URL}${endpoint}`, { method: 'POST', headers, body: form })
+    if (response.status === 401) throw new Error('Your session expired. Sign in again to analyze your documents.')
+    const data = await readResponse(response, 'Document analysis is temporarily unavailable. Please retry.')
+    if (!data.analysis || data.success === false) throw new Error(data.error || 'Analysis returned incomplete results. Please retry.')
+    const analysis = data.analysis.lease ? { ...data.analysis.lease, floorPlan: data.analysis.floorPlan } : data.analysis
+    return { ...data, analysis }
+  },
+
   // Cache for saved listings to avoid repeated API calls
   _savedListingsCache: null as Set<string> | null,
   _savedListingsCacheTime: 0,
@@ -273,7 +297,8 @@ export const api = {
       method: 'POST',
       headers: { ...getAuthHeaders() },
     })
-    if (!response.ok) throw new Error('Failed to send test alert')
-    return response.json()
+    const result = await readResponse(response, 'Failed to send test alert. Please retry.')
+    if (!result.success) throw new Error(result.error || 'The test email was not sent.')
+    return result
   },
 }

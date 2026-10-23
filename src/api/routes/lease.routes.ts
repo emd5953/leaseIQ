@@ -1,3 +1,4 @@
+import { ownReportEmail, uploadError } from '../middleware/uploads';
 import { Router, Response } from 'express';
 import multer from 'multer';
 import { LeaseService } from '../../services/lease.service';
@@ -36,8 +37,8 @@ router.post('/debug-extract', upload.single('file'), async (req: AuthRequest, re
     console.log(`[LeaseRoute] Debug extract: ${req.file.originalname}, size: ${req.file.size} bytes`);
 
     const text = await LeaseService.parseLeasePDF(req.file.buffer, req.file.originalname);
-    
-    res.json({ 
+
+    res.json({
       success: true,
       fileName: req.file.originalname,
       fileSize: req.file.size,
@@ -47,8 +48,8 @@ router.post('/debug-extract', upload.single('file'), async (req: AuthRequest, re
     });
   } catch (error) {
     console.error('Debug extract error:', error);
-    res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Failed to extract text' 
+    res.status(500).json({
+      error: error instanceof Error ? error.message : 'Failed to extract text'
     });
   }
 });
@@ -57,14 +58,14 @@ router.post('/debug-extract', upload.single('file'), async (req: AuthRequest, re
  * POST /api/lease/upload
  * Upload and analyze a lease PDF/DOCX
  */
-router.post('/upload', upload.single('file'), validateEmail, async (req: AuthRequest, res: Response) => {
+router.post('/upload', upload.single('file'), validateEmail, ownReportEmail, async (req: AuthRequest, res: Response) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
     const { email } = req.body;
-    
+
     console.log(`[LeaseRoute] Received file: ${req.file.originalname}, size: ${req.file.size} bytes, type: ${req.file.mimetype}`);
 
     // Parse PDF and analyze
@@ -94,10 +95,11 @@ router.post('/upload', upload.single('file'), validateEmail, async (req: AuthReq
     res.json({ analysis, emailSent: !!email });
   } catch (error) {
     console.error('Lease upload error:', error);
-    res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Failed to process uploaded file' 
+    res.status(502).json({
+      error: 'Document analysis is temporarily unavailable. Please retry.'
     });
   }
 });
 
+router.use(uploadError);
 export default router;
