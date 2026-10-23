@@ -1,0 +1,10 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>LeaseIQ local QA</title>
+<style>body{font:18px system-ui;max-width:760px;margin:70px auto;padding:24px;background:#f7f7f2;color:#183b30}h1{font:48px Georgia}button,a{display:inline-block;margin:8px;padding:12px;border-radius:8px}button{cursor:pointer}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:white;padding:20px}</style>
+<h1>LeaseIQ · local QA</h1><p>Isolated test accounts and fictional listings. Email stays in the local outbox. Lease analysis uses a labeled fixture; no external OCR or AI runs.</p>
+<button data-email="alice@local.invalid">Sign in as Alice</button><button data-email="bob@local.invalid">Sign in as Bob</button>
+<p><a href="/synthetic-test-lease.pdf" download>Download fictional test lease</a><a href="/dashboard">Dashboard</a><a href="/search">Rentals</a><a href="/lease-analyzer">Lease analyzer</a></p>
+<button id="refresh">Refresh local outbox</button><p id="status" role="status"></p><pre id="outbox">No messages loaded.</pre>
+<script>
+for(const button of document.querySelectorAll('[data-email]'))button.onclick=async()=>{try{const response=await fetch('/api/local/session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:button.dataset.email})});const result=await response.json();if(!response.ok)throw Error(result.error);localStorage.setItem('leaseiq_token',result.token);localStorage.setItem('leaseiq_user',JSON.stringify(result.user));location.href='/dashboard'}catch(error){document.querySelector('#status').textContent=error.message}};
+document.querySelector('#refresh').onclick=async()=>{const response=await fetch('/api/local/outbox');const messages=await response.json();document.querySelector('#status').textContent=`${messages.length} locally captured message(s). Nothing sent externally.`;document.querySelector('#outbox').textContent=JSON.stringify(messages,null,2)};
+</script></html>

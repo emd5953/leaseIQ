@@ -1,0 +1,29 @@
+# A local-only QA image. Production uses src/server.ts, never this harness.
+FROM node:22-bookworm-slim AS backend
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+CMD ["./node_modules/.bin/tsx", "scripts/local/server.ts"]
+
+FROM mongo:7.0 AS mongo-binary
+FROM backend AS tests
+RUN apt-get update && apt-get install -y --no-install-recommends libcurl4 libgssapi-krb5-2 libsasl2-2 && rm -rf /var/lib/apt/lists/*
+COPY --from=mongo-binary /usr/bin/mongod /usr/local/bin/mongod
+RUN mongod --version
+ENV MONGOMS_VERSION=7.0.0 MONGOMS_SYSTEM_BINARY=/usr/local/bin/mongod MONGOMS_SYSTEM_BINARY_VERSION_CHECK=false
+CMD ["npm", "test"]
+
+FROM node:22-bookworm-slim AS frontend
+WORKDIR /app/frontend
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+COPY frontend/ ./
+COPY src/research/types.ts /app/src/research/types.ts
+# These files only exist in this local image, never in the deployed frontend.
+COPY scripts/local/local-test.html public/local-test.html
+COPY scripts/local/synthetic-test-lease.pdf public/synthetic-test-lease.pdf
+ENV API_INTERNAL_URL=http://api:3001 NEXT_TELEMETRY_DISABLED=1
+RUN npm run build
+CMD ["npm", "start"]
