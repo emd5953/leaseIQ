@@ -78,11 +78,12 @@ describe('Ingestion to MongoDB to search', () => {
     expect(await Listing.countDocuments({})).toBe(1);
     expect((await Listing.findById(id))?.price.amount).toBe(4000);
   });
-  it('bases expiry on source evidence even after a maintenance update', async () => {
+  it('counts stale evidence without hiding an unverified listing after a maintenance update', async () => {
     const id = await storage.insertListing(await normalized('old', {}, new Date('2020-01-01')), null);
     await Listing.findByIdAndUpdate(id, { description: 'Maintenance edit today' });
-    expect(await storage.markStaleListingsInactive(3)).toBe(1);
-    expect((await Listing.findById(id))!.isActive).toBe(false);
+    expect(await storage.countStaleListings(3)).toBe(1);
+    expect((await Listing.findById(id))!.isActive).toBe(true);
+    expect((await SearchService.getListingById(id)).freshness).toBe('stale');
   });
   it('blocks retired source IDs even after a conflict has been resolved', async () => {
     const data = await normalized('retired');
@@ -108,6 +109,76 @@ describe('Ingestion to MongoDB to search', () => {
     await Listing.findByIdAndUpdate(id, { listingScope: 'unit', duplicateOf: 'historical-owner', 'price.status': 'unknown' });
     await expect(storage.updateListing(id, data, null)).rejects.toThrow('historical duplicate');
   });
+  it('deduplicates canonical detail URLs even when extraction IDs change, including concurrent imports', async () => {
+    const first = await normalized('url-first');
+    const second = { ...await normalized('url-second'), sourceUrl: first.sourceUrl + '?utm_source=feed' };
+    const ids = await Promise.all([storage.insertListing(first, null), storage.insertListing(second, null)]);
+    expect(ids[0]).toBe(ids[1]);
+    expect(await Listing.countDocuments()).toBe(1);
+  });
+  it('deduplicates concurrent observations of one explicit unit across sources', async () => {
+    const first = await normalized('unit-race');
+    const second = { ...await normalized('unit-race-other'), source: ListingSource.ZILLOW, sourceUrl: 'https://www.zillow.com/homedetails/unit-race' };
+    const ids = await Promise.all([storage.insertListing(first, null), storage.insertListing(second, null)]);
+    expect(new Set(ids).size).toBe(1);
+    expect(await Listing.countDocuments()).toBe(1);
+  });
+  it('quarantines reused source identity instead of overwriting a different unit', async () => {
+    const first = await normalized('reused', {}, new Date('2026-01-01'));
+    const id = await storage.insertListing(first, null);
+    await expect(storage.updateListing(id, await normalized('reused', { address: '230 West 55th St #9C, Manhattan, NY 10019', price: 9999 }), null)).rejects.toThrow('identity changed');
+    const result = await SearchService.getListingById(id);
+    expect(result.price).toBe(4000);
+    expect(result.addressDetails.unit).toBe('8B');
+    expect(result.sourceIdentityNeedsReview).toBe(true);
+    expect(result.verificationState).toBe('unverified');
+    // A renamed extraction ID cannot bypass the same listing's quarantine.
+    await expect(storage.insertListing({ ...first, sourceId: 'renamed-reused', scrapedAt: new Date() }, null)).rejects.toThrow('quarantined');
+  });
+  it('refuses imports when legacy records share a detail URL', async () => {
+    const first = await normalized('legacy-a');
+    const id = await storage.insertListing(first, null);
+    const original = await Listing.findById(id).lean();
+    const { _id, sourceKeys, ...copy } = original!;
+    await Listing.collection.insertOne({ ...copy, sources: [{ ...original!.sources[0], sourceId: 'legacy-b' }] });
+    await expect(storage.insertListing({ ...first, sourceId: 'new-extraction-id' }, null)).rejects.toThrow('Multiple records');
+    expect(await Listing.countDocuments()).toBe(2);
+  });
+  it('keeps missing-rent listings visible and stores their observed quote without a fake price', async () => {
+    const id = await storage.insertListing(await normalized('quote', { price: '$2,500–$4,000' }), null);
+    const result = await SearchService.getListingById(id);
+    expect(result).toMatchObject({ price: null, rentNeedsReview: true, isActive: true, verificationState: 'unverified' });
+    expect(result.rentEvidence.raw).toBe('$2,500–$4,000');
+  });
+  it('imports building ranges separately and clears an outdated range when a later extraction is missing', async () => {
+    const first = await normalized('range', { listingScope: 'building', price: 2500, rentMinimum: 2500, rentMaximum: 4800 }, new Date('2026-01-01'));
+    const id = await storage.insertListing(first, null);
+    expect(await SearchService.getListingById(id)).toMatchObject({ price: null, listingScope: 'building', buildingRent: { minimum: 2500, maximum: 4800 } });
+    await storage.updateListing(id, await normalized('range', { listingScope: 'building', price: null }), null);
+    const current = await SearchService.getListingById(id);
+    expect(current.price).toBeNull();
+    expect(current.buildingRent).toBeUndefined();
+  });
+  it('replaces a prior building range with explicit contact pricing without retaining old bounds', async () => {
+    const first = await normalized('contact-refresh', { listingScope: 'building', rentMinimum: 2500, rentMaximum: 4800 }, new Date('2026-01-01'));
+    const id = await storage.insertListing(first, null);
+    await storage.updateListing(id, await normalized('contact-refresh', { listingScope: 'building', contactForPrice: true, price: null }), null);
+    const result = await SearchService.getListingById(id);
+    expect(result.buildingRent).toMatchObject({ status: 'contact', minimum: null, maximum: null });
+    expect(result.price).toBeNull();
+    expect(result.rentEvidence.raw).toBeNull();
+  });
+  it('filters monthly unit budgets and sorts mixed periods by monthly equivalent with unknowns last', async () => {
+    await storage.insertListing(await normalized('monthly-sort', { address: '101 Main St #1, Manhattan, NY 10019', price: 2800 }), null);
+    await storage.insertListing(await normalized('weekly-sort', { address: '102 Main St #1, Manhattan, NY 10019', price: '$800/week' }), null);
+    await storage.insertListing(await normalized('unknown-sort', { address: '103 Main St #1, Manhattan, NY 10019', price: null }), null);
+    const bounded = await SearchService.search({ q: 'Main St', maxPrice: 3000 }, { limit: 19 });
+    expect(bounded.listings.map(l => l.price)).toEqual([2800]);
+    const sorted = await SearchService.search({ q: 'Main St' }, { sortBy: 'price', sortOrder: 'asc', limit: 19 });
+    expect(sorted.listings.map(l => l.price)).toEqual([2800, 800, null]);
+    const descending = await SearchService.search({ q: 'Main St' }, { sortBy: 'price', sortOrder: 'desc', limit: 19 });
+    expect(descending.listings.map(l => l.price)).toEqual([800, 2800, null]);
+  });
   it('passes exact studio, fee, and search text filters through to MongoDB', async () => {
     await storage.insertListing(await normalized('studio', { brokerFee: 'No fee' }), null);
     await storage.insertListing(await normalized('one-bed', { bedrooms: 1, address: '231 West 55th St #8B, Manhattan, NY 10019' }), null);
@@ -124,8 +195,8 @@ describe('Normalization and honest presentation', () => {
     expect((await normalized('pets2', { petPolicy: 'Ask management' })).petPolicy?.allowed).toBeNull();
     expect((await normalized('pets3', { petPolicy: null })).petPolicy).toBeNull();
   });
-  it('rejects missing rent and preserves unknown utility values including text false', async () => {
-    await expect(normalized('missing', { price: null })).rejects.toThrow('positive rent');
+  it('preserves missing rent as unknown and preserves unknown utility values including text false', async () => {
+    expect((await normalized('missing', { price: null })).price).toMatchObject({ amount: null, status: 'unknown' });
     const listing = await normalized('utilities', { utilities: { water: true, gas: 'false' } });
     expect(listing.utilities).toMatchObject({ water: true, gas: null, electric: null });
   });

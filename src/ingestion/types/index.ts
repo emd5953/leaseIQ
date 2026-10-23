@@ -34,6 +34,13 @@ export interface ParsedListing {
   sourceId: string;
   address: string | null;
   price: number | null;
+  rawPrice?: unknown;
+  pricePeriod?: unknown;
+  priceCurrency?: unknown;
+  listingScope?: 'unit' | 'building';
+  rentMinimum?: number | null;
+  rentMaximum?: number | null;
+  contactForPrice?: boolean;
   bedrooms: number | null;
   bathrooms: number | null;
   squareFeet: number | null;
@@ -77,7 +84,8 @@ export interface Address {
 }
 
 export interface Price {
-  amount: number;
+  amount: number | null;
+  status?: 'known' | 'unknown' | 'building';
   currency: string;
   period: 'monthly' | 'weekly' | 'daily';
 }
@@ -107,6 +115,9 @@ export interface NormalizedListing {
   sourceId: string;
   address: Address;
   price: Price;
+  listingScope?: 'unit' | 'building';
+  buildingRent?: { status: 'range' | 'contact'; minimum: number | null; maximum: number | null; sourceUrl: string; observedAt: Date };
+  rentEvidence?: { raw: string | number | null; period: string; sourceUrl: string; observedAt: Date };
   bedrooms: number | null;
   bathrooms: number | null;
   squareFeet: number | null;
@@ -229,7 +240,13 @@ export const LISTING_EXTRACTION_SCHEMA = {
           listingId: { type: 'string' },
           listingUrl: { type: 'string' },
           address: { type: 'string' },
-          price: { type: 'number' },
+          price: { type: 'number', description: 'Exact gross unit rent only. Never use a building minimum, range or net-effective promotion.' },
+          pricePeriod: { type: 'string', enum: ['monthly', 'weekly', 'daily'] },
+          priceCurrency: { type: 'string', description: 'Reported currency, e.g. USD' },
+          listingScope: { type: 'string', enum: ['unit', 'building'] },
+          rentMinimum: { type: 'number', description: 'Building-wide advertised minimum; never a unit price' },
+          rentMaximum: { type: 'number', description: 'Building-wide advertised maximum' },
+          contactForPrice: { type: 'boolean' },
           bedrooms: { type: 'number' },
           bathrooms: { type: 'number' },
           squareFeet: { type: 'number' },

@@ -30,7 +30,8 @@
     "validate:research": "tsx scripts/validate-research.ts",
     "audit:listings": "tsx scripts/audit-listings.ts",
     "repair:listings": "tsx scripts/repair-listings.ts",
-    "verify:listings": "tsx scripts/verify-listings.ts"
+    "verify:listings": "tsx scripts/verify-listings.ts",
+    "validate:listing-flow": "tsx scripts/validate-listing-flow.ts"
   },
   "keywords": [
     "rental",

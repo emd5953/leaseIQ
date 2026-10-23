@@ -1,5 +1,6 @@
 /** Read-only audit. Never merges, deletes, or changes production records. */
 import 'dotenv/config';
+import { sourceDetailKey } from '../src/utils/source-identity';
 import mongoose from 'mongoose';
 import { splitUnit, unitAddressKey } from '../src/utils/address';
 
@@ -8,6 +9,7 @@ async function audit() {
   await mongoose.connect(process.env.MONGODB_URI, { autoIndex: false });
   const collection = mongoose.connection.collection('listings');
   const summary = { total: 0, legacyArea: 0, legacyCoordinates: 0, missingSourceDate: 0, stale: 0, missingUnit: 0, missingAddressKey: 0, unverifiedFee: 0, invalidRent: 0, unknownRent: 0, sourceIdentityNeedsReview: 0, buildingRentRanges: 0, contactForPrice: 0, historicalDuplicates: 0, sourceMismatches: 0 };
+  const urlOwners = new Map<string, Set<string>>();
   const sourceOwners = new Map<string, string[]>();
   for await (const listing of collection.find({})) {
     summary.total++;
@@ -29,6 +31,8 @@ async function audit() {
     for (const source of listing.sources || []) {
       const name = source.source || source.sourceName;
       if (!name || !source.sourceId) continue;
+      const urlKey = sourceDetailKey(name, source.sourceUrl || '');
+      if (urlKey) { const owners = urlOwners.get(urlKey) || new Set<string>(); owners.add(String(listing._id)); urlOwners.set(urlKey, owners); }
       const key = `${name}:${source.sourceId}`;
       const ids = sourceOwners.get(key) || [];
       if (!ids.includes(String(listing._id))) ids.push(String(listing._id));
@@ -36,7 +40,7 @@ async function audit() {
     }
   }
   const duplicateSources = [...sourceOwners].filter(([, ids]) => ids.length > 1).map(([sourceKey, listingIds]) => ({ sourceKey, listingIds }));
-  console.log(JSON.stringify({ auditedAt: new Date().toISOString(), readOnly: true, summary, duplicateSources, nextSteps: [
+  console.log(JSON.stringify({ auditedAt: new Date().toISOString(), readOnly: true, summary, duplicateSources, duplicateDetailUrls: [...urlOwners].filter(([, owners]) => owners.size > 1).map(([url, owners]) => ({ url, listingIds: [...owners] })), nextSteps: [
     'Review duplicate source IDs before merging. Keep the survivor ID used by saved listings and alert history; remap references before removing anything.',
     'Reimport source records to establish missing field observations. Do not backdate unknown fees or utility policies.',
     'Canonical reads support legacy squareFeet and coordinates. Missing unit identities cannot safely be inferred from price or location.',

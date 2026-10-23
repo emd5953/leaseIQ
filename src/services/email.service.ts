@@ -1,5 +1,7 @@
 import { Resend } from 'resend';
 import { config } from '../config';
+import { presentListing } from '../utils/listing-presentation';
+import { formatAdvertisedRent } from '../utils/rent';
 
 // Create the email client only when delivery is requested.
 const escapeHtml = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
@@ -130,25 +132,17 @@ export class EmailService {
   }
 
   private static generateAlertEmail(listings: any[], searchName: string): string {
-    const listingCards = listings
-      .map(
-        (listing) => `
-      <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
-        <h3 style="margin: 0 0 8px 0; color: #111827;">${listing.address.street}</h3>
-        <p style="margin: 4px 0; color: #6b7280;">${listing.address.neighborhood}, ${listing.address.city}</p>
-        <div style="margin: 12px 0;">
-          <span style="font-size: 24px; font-weight: bold; color: #059669;">$${listing.price.amount.toLocaleString()}/mo</span>
-        </div>
-        <div style="margin: 8px 0; color: #374151;">
-          <strong>${listing.bedrooms}</strong> bed • <strong>${listing.bathrooms}</strong> bath • <strong>${listing.squareFeet || 'N/A'}</strong> sqft
-        </div>
-        ${listing.petPolicy?.allowed ? '<p style="color: #059669; margin: 8px 0;">✓ Pets Allowed</p>' : ''}
-        ${listing.brokerFee?.required ? `<p style="color: #dc2626; margin: 8px 0;">⚠ Broker Fee: ${listing.brokerFee.amount || 'Required'}</p>` : '<p style="color: #059669; margin: 8px 0;">✓ No Fee</p>'}
-        <a href="${listing.sources[0]?.url || '#'}" style="display: inline-block; margin-top: 12px; padding: 8px 16px; background: #2563eb; color: white; text-decoration: none; border-radius: 6px;">View Listing</a>
-      </div>
-    `
-      )
-      .join('');
+    const listingCards = listings.map(raw => {
+      const listing = presentListing(raw);
+      return `<div style="border:1px solid #e6e2da;border-radius:12px;padding:20px;margin:16px 0">
+        <h3>${escapeHtml(listing.title)}</h3><p>${escapeHtml(listing.address)}</p>
+        <p style="font-size:24px;font-weight:600;color:#386552">${escapeHtml(formatAdvertisedRent(raw))}</p>
+        <p>${listing.listingScope === 'building' ? 'Building pricing · confirm an exact unit' : `${listing.bedrooms === 0 ? 'Studio' : listing.bedrooms == null ? 'Beds unknown' : `${listing.bedrooms} bed`} · ${listing.bathrooms == null ? 'Baths unknown' : `${listing.bathrooms} bath`}`}</p>
+        <p>${listing.noFee === true ? 'Listed no fee' : listing.noFee === false ? 'Broker fee reported; confirm terms' : 'Broker fee not reported'}</p>
+        <p>Source-reported information · confirm current rent and availability.<br>Last observed: ${escapeHtml(listing.lastSeenAt || 'Unknown')}${listing.freshness === 'stale' ? ' · stale' : ''}</p>
+        ${listing.sourceUrl ? `<a href="${escapeHtml(listing.sourceUrl)}">View original listing</a>` : '<p>Source link unavailable</p>'}
+      </div>`;
+    }).join('');
 
     return `
       <!DOCTYPE html>
@@ -163,14 +157,14 @@ export class EmailService {
             <p style="color: #6b7280; margin: 8px 0;">New listings matching your search</p>
           </div>
           
-          <h2 style="color: #111827; margin-bottom: 16px;">${searchName}</h2>
+          <h2 style="color: #111827; margin-bottom: 16px;">${escapeHtml(searchName)}</h2>
           <p style="color: #6b7280; margin-bottom: 24px;">We found ${listings.length} new listing${listings.length > 1 ? 's' : ''} that match your preferences.</p>
           
           ${listingCards}
           
           <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb; text-align: center; color: #6b7280; font-size: 14px;">
             <p>You're receiving this because you have an active saved search on LeaseIQ.</p>
-            <p><a href="#" style="color: #2563eb;">Manage your alerts</a> | <a href="#" style="color: #2563eb;">Unsubscribe</a></p>
+            <p><a href="${escapeHtml(config.frontend.url)}/dashboard" style="color: #2563eb;">Manage or disable your alerts</a></p>
           </div>
         </body>
       </html>
@@ -301,7 +295,7 @@ export class EmailService {
             <p style="color: #6b7280; margin: 0;">
               ${listing.bedrooms === 0 ? 'Studio' : `${listing.bedrooms} Bed`} • 
               ${listing.bathrooms} Bath • 
-              $${listing.price?.toLocaleString() || 'N/A'}/mo
+              ${escapeHtml(formatAdvertisedRent(listing))}
             </p>
           </div>
           

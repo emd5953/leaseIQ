@@ -360,7 +360,11 @@ describe('UserPreferences Model Property Tests', () => {
 
           // Test 5: Invalid move-in date range (latestMoveIn < earliestMoveIn)
           // Ensure laterDate is actually later than earlierDate
-          const [earliest, latest] = laterDate > earlierDate ? [earlierDate, laterDate] : [laterDate, earlierDate];
+          // Equal generated dates are valid; construct a strictly reversed pair
+          // without mutating generated values, including the maximum JS date.
+          const earlierTime = Math.min(+laterDate, +earlierDate);
+          const earliest = new Date(Math.min(earlierTime, 8640000000000000 - 1));
+          const latest = new Date(Math.max(+laterDate, +earlierDate, +earliest + 1));
           
           let dateError: Error | null = null;
           try {

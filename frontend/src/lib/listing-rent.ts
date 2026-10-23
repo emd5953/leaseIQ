@@ -6,5 +6,7 @@ export function rentLabel(listing: any): string {
       return rent.minimum === rent.maximum ? `From $${rent.minimum.toLocaleString()}` : `$${rent.minimum.toLocaleString()}–$${rent.maximum.toLocaleString()}`;
     }
   }
-  return listing.price == null ? 'Rent unknown' : `$${listing.price.toLocaleString()}`;
+  const price = typeof listing.price === 'object' ? listing.price?.amount : listing.price;
+  if (listing.duplicateOf || listing.listingScope === 'building' || ['unknown', 'building'].includes(listing.price?.status) || listing.price?.currency && listing.price.currency !== 'USD') return 'Rent unknown';
+  return typeof price === 'number' && Number.isFinite(price) && price > 0 ? `$${price.toLocaleString()}` : 'Rent unknown';
 }

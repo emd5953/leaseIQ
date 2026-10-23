@@ -50,6 +50,7 @@ export interface IListing extends Document {
   sourceKeys?: string[];
   sourceConflicts?: { sourceKey: string; source: IListingSource; quarantinedAt: Date; reason: string }[];
   rentReview?: { originalAmount: number; reason: string; reviewedAt: Date };
+  rentEvidence?: { raw: string | number | null; period: string; sourceUrl: string; observedAt: Date };
   listingScope?: 'building' | 'unit';
   buildingRent?: { status: 'range' | 'contact'; minimum: number | null; maximum: number | null; sourceUrl: string; observedAt: Date };
   sourceVerification?: any;
@@ -128,6 +129,7 @@ const listingSchema = new Schema<IListing>({
   sourceKeys: { type: [String], default: undefined },
   sourceConflicts: { type: [Schema.Types.Mixed], default: undefined },
   rentReview: { type: Schema.Types.Mixed, default: undefined },
+  rentEvidence: { type: Schema.Types.Mixed, default: undefined },
   listingScope: { type: String, enum: ['building', 'unit'] },
   buildingRent: { type: Schema.Types.Mixed, default: undefined },
   sourceVerification: { type: Schema.Types.Mixed, default: undefined },

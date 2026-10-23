@@ -1,4 +1,5 @@
 import { createHash } from 'crypto';
+import { sourceDetailKey } from '../../utils/source-identity';
 import { FirecrawlClient } from '../services/firecrawl.client';
 import { ListingSource, RawListing, ScrapeConfig } from '../types';
 
@@ -95,8 +96,8 @@ export abstract class AbstractListingScraper {
    */
   protected generateSourceId(listing: any): string {
     // Price changes must not change identity. A detail URL is the safest fallback.
-    const identity = listing.listingUrl || listing.address;
-    return createHash('sha256').update(String(identity).trim().toLowerCase()).digest('hex');
+    const identity = sourceDetailKey(this.getSource(), listing.listingUrl || '') || listing.address;
+    return createHash('sha256').update(String(identity).trim()).digest('hex');
   }
 
   /**

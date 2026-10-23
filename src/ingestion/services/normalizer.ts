@@ -1,5 +1,7 @@
 import { splitUnit } from '../../utils/address';
-import { ParsedListing, NormalizedListing, Address, Price, PetPolicy, BrokerFee } from '../types';
+import { parseRent } from '../../utils/rent';
+import { canonicalSourceUrl } from '../../utils/source-identity';
+import { ParsedListing, NormalizedListing, Address, PetPolicy, BrokerFee } from '../types';
 
 /**
  * Data normalizer that transforms parsed listings into unified schema
@@ -9,15 +11,27 @@ export class DataNormalizer {
    * Normalize parsed listing into unified schema
    */
   async normalize(parsed: ParsedListing): Promise<NormalizedListing> {
-    if (!parsed.address?.trim() || !parsed.sourceId?.trim() || !Number.isFinite(parsed.price) || (parsed.price ?? 0) <= 0) {
-      throw new Error('Import requires a street address, stable source ID, and positive rent.');
+    if (!parsed.address?.trim() || !parsed.sourceId?.trim() || !canonicalSourceUrl(parsed.source, parsed.sourceUrl)) {
+      throw new Error('Import requires a street address, stable source ID, and a URL on the named source.');
+    }
+    if (!Number.isFinite(+parsed.scrapedAt) || +parsed.scrapedAt > Date.now() + 60000) throw new Error('Invalid source observation date');
+    const price = parseRent(parsed.rawPrice === undefined ? parsed.price : parsed.rawPrice, parsed.pricePeriod, parsed.priceCurrency);
+    let buildingRent: NormalizedListing['buildingRent'];
+    if (parsed.listingScope === 'building') {
+      const low = parseRent(parsed.rentMinimum, parsed.pricePeriod, parsed.priceCurrency);
+      const high = parseRent(parsed.rentMaximum, parsed.pricePeriod, parsed.priceCurrency);
+      if (low.amount && high.amount && low.amount <= high.amount && low.period === 'monthly') buildingRent = { status: 'range', minimum: low.amount, maximum: high.amount, sourceUrl: parsed.sourceUrl, observedAt: parsed.scrapedAt };
+      else if (parsed.contactForPrice) buildingRent = { status: 'contact', minimum: null, maximum: null, sourceUrl: parsed.sourceUrl, observedAt: parsed.scrapedAt };
     }
     return {
       source: parsed.source,
       sourceUrl: parsed.sourceUrl,
       sourceId: parsed.sourceId,
       address: this.normalizeAddress(parsed.address),
-      price: this.normalizePrice(parsed.price),
+      price: parsed.listingScope === 'building' ? { ...price, amount: null, status: buildingRent ? 'building' : 'unknown' } : price,
+      listingScope: parsed.listingScope,
+      buildingRent,
+      rentEvidence: { raw: typeof parsed.rawPrice === 'string' || typeof parsed.rawPrice === 'number' ? parsed.rawPrice : parsed.price, period: String(parsed.pricePeriod || 'monthly (extraction default)'), sourceUrl: parsed.sourceUrl, observedAt: parsed.scrapedAt },
       bedrooms: parsed.bedrooms != null && Number.isInteger(parsed.bedrooms) && parsed.bedrooms >= 0 ? parsed.bedrooms : null,
       bathrooms: parsed.bathrooms != null && parsed.bathrooms > 0 ? parsed.bathrooms : null,
       squareFeet: parsed.squareFeet,
@@ -131,27 +145,6 @@ export class DataNormalizer {
 
     const zipNum = parseInt(zip);
     return nycZipRanges.some(range => zipNum >= range.min && zipNum <= range.max);
-  }
-
-  /**
-   * Standardize price format (convert to monthly USD)
-   */
-  private normalizePrice(price: number | null): Price {
-    if (!price) {
-      return {
-        amount: 0,
-        currency: 'USD',
-        period: 'monthly',
-      };
-    }
-
-    // Assume all prices are monthly by default
-    // In a real implementation, you'd detect weekly/daily and convert
-    return {
-      amount: price,
-      currency: 'USD',
-      period: 'monthly',
-    };
   }
 
   /**

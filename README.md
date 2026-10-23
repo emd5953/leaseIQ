@@ -52,12 +52,13 @@ npm --prefix frontend run build
 npm run test:reliability
 npm run validate:research       # live, read-only checks for three real properties
 npm run audit:listings          # read-only MongoDB audit; requires MONGODB_URI
+npm run validate:listing-flow   # replay live API observations in temporary MongoDB
 npm test                       # full unit, property, and reliability suite
 ```
 
 `RESEARCH_VALIDATION_OUTPUT=/tmp/leaseiq-reports npm run validate:research` also saves full dated JSON reports. Source failures or unmatched expected properties produce a nonzero exit status.
 
-The reliability suite exercises ingestion, storage, deduplication, source failure handling, report provenance, HTTP endpoints, search, and email rendering without sending email. The full suite passes 294 tests across 27 files, including the legacy account and listing suites. Database-backed property cases start with isolated data and use the original sample counts. See [validation evidence and remaining limitations](docs/RESEARCH_RELIABILITY.md) for exact results.
+The reliability suite exercises ingestion, storage, deduplication, source failure handling, report provenance, HTTP endpoints, search, and email rendering without sending email. The full suite passes 349 tests across 31 files, including the legacy account and listing suites. Database-backed property cases start with isolated data and use the original sample counts. See [validation evidence and remaining limitations](docs/RESEARCH_RELIABILITY.md) for exact results.
 
 ## Architecture
 
@@ -74,3 +75,9 @@ Street address + borough → exact active HPD building match
 The research path does not send public records to an LLM. Lease and floor-plan analysis retain the existing services. Ingestion and the API share one listing schema; the read boundary supports legacy area and source-date fields. New imports retain per-field observation dates and preserve missing values rather than inventing defaults.
 
 See [data flow, rollout, and validation notes](docs/RESEARCH_RELIABILITY.md) before running imports against an existing database.
+
+## Rental workspace
+
+Browse with compact filters, save rentals in this browser without an account, and compare up to three listings at `/shortlist`. Signed-in saves remain in the account dashboard. Source dates and identity warnings are shown separately; unknown rents stay visible. Budget filters apply to known monthly unit rents, while building ranges stay distinct.
+
+See [product audit, validation screenshots, and rollout limitations](docs/PRODUCT_POLISH.md).

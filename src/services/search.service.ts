@@ -2,6 +2,7 @@ import { NYC_CITIES } from '../utils/nyc';
 import { Listing } from '../models';
 import { presentListing } from '../utils/listing-presentation';
 import { buildListingQuery } from '../utils/queries';
+import { sourceDetailKey } from '../utils/source-identity';
 
 export interface SearchFilters {
   q?: string;
@@ -77,6 +78,19 @@ function setCachedResult(key: string, data: SearchResult): void {
 }
 
 export class SearchService {
+  /** Legacy imports may share a URL under different extracted IDs. Keep both
+   * visible, but never present either as a verified identity. */
+  private static async presentWithIdentityWarnings(listings: any[]): Promise<any[]> {
+    if (!listings.length) return [];
+    const urls = [...new Set<string>(listings.flatMap(l => (l.sources || []).filter((s: any) => sourceDetailKey(s.source, s.sourceUrl || '')).map((s: any) => s.sourceUrl)))];
+    const owners = urls.length ? await Listing.find({ 'sources.sourceUrl': { $in: urls } }).select('_id sources').lean().maxTimeMS(3000).exec() : [];
+    return listings.map(listing => {
+      const keys = new Set((listing.sources || []).map((s: any) => sourceDetailKey(s.source, s.sourceUrl || '')).filter(Boolean));
+      const shared = owners.some(owner => String(owner._id) !== String(listing._id) && owner.sources.some(s => keys.has(sourceDetailKey(s.source, s.sourceUrl))));
+      const presented = this.transformListing(listing);
+      return shared ? { ...presented, sourceIdentityNeedsReview: true, verificationState: 'unverified', identityWarning: 'Another stored listing shares this source page. The exact unit needs review.' } : presented;
+    });
+  }
   /**
    * Transform listing data for frontend consumption
    * Converts address object to string and flattens nested structures
@@ -135,14 +149,23 @@ export class SearchService {
 
     // Execute query with timeout and optimized projection
     const [listings, total] = await Promise.all([
-      Listing.find(query)
+      (baseSortField === 'price' ? Listing.aggregate([
+        { $match: query },
+        { $addFields: { _rentSort: { $cond: [
+          { $and: [{ $gt: ['$price.amount', 0] }, { $not: [{ $in: ['$price.status', ['unknown', 'building']] }] }, { $ne: ['$listingScope', 'building'] }, { $in: [{ $ifNull: ['$price.currency', 'USD'] }, ['USD']] }] },
+          { $multiply: ['$price.amount', { $switch: { branches: [{ case: { $eq: ['$price.period', 'weekly'] }, then: 52 / 12 }, { case: { $eq: ['$price.period', 'daily'] }, then: 365 / 12 }], default: 1 } }] }, null,
+        ] } } },
+        { $addFields: { _rentUnknown: { $cond: [{ $eq: ['$_rentSort', null] }, 1, 0] } } },
+        { $sort: { _rentUnknown: 1, _rentSort: sortOrder, _id: sortOrder } },
+        { $skip: skip }, { $limit: limit }, { $project: { _rentSort: 0, _rentUnknown: 0, __v: 0 } },
+      ]).option({ maxTimeMS: 3000 }).exec() : Listing.find(query)
         .sort(sort)
         .skip(skip)
         .limit(limit)
         .select('address price bedrooms bathrooms squareFootage squareFeet images sources sourceConflicts sourceVerification listingScope buildingRent duplicateOf petPolicy brokerFee amenities createdAt updatedAt isActive fieldObservedAt dataVersion')
         .lean()
         .maxTimeMS(3000) // Reduced timeout
-        .exec(),
+        .exec()),
       // Use estimatedDocumentCount for faster count on simple queries
       skip === 0 && Object.keys(additionalFilters).length === 0
         ? Listing.countDocuments(query).maxTimeMS(1000).exec()
@@ -153,7 +176,7 @@ export class SearchService {
     console.log(`[SEARCH] MongoDB query completed in ${queryTime}ms, found ${listings.length} listings`);
 
     const result = {
-      listings: listings.map(this.transformListing),
+      listings: await this.presentWithIdentityWarnings(listings),
       total,
       page,
       totalPages: Math.ceil(total / limit),
@@ -170,7 +193,7 @@ export class SearchService {
 
   static async getListingById(id: string): Promise<any | null> {
     const listing = await Listing.findById(id).select('-__v').lean().exec();
-    return this.transformListing(listing);
+    return listing ? (await this.presentWithIdentityWarnings([listing]))[0] : null;
   }
 
   static async getRecentListings(limit: number = 10): Promise<any[]> {
@@ -181,6 +204,6 @@ export class SearchService {
       .lean()
       .exec();
     
-    return listings.map(this.transformListing);
+    return this.presentWithIdentityWarnings(listings);
   }
 }

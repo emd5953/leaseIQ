@@ -41,7 +41,7 @@ describe('Query Utilities Unit Tests', () => {
 
       const query = buildListingQuery(criteria);
 
-      expect(query['price.amount']).toEqual({ $gte: 1000, $lte: 2000 });
+      expect(query['price.amount']).toEqual({ $gt: 0, $gte: 1000, $lte: 2000 });
     });
 
     it('should build query with bedroom range', () => {
@@ -134,7 +134,7 @@ describe('Query Utilities Unit Tests', () => {
 
       const query = buildListingQuery(criteria);
 
-      expect(query['price.amount']).toEqual({ $gte: 1000, $lte: 3000 });
+      expect(query['price.amount']).toEqual({ $gt: 0, $gte: 1000, $lte: 3000 });
       expect(query.bedrooms).toEqual({ $gte: 2 });
       expect(query.$and).toBeDefined();
       expect(query['petPolicy.dogsAllowed']).toBe(true);

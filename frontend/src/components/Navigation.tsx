@@ -50,7 +50,7 @@ export default function Navigation() {
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-8">
+          <div className="hidden md:flex items-center gap-5 text-sm">
             <Link
               href="/search" aria-current={pathname === '/search' ? 'page' : undefined}
               className="text-foreground hover:text-primary transition-colors duration-300"
@@ -76,6 +76,7 @@ export default function Navigation() {
               Lease Analyzer
             </Link>
 
+            <Link href="/shortlist" aria-current={pathname === "/shortlist" ? "page" : undefined} className="text-primary">Shortlist</Link>
             {/* Auth Section */}
             {!isLoading && (
               <>
@@ -153,6 +154,7 @@ export default function Navigation() {
               Lease Analyzer
             </Link>
 
+            <Link href="/shortlist" onClick={() => setMobileMenuOpen(false)} className="block text-lg text-primary">Shortlist</Link>
             {/* Mobile Auth */}
             {!isLoading && (
               <div className="pt-4 border-t border-border">

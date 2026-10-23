@@ -1,5 +1,11 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || ''
 
+async function readResponse(response: Response, fallback: string) {
+  const result = await response.json().catch(() => null)
+  if (!response.ok || result == null) throw new Error(typeof result?.error === 'string' ? result.error : fallback)
+  return result
+}
+
 // Helper to get auth headers
 function getAuthHeaders(): HeadersInit {
   const token = typeof window !== 'undefined' ? localStorage.getItem('leaseiq_token') : null
@@ -101,8 +107,9 @@ export const api = {
     params.append('_t', Date.now().toString())
 
     const response = await fetch(`${API_URL}/api/search?${params}`, { signal })
-    if (!response.ok) throw new Error((await response.json()).error || 'Search failed')
-    return response.json()
+    const result = await readResponse(response, 'Listing search is temporarily unavailable. Please retry.')
+    if (!Array.isArray(result.listings)) throw new Error('Listing search returned incomplete results. Please retry.')
+    return result
   },
 
   async getRecentListings(limit: number = 20) {
@@ -113,8 +120,7 @@ export const api = {
 
   async getListingById(id: string) {
     const response = await fetch(`${API_URL}/api/search/${id}`)
-    if (!response.ok) throw new Error((await response.json()).error || 'Listing unavailable')
-    return response.json()
+    return readResponse(response, 'This listing is temporarily unavailable. Please retry.')
   },
 
   async researchAddress(street: string, borough: string, signal?: AbortSignal) {
@@ -122,9 +128,7 @@ export const api = {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ street, borough }), signal,
     })
-    const result = await response.json()
-    if (!response.ok) throw new Error(result.error || 'Research failed')
-    return result
+    return readResponse(response, 'Property research is temporarily unavailable. Please retry.')
   },
 
   async researchListing(listingId: string, email?: string, signal?: AbortSignal) {
@@ -133,9 +137,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       body: JSON.stringify({ email }),
     })
-    const result = await response.json()
-    if (!response.ok) throw new Error(result.error || 'Research failed')
-    return result
+    return readResponse(response, 'Property research is temporarily unavailable. Please retry.')
   },
 
   async analyzeLease(leaseText: string, email?: string) {

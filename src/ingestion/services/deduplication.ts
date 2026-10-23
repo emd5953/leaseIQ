@@ -5,7 +5,7 @@ import { ListingStorage } from './storage';
 
 export class DeduplicationEngine {
   async findDuplicate(listing: NormalizedListing): Promise<string | null> {
-    const exact = await ListingModel.findOne({ sources: { $elemMatch: { source: listing.source, sourceId: listing.sourceId } } });
+    const exact = await new ListingStorage().findSourceOwner(listing);
     if (exact) return exact._id.toString();
     // A building address alone is not a unit identity. Fuzzy price/address matches
     // can merge neighboring apartments; only merge an explicit matching unit.
