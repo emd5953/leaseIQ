@@ -17,7 +17,7 @@ export function normalizeLeaseReport(input: Record<string, any>) {
     summary: reportText(input.summary),
     overallRating: ['favorable', 'neutral', 'concerning'].includes(input.overallRating) ? input.overallRating as 'favorable' | 'neutral' | 'concerning' : 'neutral' as const,
     keyTerms: terms(input.keyTerms),
-    financialSummary: terms(input.financialSummary),
+    financialSummary: leaseFinancialSummary(terms(input.keyTerms)),
     redFlags: Array.isArray(input.redFlags) ? input.redFlags.filter((flag: any) => flag && typeof flag === 'object').map((flag: any) => ({
       title: reportText(flag.title), description: reportText(flag.description),
       severity: ['high', 'medium', 'low'].includes(flag.severity) ? flag.severity as 'high' | 'medium' | 'low' : 'low' as const,
@@ -25,5 +25,23 @@ export function normalizeLeaseReport(input: Record<string, any>) {
     importantDates: Array.isArray(input.importantDates) ? input.importantDates.filter((item: any) => item && typeof item === 'object').map((item: any) => ({ date: reportText(item.date), description: reportText(item.description) })) : [],
     tenantRights: list(input.tenantRights), landlordObligations: list(input.landlordObligations),
     terminationClauses: list(input.terminationClauses), recommendations: list(input.recommendations),
+  };
+}
+
+/** Derive subtotals only from unambiguous dollar amounts; model-generated totals are discarded. */
+export function leaseFinancialSummary(keyTerms: Record<string, unknown>) {
+  const cents = (value: unknown): number | null => {
+    if (typeof value !== 'string' || !/^\$\s*(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d{1,2})?$/.test(value.trim())) return null;
+    const number = Math.round(Number(value.replace(/[$,\s]/g, '')) * 100);
+    return Number.isSafeInteger(number) && number >= 0 ? number : null;
+  };
+  const rent = cents(keyTerms.monthlyRent);
+  const deposit = cents(keyTerms.securityDeposit);
+  if (rent === null || rent <= 0 || !Number.isSafeInteger(rent * 12)) return {};
+  const dollars = (value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: value % 100 ? 2 : 0 }).format(value / 100);
+  return {
+    monthlyTotal: dollars(rent), annualCost: dollars(rent * 12),
+    ...(deposit !== null && Number.isSafeInteger(rent + deposit) ? { totalMoveInCost: dollars(rent + deposit) } : {}),
+    calculationBasis: 'Calculated from extracted rent and deposit. Other fees and utilities are excluded; this is not a complete move-in quote.',
   };
 }

@@ -19,9 +19,13 @@ export class EmailService {
   static async send(options: EmailOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
       if (!config.resend.apiKey) return { success: false, error: 'Email delivery is not configured.' };
+      const from = options.from || config.resend.from || (process.env.NODE_ENV !== 'production' ? this.DEFAULT_FROM : '');
+      if (!from || (process.env.NODE_ENV === 'production' && /@resend\.dev(?:>|\s|$)/i.test(from))) {
+        return { success: false, error: 'Email delivery is unavailable: a verified production sender must be configured.' };
+      }
       const resend = new Resend(config.resend.apiKey);
       const result = await resend.emails.send({
-        from: options.from || this.DEFAULT_FROM,
+        from,
         to: options.to,
         subject: options.subject,
         html: options.html,
@@ -29,7 +33,7 @@ export class EmailService {
 
       if (result.error) {
         console.error('Email send error:', result.error);
-        return { success: false, error: result.error.message };
+        return { success: false, error: /only send testing emails|verify a domain/i.test(result.error.message) ? 'Email delivery is unavailable: the sender domain must be verified.' : 'The email provider could not send this message. Please try again later.' };
       }
 
       return { success: true, messageId: result.data?.id };
@@ -359,13 +363,13 @@ export class EmailService {
     ` : '';
 
     // Financial summary section
-    const financialHtml = analysis.financialSummary && Object.keys(analysis.financialSummary).length > 0 ? `
+    const financialHtml = analysis.financialSummary?.calculationBasis ? `
       <div style="margin-bottom: 24px;">
         <h3 style="color: #111827;">💰 Financial Summary</h3>
         <div style="background: #f0fdf4; padding: 16px; border-radius: 8px; border-left: 4px solid #059669;">
-          ${analysis.financialSummary.totalMoveInCost ? `<p style="margin: 4px 0;"><strong>Total Move-in Cost:</strong> ${analysis.financialSummary.totalMoveInCost}</p>` : ''}
-          ${analysis.financialSummary.monthlyTotal ? `<p style="margin: 4px 0;"><strong>Monthly Total:</strong> ${analysis.financialSummary.monthlyTotal}</p>` : ''}
-          ${analysis.financialSummary.annualCost ? `<p style="margin: 4px 0;"><strong>Annual Cost:</strong> ${analysis.financialSummary.annualCost}</p>` : ''}
+          ${analysis.financialSummary.totalMoveInCost ? `<p style="margin: 4px 0;"><strong>Rent + Deposit (excludes other costs):</strong> ${analysis.financialSummary.totalMoveInCost}</p>` : ''}
+          ${analysis.financialSummary.monthlyTotal ? `<p style="margin: 4px 0;"><strong>Monthly Rent:</strong> ${analysis.financialSummary.monthlyTotal}</p>` : ''}
+          ${analysis.financialSummary.annualCost ? `<p style="margin: 4px 0;"><strong>Annualized Rent:</strong> ${analysis.financialSummary.annualCost}</p>` : ''}
         </div>
       </div>
     ` : '';
@@ -373,7 +377,7 @@ export class EmailService {
     // Tenant rights section
     const tenantRightsHtml = (analysis.tenantRights || []).length > 0 ? `
       <div style="margin-bottom: 24px;">
-        <h3 style="color: #111827;">⚖️ Your Rights as Tenant</h3>
+        <h3 style="color: #111827;">⚖️ Tenant Terms to Review</h3>
         <ul style="margin: 0; padding-left: 20px; color: #374151;">
           ${analysis.tenantRights.map((r: string) => `<li style="margin: 4px 0;">${r}</li>`).join('')}
         </ul>

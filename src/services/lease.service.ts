@@ -40,6 +40,7 @@ export interface LeaseAnalysis {
     description: string;
   }>;
   financialSummary: {
+    calculationBasis?: string;
     totalMoveInCost?: string;
     monthlyTotal?: string;
     annualCost?: string;
