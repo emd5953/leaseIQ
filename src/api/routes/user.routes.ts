@@ -1,23 +1,24 @@
 import { Router, Response } from 'express';
-import { Types } from 'mongoose';
+import mongoose, { Types } from 'mongoose';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 import { UserPreferences } from '../../models/userPreferences.model';
 import { ListingInteraction } from '../../models/listingInteraction.model';
 import { SavedSearch } from '../../models/savedSearch.model';
 import { Listing } from '../../models/listing.model';
 import { AlertService } from '../../services/alert.service';
+import { validateObjectId } from '../middleware/validation';
 
 const router = Router();
 
 // All routes require authentication
 router.use(requireAuth);
-for (const parameter of ['id', 'listingId']) {
-  router.param(parameter, (_req, res, next, value) => {
-    if (!Types.ObjectId.isValid(value)) return res.status(400).json({ error: 'Invalid ID' });
-    next();
-  });
-}
-
+router.use((_req, res, next) => {
+  if (mongoose.connection.readyState !== 1)
+    return res.status(503).json({ error: 'Account storage is unavailable. Please retry later.' });
+  next();
+});
+router.param('listingId', (req, res, next) => validateObjectId('listingId')(req, res, next));
+router.param('id', (req, res, next) => validateObjectId('id')(req, res, next));
 
 // ============ PREFERENCES ============
 
@@ -43,20 +44,20 @@ router.put('/preferences', async (req: AuthRequest, res: Response) => {
   try {
     // Clean up the data - convert undefined to null for proper storage
     const cleanData = { ...req.body };
-    Object.keys(cleanData).forEach(key => {
+    Object.keys(cleanData).forEach((key) => {
       if (cleanData[key] === undefined) {
         cleanData[key] = null;
       }
     });
-    
+
     const updateData = { ...cleanData, userId: new Types.ObjectId(req.userId) };
     delete updateData._id;
 
-    const preferences = await UserPreferences.findOneAndUpdate(
-      { userId: req.userId },
-      updateData,
-      { new: true, upsert: true, runValidators: true }
-    );
+    const preferences = await UserPreferences.findOneAndUpdate({ userId: req.userId }, updateData, {
+      new: true,
+      upsert: true,
+      runValidators: true,
+    });
 
     res.json(preferences);
   } catch (error) {
@@ -86,8 +87,10 @@ router.get('/saved-listings', async (req: AuthRequest, res: Response) => {
 
     // Map listings with interaction metadata
     const listingsMap = new Map(listings.map((l) => [l._id.toString(), l]));
-    const result = interactions.filter(i => listingsMap.has(i.listingId.toString())).map((interaction) => ({
+    const result = interactions.map((interaction) => ({
+      _id: interaction.listingId,
       ...listingsMap.get(interaction.listingId.toString()),
+      listingUnavailable: !listingsMap.has(interaction.listingId.toString()),
       savedAt: interaction.timestamp,
       notes: interaction.metadata?.notes,
       status: interaction.metadata?.status || 'interested',
@@ -109,8 +112,13 @@ router.post('/saved-listings/:listingId', async (req: AuthRequest, res: Response
     const { listingId } = req.params;
     const { notes, status } = req.body;
 
-    if (status !== undefined && !['interested', 'touring', 'applied', 'lease', 'moved'].includes(status)) return res.status(400).json({ error: 'Invalid tracker status' });
-    if (notes !== undefined && notes !== null && typeof notes !== 'string') return res.status(400).json({ error: 'Notes must be text' });
+    if (
+      status !== undefined &&
+      !['interested', 'touring', 'applied', 'lease', 'moved'].includes(status)
+    )
+      return res.status(400).json({ error: 'Invalid tracker status' });
+    if (notes !== undefined && notes !== null && (typeof notes !== 'string' || notes.length > 5000))
+      return res.status(400).json({ error: 'Notes must be text of at most 5000 characters' });
     // Verify listing exists
     const listing = await Listing.findById(listingId);
     if (!listing) {
@@ -126,17 +134,20 @@ router.post('/saved-listings/:listingId', async (req: AuthRequest, res: Response
       },
       {
         $setOnInsert: {
-          userId: req.userId, listingId: new Types.ObjectId(listingId as string),
-          interactionType: 'saved', timestamp: new Date(),
+          userId: req.userId,
+          listingId: new Types.ObjectId(listingId as string),
+          interactionType: 'saved',
+          timestamp: new Date(),
           ...(notes === undefined ? { 'metadata.notes': null } : {}),
           ...(status === undefined ? { 'metadata.status': 'interested' } : {}),
+          'metadata.viewDurationSeconds': null,
         },
         $set: {
           ...(notes !== undefined ? { 'metadata.notes': notes } : {}),
           ...(status !== undefined ? { 'metadata.status': status } : {}),
         },
       },
-      { upsert: true, new: true, runValidators: true }
+      { upsert: true, new: true, runValidators: true },
     );
 
     res.json({ success: true, interaction });
@@ -154,10 +165,12 @@ router.patch('/saved-listings/:listingId', async (req: AuthRequest, res: Respons
   try {
     const { listingId } = req.params;
     const { notes, status } = req.body;
-    if (notes !== undefined && notes !== null && typeof notes !== 'string') return res.status(400).json({ error: 'Notes must be text' });
     const allowedStatuses = ['interested', 'touring', 'applied', 'lease', 'moved'];
 
-    if (status !== undefined && !allowedStatuses.includes(status)) {
+    if (
+      (status !== undefined && !allowedStatuses.includes(status)) ||
+      (notes !== undefined && notes !== null && (typeof notes !== 'string' || notes.length > 5000))
+    ) {
       return res.status(400).json({ error: 'Invalid tracker status' });
     }
 
@@ -171,7 +184,7 @@ router.patch('/saved-listings/:listingId', async (req: AuthRequest, res: Respons
         ...(notes !== undefined ? { 'metadata.notes': notes } : {}),
         ...(status ? { 'metadata.status': status } : {}),
       },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     );
 
     if (!interaction) {
@@ -206,7 +219,6 @@ router.delete('/saved-listings/:listingId', async (req: AuthRequest, res: Respon
   }
 });
 
-
 // ============ SAVED SEARCHES WITH ALERTS ============
 
 /**
@@ -215,9 +227,7 @@ router.delete('/saved-listings/:listingId', async (req: AuthRequest, res: Respon
  */
 router.get('/saved-searches', async (req: AuthRequest, res: Response) => {
   try {
-    const searches = await SavedSearch.find({ userId: req.userId })
-      .sort({ createdAt: -1 })
-      .lean();
+    const searches = await SavedSearch.find({ userId: req.userId }).sort({ createdAt: -1 }).lean();
 
     res.json(searches);
   } catch (error) {
@@ -263,13 +273,20 @@ router.post('/saved-searches', async (req: AuthRequest, res: Response) => {
 router.put('/saved-searches/:id', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const allowed = ['name', 'criteria', 'alertsEnabled', 'alertFrequency', 'alertMethod', 'isActive'];
-    const updateData = Object.fromEntries(Object.entries(req.body).filter(([key]) => allowed.includes(key)));
+    const updateData = Object.fromEntries(
+      Object.entries(req.body).filter(([key]) =>
+        ['name', 'criteria', 'alertsEnabled', 'alertFrequency', 'alertMethod', 'isActive'].includes(
+          key,
+        ),
+      ),
+    );
+    delete updateData._id;
+    delete updateData.userId;
 
     const savedSearch = await SavedSearch.findOneAndUpdate(
       { _id: id, userId: req.userId },
       updateData,
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     );
 
     if (!savedSearch) {
@@ -318,7 +335,7 @@ router.post('/saved-searches/:id/test-alert', async (req: AuthRequest, res: Resp
       return res.status(404).json({ error: 'Saved search not found' });
     }
 
-    const result = await AlertService.sendImmediateAlert(id as string, { test: true });
+    const result = await AlertService.sendImmediateAlert(id as string, req.userId!);
     res.status(result.success ? 200 : 400).json(result);
   } catch (error) {
     console.error('Test alert error:', error);

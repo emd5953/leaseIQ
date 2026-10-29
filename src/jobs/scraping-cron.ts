@@ -5,20 +5,27 @@ import { config } from '../config';
 
 async function runScrapingJob() {
   console.log(`[${new Date().toISOString()}] Running high-frequency scraping job...`);
-  
+
   try {
     const orchestrator = new ScrapingOrchestrator();
     const rotator = new RotatingScraper();
-    
+
     // Get current source from rotation (changes every 30 minutes)
     const sources = rotator.getCurrentSources();
     console.log(`[${new Date().toISOString()}] Scraping sources:`, sources);
-    console.log(`[${new Date().toISOString()}] Each source runs ${rotator.getRunsPerDay()} times per day`);
-    console.log(`[${new Date().toISOString()}] Max listing age: ${rotator.getMaxFreshness()} hours`);
-    
+    console.log(
+      `[${new Date().toISOString()}] Each source runs ${rotator.getRunsPerDay()} times per day`,
+    );
+    console.log(
+      `[${new Date().toISOString()}] Max listing age: ${rotator.getMaxFreshness()} hours`,
+    );
+
     const result = await orchestrator.runPartialScrape(sources);
-    if (result.errorsEncountered > 0) throw new Error(`Import completed with ${result.errorsEncountered} errors; see scrapingJobs for details.`);
-    
+    if (result.errorsEncountered > 0)
+      throw new Error(
+        `Import completed with ${result.errorsEncountered} errors; see scrapingJobs for details.`,
+      );
+
     console.log(`[${new Date().toISOString()}] Scraping job complete:`, {
       totalListingsScraped: result.totalListingsScraped,
       newListingsAdded: result.newListingsAdded,
@@ -40,17 +47,14 @@ async function startScrapingCron() {
     if (!config.firecrawl.apiKey) {
       console.warn('⚠️  FIRECRAWL_API_KEY not set - scraping may not work');
     }
-    
+
     console.log('Environment check passed');
-    console.log('MongoDB URI:', config.mongodb.uri.substring(0, 20) + '...');
 
     // Connect to MongoDB
     console.log('Connecting to MongoDB...');
     await mongoose.connect(config.mongodb.uri, {
       serverSelectionTimeoutMS: 10000,
       socketTimeoutMS: 45000,
-      tls: true,
-      tlsAllowInvalidCertificates: true,
     });
     console.log('✓ MongoDB connected');
 
@@ -58,7 +62,7 @@ async function startScrapingCron() {
     console.log('Running scraping job...');
     await runScrapingJob();
     console.log('✓ Scraping job completed');
-    
+
     // Close connection and exit
     await mongoose.connection.close();
     console.log('✓ MongoDB connection closed');

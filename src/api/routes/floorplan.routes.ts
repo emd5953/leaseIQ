@@ -1,97 +1,32 @@
-import { Router, Response } from 'express';
-import multer from 'multer';
-import { FloorPlanService } from '../../services/floorplan.service';
-import { EmailService } from '../../services/email.service';
-import { validateEmail, validateUrl } from '../middleware/validation';
-import { requireAuth, AuthRequest } from '../middleware/auth';
-
+import { Router } from 'express';
+import { requireAuth, requireOwnRecipient, AuthRequest } from '../middleware/auth';
+import { analysisUpload, analyzeUpload, serviceStatus } from '../middleware/analysis';
+import { downloadImage, DownloadError } from '../../utils/safe-image';
 const router = Router();
-
-// Require authentication for all floorplan endpoints
 router.use(requireAuth);
-
-// Configure multer for image uploads (10MB limit)
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    if (FloorPlanService.isValidImageType(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Only image files (PNG, JPG, WEBP, GIF) are allowed'));
-    }
-  },
-});
-
-/**
- * POST /api/floorplan/analyze
- * Upload and analyze a floor plan image
- */
-router.post('/analyze', upload.single('file'), validateEmail, async (req: AuthRequest, res: Response) => {
+router.post(
+  '/analyze',
+  analysisUpload.single('file'),
+  requireOwnRecipient,
+  analyzeUpload('floorPlan'),
+);
+router.post('/analyze-url', requireOwnRecipient, async (req: AuthRequest, res) => {
+  if (typeof req.body.imageUrl !== 'string')
+    return res.status(400).json({ error: 'An image URL is required' });
+  if (!serviceStatus().floorPlanAnalysis)
+    return res.status(503).json({ error: 'Floor plan analysis is not configured.' });
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
-    }
-
-    const { email } = req.body;
-    
-    console.log(`[FloorPlan] Analyzing: ${req.file.originalname}, size: ${req.file.size} bytes`);
-
-    const analysis = await FloorPlanService.analyzeFloorPlan(
-      req.file.buffer,
-      req.file.mimetype
-    );
-
-    console.log(`[FloorPlan] Analysis complete: ${analysis.layout.bedrooms}BR/${analysis.layout.bathrooms}BA, ${analysis.spaceEfficiency}`);
-
-    // Send email if requested
-    if (email) {
-      const emailResult = await EmailService.sendFloorPlanAnalysis(email, analysis);
-      if (!emailResult.success) {
-        return res.json({ analysis, emailSent: false, emailError: emailResult.error });
-      }
-    }
-
-    res.json({ analysis, emailSent: !!email });
+    const image = await downloadImage(req.body.imageUrl);
+    req.file = {
+      buffer: image.buffer,
+      mimetype: image.mimeType,
+      originalname: 'floorplan',
+    } as Express.Multer.File;
+    return analyzeUpload('floorPlan')(req, res);
   } catch (error) {
-    console.error('Floor plan analysis error:', error);
-    res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Failed to analyze floor plan' 
-    });
+    res
+      .status(error instanceof DownloadError ? error.status : 502)
+      .json({ error: error instanceof DownloadError ? error.message : 'Image unavailable' });
   }
 });
-
-/**
- * POST /api/floorplan/analyze-url
- * Analyze a floor plan from URL
- */
-router.post('/analyze-url', validateUrl('imageUrl'), validateEmail, async (req: AuthRequest, res: Response) => {
-  try {
-    const { imageUrl, email } = req.body;
-
-    if (!imageUrl) {
-      return res.status(400).json({ error: 'No image URL provided' });
-    }
-
-    console.log(`[FloorPlan] Analyzing URL: ${imageUrl}`);
-
-    const analysis = await FloorPlanService.analyzeFloorPlanFromURL(imageUrl);
-
-    // Send email if requested
-    if (email) {
-      const emailResult = await EmailService.sendFloorPlanAnalysis(email, analysis);
-      if (!emailResult.success) {
-        return res.json({ analysis, emailSent: false, emailError: emailResult.error });
-      }
-    }
-
-    res.json({ analysis, emailSent: !!email });
-  } catch (error) {
-    console.error('Floor plan URL analysis error:', error);
-    res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Failed to analyze floor plan' 
-    });
-  }
-});
-
 export default router;

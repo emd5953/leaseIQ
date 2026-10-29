@@ -9,6 +9,12 @@ dist/
 # Environment variables
 .env
 .env.local
+.env.*.local
+.codex-*.json
+playwright-report/
+test-results/
+frontend/.next-e2e/
+frontend/.next-lifecycle/
 
 # Test coverage
 coverage/
