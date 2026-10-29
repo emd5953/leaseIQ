@@ -3,14 +3,12 @@ require('dotenv').config();
 
 async function testConnection() {
   const uri = process.env.MONGODB_URI;
+  if (!uri) throw new Error('MONGODB_URI is required.');
   
   console.log('Testing MongoDB connection...');
-  console.log('URI (sanitized):', uri.replace(/\/\/[^@]+@/, '//***:***@'));
   
   const client = new MongoClient(uri, {
     serverSelectionTimeoutMS: 5000,
-    tls: true,
-    tlsAllowInvalidCertificates: true, // Temporary workaround for Node 22
   });
 
   try {
@@ -19,7 +17,7 @@ async function testConnection() {
     console.log('✓ Successfully connected to MongoDB!');
     
     console.log('\nTesting database access...');
-    const db = client.db('leaseiq');
+    const db = client.db();
     const collections = await db.listCollections().toArray();
     console.log('✓ Database accessible');
     console.log('Collections:', collections.map(c => c.name));
@@ -32,7 +30,7 @@ async function testConnection() {
     if (error.message.includes('SSL') || error.message.includes('TLS')) {
       console.error('\nThis appears to be an SSL/TLS error.');
       console.error('Possible causes:');
-      console.error('1. Node.js version incompatibility (try Node 20 LTS)');
+      console.error('1. Certificate trust configuration (use supported Node 24.x)');
       console.error('2. Network/firewall blocking the connection');
       console.error('3. MongoDB Atlas IP whitelist not configured');
     } else if (error.message.includes('authentication')) {

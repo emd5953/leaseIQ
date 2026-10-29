@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import mongoose from 'mongoose';
 import { OAuth2Client } from 'google-auth-library';
 import { User } from '../../models/user.model';
 import { config } from '../../config';
@@ -6,12 +7,16 @@ import { googlePopupOrigin } from '../../utils/google-auth-origin';
 import { generateToken, requireAuth, AuthRequest } from '../middleware/auth';
 
 const router = Router();
+router.use((req, res, next) => {
+  if (req.path !== '/me' && !config.google.oauthClientId)
+    return res.status(503).json({ error: 'Google sign-in is not configured.' });
+  if (mongoose.connection.readyState !== 1)
+    return res.status(503).json({ error: 'Account storage is unavailable.' });
+  next();
+});
 
 // Create OAuth2Client with proper redirect URI for auth-code flow
-const googleClient = new OAuth2Client(
-  config.google.oauthClientId,
-  config.google.oauthClientSecret
-);
+const googleClient = new OAuth2Client(config.google.oauthClientId, config.google.oauthClientSecret);
 
 /**
  * POST /api/auth/google
@@ -32,7 +37,7 @@ router.post('/google', async (req: Request, res: Response) => {
     });
 
     const payload = ticket.getPayload();
-    if (!payload || !payload.email) {
+    if (!payload || !payload.email || !payload.email_verified) {
       return res.status(400).json({ error: 'Invalid Google token' });
     }
 
@@ -88,9 +93,12 @@ router.post('/google/code', async (req: Request, res: Response) => {
     }
 
     const origin = googlePopupOrigin(req.get('origin'));
-    if (!origin) return res.status(403).json({ error: 'Sign in from the LeaseIQ website and try again.' });
+    if (!origin)
+      return res.status(403).json({ error: 'Sign in from the LeaseIQ website and try again.' });
     if (!config.google.oauthClientId || !config.google.oauthClientSecret) {
-      return res.status(503).json({ error: 'Google sign-in is temporarily unavailable. Please try again later.' });
+      return res
+        .status(503)
+        .json({ error: 'Google sign-in is temporarily unavailable. Please try again later.' });
     }
 
     // Exchange code for tokens with redirect_uri
@@ -112,7 +120,7 @@ router.post('/google/code', async (req: Request, res: Response) => {
 
     const payload = ticket.getPayload();
 
-    if (!payload || !payload.email) {
+    if (!payload || !payload.email || !payload.email_verified) {
       console.error('Invalid token payload');
       return res.status(400).json({ error: 'Invalid Google token' });
     }
@@ -141,7 +149,6 @@ router.post('/google/code', async (req: Request, res: Response) => {
 
     const token = generateToken(user._id.toString(), user.email);
 
-
     res.json({
       token,
       user: {
@@ -155,10 +162,20 @@ router.post('/google/code', async (req: Request, res: Response) => {
     // Never log authorization codes, tokens, request bodies, or profile details.
     const providerCode = error?.response?.data?.error;
     const expired = providerCode === 'invalid_grant';
-    console.error('Google code sign-in failed', { category: expired ? 'expired_code' : error?.code === 11000 ? 'account_index_conflict' : 'provider_or_storage_failure' });
-    res.status(expired ? 401 : 503).json({ error: expired
-      ? 'Your Google sign-in expired. Please try signing in again.'
-      : 'Google sign-in is temporarily unavailable. Please try again later.' });
+    console.error('Google code sign-in failed', {
+      category: expired
+        ? 'expired_code'
+        : error?.code === 11000
+          ? 'account_index_conflict'
+          : 'provider_or_storage_failure',
+    });
+    res
+      .status(expired ? 401 : 503)
+      .json({
+        error: expired
+          ? 'Your Google sign-in expired. Please try signing in again.'
+          : 'Google sign-in is temporarily unavailable. Please try again later.',
+      });
   }
 });
 

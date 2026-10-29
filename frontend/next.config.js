@@ -1,17 +1,21 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   reactStrictMode: true,
-  
+
   // Production optimizations
   productionBrowserSourceMaps: false, // Disable source maps in production
-  
+
   // Compiler options for production
   compiler: {
-    removeConsole: process.env.NODE_ENV === 'production' ? {
-      exclude: ['error', 'warn'], // Keep error and warn logs
-    } : false,
+    removeConsole:
+      process.env.NODE_ENV === 'production'
+        ? {
+            exclude: ['error', 'warn'], // Keep error and warn logs
+          }
+        : false,
   },
-  
+
   // Webpack configuration for additional minification
   webpack: (config, { dev, isServer }) => {
     // Production-only optimizations
@@ -19,11 +23,11 @@ const nextConfig = {
       config.optimization = {
         ...config.optimization,
         minimize: true,
-      };
+      }
     }
-    return config;
+    return config
   },
-  
+
   images: {
     domains: [],
     remotePatterns: [
@@ -33,10 +37,11 @@ const nextConfig = {
       },
     ],
   },
-  
+
   async rewrites() {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-    
+    const apiUrl =
+      process.env.API_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001'
+
     return [
       {
         source: '/api/:path*',

@@ -1,5 +1,5 @@
 import { isNYCAddress } from '../../utils/nyc';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID as uuidv4 } from 'node:crypto';
 import { ListingSource, ScrapingJobResult, SourceResult, ScrapeConfig } from '../types';
 import { ScrapingJobModel } from '../models';
 import { FirecrawlClient } from './firecrawl.client';
@@ -11,9 +11,7 @@ import { ListingStorage } from './storage';
 import { RateLimiter } from './rateLimiter';
 import { ErrorHandler } from './errorHandler';
 import { MetricsTracker } from './metrics';
-import { 
-  StreetEasyScraper,
-} from '../scrapers';
+import { StreetEasyScraper } from '../scrapers';
 import { config } from '../config';
 
 /**
@@ -97,7 +95,7 @@ export class ScrapingOrchestrator {
         // HTTP clients own their deadlines. Racing this work against a timer lets
         // timed-out imports continue writing after the job has been marked done.
         const result = await this.processSingleSource(source);
-        
+
         if (result) {
           sourceResults.push(result);
           totalListingsScraped += result.listingsScraped;
@@ -130,7 +128,7 @@ export class ScrapingOrchestrator {
         duplicatesDetected,
         errorsEncountered,
         sourceResults,
-      }
+      },
     );
 
     const result: ScrapingJobResult = {
@@ -160,7 +158,9 @@ export class ScrapingOrchestrator {
   /**
    * Process a single source with parallel listing processing
    */
-  private async processSingleSource(source: ListingSource): Promise<SourceResult & { newAdded?: number; duplicates?: number }> {
+  private async processSingleSource(
+    source: ListingSource,
+  ): Promise<SourceResult & { newAdded?: number; duplicates?: number }> {
     const sourceStart = Date.now();
     let sourceListings = 0;
     let sourceErrors = 0;
@@ -184,27 +184,32 @@ export class ScrapingOrchestrator {
 
       // Get NYC-specific URLs for this source
       const urls = this.getNYCUrlsForSource(source);
-      
+
       // Scrape all URLs for this source with timeout protection
       const allRawListings = [];
       for (const url of urls) {
         console.log(`[Orchestrator] Scraping ${source} from ${url}...`);
         const scrapeStart = Date.now();
-        
+
         try {
           const rawListings = await scraper.scrape({ url } as ScrapeConfig);
           const scrapeDuration = Date.now() - scrapeStart;
-          console.log(`[Orchestrator] Scraped ${rawListings.length} listings from ${source} in ${scrapeDuration}ms`);
+          console.log(
+            `[Orchestrator] Scraped ${rawListings.length} listings from ${source} in ${scrapeDuration}ms`,
+          );
           allRawListings.push(...rawListings);
         } catch (scrapeError) {
           const scrapeDuration = Date.now() - scrapeStart;
-          console.error(`[Orchestrator] Scrape failed for ${source} after ${scrapeDuration}ms:`, scrapeError);
+          console.error(
+            `[Orchestrator] Scrape failed for ${source} after ${scrapeDuration}ms:`,
+            scrapeError,
+          );
           sourceErrors++;
           issues.push(scrapeError instanceof Error ? scrapeError.message : 'Source scrape failed');
           // Continue to next URL instead of failing entire source
         }
       }
-      
+
       sourceListings = allRawListings.length;
 
       if (allRawListings.length === 0) {
@@ -213,7 +218,9 @@ export class ScrapingOrchestrator {
           source,
           listingsScraped: 0,
           errors: sourceErrors || 1,
-          issues: issues.length ? issues.slice(0, 20) : ['Source returned no usable listings; coverage was not refreshed.'],
+          issues: issues.length
+            ? issues.slice(0, 20)
+            : ['Source returned no usable listings; coverage was not refreshed.'],
           duration: Date.now() - sourceStart,
           newAdded: 0,
           duplicates: 0,
@@ -225,17 +232,22 @@ export class ScrapingOrchestrator {
       for (let i = 0; i < allRawListings.length; i += BATCH_SIZE) {
         const batch = allRawListings.slice(i, i + BATCH_SIZE);
         const results = await Promise.allSettled(
-          batch.map(rawListing => this.processListing(rawListing, source))
+          batch.map((rawListing) => this.processListing(rawListing, source)),
         );
 
         for (const result of results) {
           if (result.status === 'fulfilled') {
             if (result.value === 'new') newAdded++;
             else if (result.value === 'duplicate') duplicates++;
-            else { sourceErrors++; issues.push('Listing was rejected during processing'); }
+            else {
+              sourceErrors++;
+              issues.push('Listing was rejected during processing');
+            }
           } else {
             sourceErrors++;
-            issues.push(result.reason instanceof Error ? result.reason.message : 'Listing import failed');
+            issues.push(
+              result.reason instanceof Error ? result.reason.message : 'Listing import failed',
+            );
           }
         }
       }
@@ -249,7 +261,9 @@ export class ScrapingOrchestrator {
     }
 
     const sourceDuration = Date.now() - sourceStart;
-    console.log(`[Orchestrator] Completed ${source}: ${newAdded} new, ${duplicates} duplicates, ${sourceErrors} errors in ${sourceDuration}ms`);
+    console.log(
+      `[Orchestrator] Completed ${source}: ${newAdded} new, ${duplicates} duplicates, ${sourceErrors} errors in ${sourceDuration}ms`,
+    );
     return {
       source,
       listingsScraped: sourceListings,
@@ -267,45 +281,21 @@ export class ScrapingOrchestrator {
    */
   private getNYCUrlsForSource(source: ListingSource): string[] {
     const urls: Record<ListingSource, string[]> = {
-      [ListingSource.STREETEASY]: [
-        'https://streeteasy.com/for-rent/nyc',
-      ],
-      [ListingSource.ZILLOW]: [
-        'https://www.zillow.com/new-york-ny/rentals/',
-      ],
-      [ListingSource.APARTMENTS_COM]: [
-        'https://www.apartments.com/new-york-ny/',
-      ],
-      [ListingSource.TRULIA]: [
-        'https://www.trulia.com/for_rent/New_York,NY/',
-      ],
-      [ListingSource.REALTOR]: [
-        'https://www.realtor.com/apartments/New-York_NY',
-      ],
-      [ListingSource.ZUMPER]: [
-        'https://www.zumper.com/apartments-for-rent/new-york-ny',
-      ],
-      [ListingSource.RENTHOP]: [
-        'https://www.renthop.com/search/nyc',
-      ],
-      [ListingSource.RENT_COM]: [
-        'https://www.rent.com/new-york/apartments',
-      ],
-      [ListingSource.HOTPADS]: [
-        'https://hotpads.com/new-york-ny/apartments-for-rent',
-      ],
+      [ListingSource.STREETEASY]: ['https://streeteasy.com/for-rent/nyc'],
+      [ListingSource.ZILLOW]: ['https://www.zillow.com/new-york-ny/rentals/'],
+      [ListingSource.APARTMENTS_COM]: ['https://www.apartments.com/new-york-ny/'],
+      [ListingSource.TRULIA]: ['https://www.trulia.com/for_rent/New_York,NY/'],
+      [ListingSource.REALTOR]: ['https://www.realtor.com/apartments/New-York_NY'],
+      [ListingSource.ZUMPER]: ['https://www.zumper.com/apartments-for-rent/new-york-ny'],
+      [ListingSource.RENTHOP]: ['https://www.renthop.com/search/nyc'],
+      [ListingSource.RENT_COM]: ['https://www.rent.com/new-york/apartments'],
+      [ListingSource.HOTPADS]: ['https://hotpads.com/new-york-ny/apartments-for-rent'],
       [ListingSource.APARTMENT_GUIDE]: [
         'https://www.apartmentguide.com/apartments/New-York/New-York/',
       ],
-      [ListingSource.RENTALS_COM]: [
-        'https://www.rentals.com/New-York/New-York/',
-      ],
-      [ListingSource.APARTMENT_LIST]: [
-        'https://www.apartmentlist.com/ny/new-york',
-      ],
-      [ListingSource.PADMAPPER]: [
-        'https://www.padmapper.com/apartments/new-york-ny',
-      ],
+      [ListingSource.RENTALS_COM]: ['https://www.rentals.com/New-York/New-York/'],
+      [ListingSource.APARTMENT_LIST]: ['https://www.apartmentlist.com/ny/new-york'],
+      [ListingSource.PADMAPPER]: ['https://www.padmapper.com/apartments/new-york-ny'],
       [ListingSource.CRAIGSLIST]: [],
       [ListingSource.FACEBOOK]: [],
     };
@@ -316,7 +306,10 @@ export class ScrapingOrchestrator {
   /**
    * Process a single listing
    */
-  private async processListing(rawListing: any, source: ListingSource): Promise<'new' | 'duplicate' | 'error'> {
+  private async processListing(
+    rawListing: any,
+    source: ListingSource,
+  ): Promise<'new' | 'duplicate' | 'error'> {
     try {
       // Parse
       const parsed = await this.parser.parse(rawListing);
@@ -327,7 +320,8 @@ export class ScrapingOrchestrator {
       // Normalize
       const normalized = await this.normalizer.normalize(parsed);
 
-      if (!this.isNYCListing(normalized.address, null)) throw new Error('Address is outside supported NYC coverage');
+      if (!this.isNYCListing(normalized.address, null))
+        throw new Error('Address is outside supported NYC coverage');
 
       // Check for duplicates BEFORE geocoding (saves API calls)
       const duplicateId = await this.deduplicator.findDuplicate(normalized);

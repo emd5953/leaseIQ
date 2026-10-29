@@ -1,4 +1,3 @@
-import { Client } from '@googlemaps/google-maps-services-js';
 import { Coordinates } from '../types';
 import { config } from '../config';
 
@@ -6,7 +5,6 @@ import { config } from '../config';
  * Geocoding service wrapper for Google Maps Geocoding API
  */
 export class GeocodingService {
-  private client: Client;
   private apiKey: string;
   private cache: Map<string, Coordinates | null>;
   private maxRetries: number = 3;
@@ -14,7 +12,6 @@ export class GeocodingService {
 
   constructor(apiKey?: string) {
     this.apiKey = apiKey || config.geocoding.apiKey;
-    this.client = new Client({});
     this.cache = new Map();
   }
 
@@ -31,21 +28,32 @@ export class GeocodingService {
     let lastError: any;
     for (let attempt = 0; attempt < this.maxRetries; attempt++) {
       try {
-        const response = await this.client.geocode({
-          params: {
-            address,
-            key: this.apiKey,
-          },
-          timeout: 8000,
-        });
-
+        const url = new URL('https://maps.googleapis.com/maps/api/geocode/json');
+        url.search = new URLSearchParams({ address, key: this.apiKey }).toString();
+        const resultResponse = await fetch(url, { signal: AbortSignal.timeout(8000) });
+        if (!resultResponse.ok) throw new Error('Geocoding service unavailable');
+        const data = (await resultResponse.json()) as {
+          status: string;
+          results: Array<{
+            partial_match?: boolean;
+            geometry: { location_type: string; location: { lat: number; lng: number } };
+          }>;
+        };
+        if (!['OK', 'ZERO_RESULTS'].includes(data.status) || !Array.isArray(data.results))
+          throw new Error('Geocoding returned an invalid response');
+        const response = { data };
         if (response.data.results.length === 0) {
           this.cache.set(address, null);
           return null;
         }
 
+        if (response.data.results.length !== 1) return null;
         const result = response.data.results[0];
-        if (result.partial_match || !['ROOFTOP', 'RANGE_INTERPOLATED'].includes(result.geometry.location_type || '')) return null;
+        if (
+          result.partial_match ||
+          !['ROOFTOP', 'RANGE_INTERPOLATED'].includes(result.geometry.location_type || '')
+        )
+          return null;
         const location = result.geometry.location;
         const coordinates: Coordinates = {
           latitude: location.lat,
@@ -89,7 +97,7 @@ export class GeocodingService {
    * Delay helper for retry logic
    */
   private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /**

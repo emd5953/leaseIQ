@@ -1,52 +1,101 @@
-import { Resend } from 'resend';
-import { config } from '../config';
 import { presentListing } from '../utils/listing-presentation';
 import { formatAdvertisedRent } from '../utils/rent';
+import { config } from '../config';
 
 // Create the email client only when delivery is requested.
-const escapeHtml = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
+const escapeHtml = (value: unknown) =>
+  String(value ?? '').replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
+  );
+
+// Escape provider/document text before interpolation into the existing templates.
+function emailText(value: any): any {
+  if (typeof value === 'string') return escapeHtml(value);
+  if (Array.isArray(value)) return value.map(emailText);
+  if (value && typeof value === 'object')
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, emailText(v)]));
+  return value;
+}
 
 export interface EmailOptions {
   to: string;
   subject: string;
   html: string;
   from?: string;
+  idempotencyKey?: string;
 }
 
 export class EmailService {
   private static readonly DEFAULT_FROM = 'LeaseIQ <onboarding@resend.dev>';
+  static senderAddress() {
+    return (
+      config.resend.from ||
+      process.env.EMAIL_FROM ||
+      (process.env.NODE_ENV === 'production' ? '' : this.DEFAULT_FROM)
+    );
+  }
 
-  static async send(options: EmailOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  static isConfigured() {
+    const sender = config.resend.from || process.env.EMAIL_FROM || '';
+    return (
+      !!config.resend.apiKey &&
+      (process.env.NODE_ENV !== 'production' || (!!sender && !/@resend\.dev\b/i.test(sender)))
+    );
+  }
+
+  static async send(
+    options: EmailOptions,
+  ): Promise<{ success: boolean; messageId?: string; error?: string; uncertain?: boolean }> {
     try {
-      if (!config.resend.apiKey) return { success: false, error: 'Email delivery is not configured.' };
-      const from = options.from || config.resend.from || (process.env.NODE_ENV !== 'production' ? this.DEFAULT_FROM : '');
-      if (!from || (process.env.NODE_ENV === 'production' && /@resend\.dev(?:>|\s|$)/i.test(from))) {
-        return { success: false, error: 'Email delivery is unavailable: a verified production sender must be configured.' };
-      }
-      const resend = new Resend(config.resend.apiKey);
-      const result = await resend.emails.send({
-        from,
-        to: options.to,
-        subject: options.subject,
-        html: options.html,
+      if (!config.resend.apiKey)
+        return { success: false, error: 'Email delivery is not configured.' };
+      const from = options.from || this.senderAddress();
+      if (process.env.NODE_ENV === 'production' && (!from || /@resend\.dev\b/i.test(from)))
+        return {
+          success: false,
+          error: 'Email delivery is unavailable: a verified production sender must be configured.',
+          uncertain: false,
+        };
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        signal: AbortSignal.timeout(30000),
+        headers: {
+          Authorization: `Bearer ${config.resend.apiKey}`,
+          'Content-Type': 'application/json',
+          ...(options.idempotencyKey ? { 'Idempotency-Key': options.idempotencyKey } : {}),
+        },
+        body: JSON.stringify({
+          from,
+          to: options.to,
+          subject: options.subject,
+          html: options.html,
+        }),
       });
-
-      if (result.error) {
-        console.error('Email send error:', result.error);
-        return { success: false, error: /only send testing emails|verify a domain/i.test(result.error.message) ? 'Email delivery is unavailable: the sender domain must be verified.' : 'The email provider could not send this message. Please try again later.' };
-      }
-
-      return { success: true, messageId: result.data?.id };
+      const result = (await response.json()) as { id?: string; message?: string };
+      if (!response.ok || !result.id)
+        return {
+          success: false,
+          error: /only send testing emails|verify a domain/i.test(result.message || '')
+            ? 'Email delivery is unavailable: the sender domain must be verified.'
+            : 'Email provider did not confirm acceptance. Please retry.',
+          uncertain: response.status >= 500 || response.status === 409 || response.ok,
+        };
+      return { success: true, messageId: result.id };
     } catch (error) {
       console.error('Email service error:', error);
-      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+      return {
+        success: false,
+        error: 'Email request failed or timed out; delivery could not be confirmed.',
+        uncertain: true,
+      };
     }
   }
 
   static async sendListingAlert(
     userEmail: string,
     listings: any[],
-    searchName: string
+    searchName: string,
   ): Promise<{ success: boolean; messageId?: string; error?: string }> {
     const html = this.generateAlertEmail(listings, searchName);
     return this.send({
@@ -69,10 +118,11 @@ export class EmailService {
       };
       tips?: string[];
       resourceLinks?: { name: string; url: string }[];
-    }
+    },
   ): Promise<{ success: boolean; messageId?: string; error?: string }> {
     const html = this.generateResearchEmail(listing, research);
-    const address = typeof listing.address === 'string' ? listing.address : listing.address?.street || 'Property';
+    const address =
+      typeof listing.address === 'string' ? listing.address : listing.address?.street || 'Property';
     return this.send({
       to: userEmail,
       subject: `🔍 Research Report: ${address}`,
@@ -84,8 +134,10 @@ export class EmailService {
     userEmail: string,
     analysis: {
       summary: string;
-      overallRating?: 'favorable' | 'neutral' | 'concerning';
-      redFlags: Array<{ title: string; description: string; severity: 'high' | 'medium' | 'low' }> | string[];
+      overallRating?: 'favorable' | 'neutral' | 'concerning' | null;
+      redFlags:
+        | Array<{ title: string; description: string; severity: 'high' | 'medium' | 'low' }>
+        | string[];
       keyTerms: any;
       importantDates?: Array<{ date: string; description: string }>;
       financialSummary?: any;
@@ -93,7 +145,7 @@ export class EmailService {
       landlordObligations?: string[];
       terminationClauses?: string[];
       recommendations?: string[];
-    }
+    },
   ): Promise<{ success: boolean; messageId?: string; error?: string }> {
     const html = this.generateLeaseAnalysisEmail(analysis);
     return this.send({
@@ -105,27 +157,34 @@ export class EmailService {
 
   static async sendCombinedAnalysis(
     userEmail: string,
-    analysis: any
+    analysis: any,
+    idempotencyKey?: string,
   ): Promise<{ success: boolean; messageId?: string; error?: string }> {
     const html = this.generateCombinedAnalysisEmail(analysis);
     return this.send({
       to: userEmail,
       subject: `🏠 Complete Property Analysis - Lease & Floor Plan`,
       html,
+      idempotencyKey,
     });
   }
 
   static async sendFloorPlanAnalysis(
     userEmail: string,
     analysis: {
-      layout: { bedrooms: number; bathrooms: number; totalRooms: number; estimatedSquareFeet?: number };
+      layout: {
+        bedrooms: number;
+        bathrooms: number;
+        totalRooms: number;
+        estimatedSquareFeet?: number;
+      };
       features: string[];
       pros: string[];
       cons: string[];
       spaceEfficiency: string;
       summary: string;
       recommendations: string[];
-    }
+    },
   ): Promise<{ success: boolean; messageId?: string; error?: string }> {
     const html = this.generateFloorPlanEmail(analysis);
     return this.send({
@@ -135,10 +194,19 @@ export class EmailService {
     });
   }
 
+  static listingAlertPayload(to: string, listings: any[], name: string): EmailOptions {
+    return {
+      to,
+      from: this.senderAddress() || undefined,
+      subject: `${listings.length} new listings: ${name}`,
+      html: this.generateAlertEmail(listings, name),
+    };
+  }
   private static generateAlertEmail(listings: any[], searchName: string): string {
-    const listingCards = listings.map(raw => {
-      const listing = presentListing(raw);
-      return `<div style="border:1px solid #e6e2da;border-radius:12px;padding:20px;margin:16px 0">
+    const listingCards = listings
+      .map((raw) => {
+        const listing = presentListing(raw);
+        return `<div style="border:1px solid #e6e2da;border-radius:12px;padding:20px;margin:16px 0">
         <h3>${escapeHtml(listing.title)}</h3><p>${escapeHtml(listing.address)}</p>
         <p style="font-size:24px;font-weight:600;color:#386552">${escapeHtml(formatAdvertisedRent(raw))}</p>
         <p>${listing.listingScope === 'building' ? 'Building pricing · confirm an exact unit' : `${listing.bedrooms === 0 ? 'Studio' : listing.bedrooms == null ? 'Beds unknown' : `${listing.bedrooms} bed`} · ${listing.bathrooms == null ? 'Baths unknown' : `${listing.bathrooms} bath`}`}</p>
@@ -146,7 +214,8 @@ export class EmailService {
         <p>Source-reported information · confirm current rent and availability.<br>Last observed: ${escapeHtml(listing.lastSeenAt || 'Unknown')}${listing.freshness === 'stale' ? ' · stale' : ''}</p>
         ${listing.sourceUrl ? `<a href="${escapeHtml(listing.sourceUrl)}">View original listing</a>` : '<p>Source link unavailable</p>'}
       </div>`;
-    }).join('');
+      })
+      .join('');
 
     return `
       <!DOCTYPE html>
@@ -160,12 +229,12 @@ export class EmailService {
             <h1 style="color: #2563eb; margin: 0;">LeaseIQ</h1>
             <p style="color: #6b7280; margin: 8px 0;">New listings matching your search</p>
           </div>
-          
+
           <h2 style="color: #111827; margin-bottom: 16px;">${escapeHtml(searchName)}</h2>
           <p style="color: #6b7280; margin-bottom: 24px;">We found ${listings.length} new listing${listings.length > 1 ? 's' : ''} that match your preferences.</p>
-          
+
           ${listingCards}
-          
+
           <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb; text-align: center; color: #6b7280; font-size: 14px;">
             <p>You're receiving this because you have an active saved search on LeaseIQ.</p>
             <p><a href="${escapeHtml(config.frontend.url)}/dashboard" style="color: #2563eb;">Manage or disable your alerts</a></p>
@@ -176,9 +245,10 @@ export class EmailService {
   }
 
   private static generateResearchEmail(listing: any, research: any): string {
-    const address = typeof listing.address === 'string' 
-      ? listing.address 
-      : `${listing.address?.street || ''}, ${listing.address?.city || ''}, ${listing.address?.state || ''}`;
+    const address =
+      typeof listing.address === 'string'
+        ? listing.address
+        : `${listing.address?.street || ''}, ${listing.address?.city || ''}, ${listing.address?.state || ''}`;
 
     if (research.version === 2) {
       return `<html><body style="font-family:Arial,sans-serif;color:#243b35;max-width:720px;margin:32px auto;line-height:1.6">
@@ -192,95 +262,132 @@ export class EmailService {
     const n = research.neighborhood || {};
 
     // Neighborhood vibe section
-    const vibeHtml = (n.vibe || n.demographics) ? `
+    const vibeHtml =
+      n.vibe || n.demographics
+        ? `
       <div style="background: #f0f9ff; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
         ${n.vibe ? `<p style="color: #374151; margin: 0 0 8px 0;">${n.vibe}</p>` : ''}
         ${n.demographics ? `<p style="color: #6b7280; margin: 0; font-size: 14px;">👥 ${n.demographics}</p>` : ''}
       </div>
-    ` : '';
+    `
+        : '';
 
     // Scores section
     const scoresHtml = `
       <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px;">
-        ${n.crimeLevel ? `
+        ${
+          n.crimeLevel
+            ? `
           <div style="background: ${n.crimeLevel === 'low' ? '#f0fdf4' : n.crimeLevel === 'medium' ? '#fefce8' : '#fef2f2'}; padding: 12px 16px; border-radius: 8px; text-align: center;">
             <div style="font-size: 12px; color: #6b7280;">Safety</div>
             <div style="font-weight: 600; color: ${n.crimeLevel === 'low' ? '#059669' : n.crimeLevel === 'medium' ? '#ca8a04' : '#dc2626'};">
               ${n.crimeLevel.charAt(0).toUpperCase() + n.crimeLevel.slice(1)} Crime
             </div>
           </div>
-        ` : ''}
-        ${n.walkScore ? `
+        `
+            : ''
+        }
+        ${
+          n.walkScore
+            ? `
           <div style="background: #f9fafb; padding: 12px 16px; border-radius: 8px; text-align: center;">
             <div style="font-size: 12px; color: #6b7280;">Walk</div>
             <div style="font-weight: 600; color: #111827;">${n.walkScore}</div>
           </div>
-        ` : ''}
-        ${n.transitScore ? `
+        `
+            : ''
+        }
+        ${
+          n.transitScore
+            ? `
           <div style="background: #f9fafb; padding: 12px 16px; border-radius: 8px; text-align: center;">
             <div style="font-size: 12px; color: #6b7280;">Transit</div>
             <div style="font-weight: 600; color: #111827;">${n.transitScore}</div>
           </div>
-        ` : ''}
-        ${n.bikeScore ? `
+        `
+            : ''
+        }
+        ${
+          n.bikeScore
+            ? `
           <div style="background: #f9fafb; padding: 12px 16px; border-radius: 8px; text-align: center;">
             <div style="font-size: 12px; color: #6b7280;">Bike</div>
             <div style="font-weight: 600; color: #111827;">${n.bikeScore}</div>
           </div>
-        ` : ''}
+        `
+            : ''
+        }
       </div>
     `;
 
     // Crime details
-    const crimeHtml = n.crimeDetails ? `
+    const crimeHtml = n.crimeDetails
+      ? `
       <div style="background: #fef3c7; padding: 12px 16px; border-radius: 8px; border-left: 4px solid #f59e0b; margin-bottom: 16px;">
         <p style="margin: 0; font-size: 14px; color: #92400e;"><strong>⚠️ Safety Details:</strong> ${n.crimeDetails}</p>
       </div>
-    ` : '';
+    `
+      : '';
 
     // Culture & Dining
-    const cultureHtml = (n.dining?.length || n.culture?.length || n.nightlife) ? `
+    const cultureHtml =
+      n.dining?.length || n.culture?.length || n.nightlife
+        ? `
       <div style="margin-bottom: 16px;">
         <h4 style="color: #111827; margin: 0 0 12px 0;">🎭 Culture & Dining</h4>
         ${n.dining?.length ? `<p style="margin: 4px 0; color: #374151;"><strong>🍽️ Dining:</strong> ${n.dining.join(', ')}</p>` : ''}
         ${n.culture?.length ? `<p style="margin: 4px 0; color: #374151;"><strong>🎨 Culture:</strong> ${n.culture.join(', ')}</p>` : ''}
         ${n.nightlife ? `<p style="margin: 4px 0; color: #374151;"><strong>🌙 Nightlife:</strong> ${n.nightlife}</p>` : ''}
       </div>
-    ` : '';
+    `
+        : '';
 
     // Parks & Grocery
-    const amenitiesHtml = (n.parks?.length || n.groceryStores?.length) ? `
+    const amenitiesHtml =
+      n.parks?.length || n.groceryStores?.length
+        ? `
       <div style="margin-bottom: 16px;">
         ${n.parks?.length ? `<p style="margin: 4px 0; color: #374151;"><strong>🌳 Parks:</strong> ${n.parks.join(', ')}</p>` : ''}
         ${n.groceryStores?.length ? `<p style="margin: 4px 0; color: #374151;"><strong>🛒 Grocery:</strong> ${n.groceryStores.join(', ')}</p>` : ''}
         ${n.nearbyAmenities?.length ? `<p style="margin: 4px 0; color: #374151;"><strong>📍 Nearby:</strong> ${n.nearbyAmenities.join(', ')}</p>` : ''}
       </div>
-    ` : '';
+    `
+        : '';
 
     // Tips section
-    const tipsHtml = research.tips?.length > 0 ? `
+    const tipsHtml =
+      research.tips?.length > 0
+        ? `
       <div style="margin-bottom: 24px;">
         <h3 style="color: #111827;">💡 Tips for This Rental</h3>
         <ul style="margin: 0; padding-left: 20px; color: #374151;">
           ${research.tips.map((tip: string) => `<li style="margin: 8px 0;">${tip}</li>`).join('')}
         </ul>
       </div>
-    ` : '';
+    `
+        : '';
 
     // Resource links section
-    const resourcesHtml = research.resourceLinks?.length > 0 ? `
+    const resourcesHtml =
+      research.resourceLinks?.length > 0
+        ? `
       <div style="margin-bottom: 24px;">
         <h3 style="color: #111827;">🔗 Verify This Building</h3>
         <p style="color: #6b7280; font-size: 14px; margin-bottom: 12px;">Use these official resources to check building history:</p>
         <div style="background: #eff6ff; padding: 16px; border-radius: 8px;">
-          ${research.resourceLinks.map((link: any) => `
+          ${research.resourceLinks
+            .map(
+              (link: any) => `
             <a href="${link.url}" target="_blank" style="display: block; color: #2563eb; text-decoration: none; margin: 8px 0; font-weight: 500;">
               → ${link.name}
             </a>
-          `).join('')}
+          `,
+            )
+            .join('')}
         </div>
       </div>
-    ` : '';
+    `
+        : '';
 
     return `
       <!DOCTYPE html>
@@ -293,22 +400,24 @@ export class EmailService {
           <div style="text-align: center; margin-bottom: 32px;">
             <h1 style="color: #2563eb; margin: 0;">LeaseIQ Research Report</h1>
           </div>
-          
+
           <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 24px; background: #f9fafb;">
             <h2 style="margin: 0 0 8px 0;">${address}</h2>
             <p style="color: #6b7280; margin: 0;">
-              ${listing.bedrooms === 0 ? 'Studio' : `${listing.bedrooms} Bed`} • 
-              ${listing.bathrooms} Bath • 
+              ${listing.bedrooms === 0 ? 'Studio' : `${listing.bedrooms} Bed`} •
+              ${listing.bathrooms} Bath •
               ${escapeHtml(formatAdvertisedRent(listing))}
             </p>
           </div>
-          
+
           <div style="margin-bottom: 24px;">
             <h3 style="color: #111827;">📋 Summary</h3>
             <p style="color: #374151; line-height: 1.7;">${research.summary}</p>
           </div>
-          
-          ${research.neighborhood ? `
+
+          ${
+            research.neighborhood
+              ? `
           <div style="margin-bottom: 24px;">
             <h3 style="color: #111827;">📍 Neighborhood Guide</h3>
             ${vibeHtml}
@@ -317,11 +426,13 @@ export class EmailService {
             ${cultureHtml}
             ${amenitiesHtml}
           </div>
-          ` : ''}
-          
+          `
+              : ''
+          }
+
           ${tipsHtml}
           ${resourcesHtml}
-          
+
           <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb; text-align: center; color: #6b7280; font-size: 14px;">
             <p>Research powered by LeaseIQ</p>
           </div>
@@ -331,14 +442,17 @@ export class EmailService {
   }
 
   private static generateLeaseAnalysisEmail(analysis: any): string {
+    analysis = emailText(analysis);
     // Handle redFlags as either array of objects or strings
     const redFlagsHtml = (analysis.redFlags || [])
       .map((flag: any) => {
         if (typeof flag === 'string') {
           return `<li style="color: #dc2626; margin: 8px 0;">${flag}</li>`;
         }
-        const severityColor = flag.severity === 'high' ? '#dc2626' : flag.severity === 'medium' ? '#f59e0b' : '#6b7280';
-        const severityLabel = flag.severity === 'high' ? '🔴' : flag.severity === 'medium' ? '🟡' : '🟢';
+        const severityColor =
+          flag.severity === 'high' ? '#dc2626' : flag.severity === 'medium' ? '#f59e0b' : '#6b7280';
+        const severityLabel =
+          flag.severity === 'high' ? '🔴' : flag.severity === 'medium' ? '🟡' : '🟢';
         return `<li style="margin: 12px 0;">
           <div style="color: ${severityColor}; font-weight: 600;">${severityLabel} ${flag.title}</div>
           <div style="color: #374151; margin-top: 4px; font-size: 14px;">${flag.description}</div>
@@ -347,23 +461,37 @@ export class EmailService {
       .join('');
 
     // Overall rating badge
-    const ratingColor = analysis.overallRating === 'favorable' ? '#059669' : 
-                        analysis.overallRating === 'concerning' ? '#dc2626' : '#f59e0b';
-    const ratingLabel = analysis.overallRating === 'favorable' ? '✓ Favorable' : 
-                        analysis.overallRating === 'concerning' ? '⚠ Concerning' : '○ Neutral';
+    const ratingColor =
+      analysis.overallRating === 'favorable'
+        ? '#059669'
+        : analysis.overallRating === 'concerning'
+          ? '#dc2626'
+          : '#f59e0b';
+    const ratingLabel =
+      analysis.overallRating === 'favorable'
+        ? '✓ Favorable'
+        : analysis.overallRating === 'concerning'
+          ? '⚠ Concerning'
+          : analysis.overallRating === 'neutral'
+            ? '○ Neutral'
+            : 'Rating unknown';
 
     // Important dates section
-    const importantDatesHtml = (analysis.importantDates || []).length > 0 ? `
+    const importantDatesHtml =
+      (analysis.importantDates || []).length > 0
+        ? `
       <div style="margin-bottom: 24px;">
         <h3 style="color: #111827;">📅 Important Dates</h3>
         <div style="background: #f9fafb; padding: 16px; border-radius: 8px;">
           ${analysis.importantDates.map((d: any) => `<p style="margin: 4px 0;"><strong>${d.date}:</strong> ${d.description}</p>`).join('')}
         </div>
       </div>
-    ` : '';
+    `
+        : '';
 
     // Financial summary section
-    const financialHtml = analysis.financialSummary?.calculationBasis ? `
+    const financialHtml = analysis.financialSummary?.calculationBasis
+      ? `
       <div style="margin-bottom: 24px;">
         <h3 style="color: #111827;">💰 Financial Summary</h3>
         <div style="background: #f0fdf4; padding: 16px; border-radius: 8px; border-left: 4px solid #059669;">
@@ -372,30 +500,39 @@ export class EmailService {
           ${analysis.financialSummary.annualCost ? `<p style="margin: 4px 0;"><strong>Annualized Rent:</strong> ${analysis.financialSummary.annualCost}</p>` : ''}
         </div>
       </div>
-    ` : '';
+    `
+      : '';
 
     // Tenant rights section
-    const tenantRightsHtml = (analysis.tenantRights || []).length > 0 ? `
+    const tenantRightsHtml =
+      (analysis.tenantRights || []).length > 0
+        ? `
       <div style="margin-bottom: 24px;">
         <h3 style="color: #111827;">⚖️ Tenant Terms to Review</h3>
         <ul style="margin: 0; padding-left: 20px; color: #374151;">
           ${analysis.tenantRights.map((r: string) => `<li style="margin: 4px 0;">${r}</li>`).join('')}
         </ul>
       </div>
-    ` : '';
+    `
+        : '';
 
     // Landlord obligations section
-    const landlordObligationsHtml = (analysis.landlordObligations || []).length > 0 ? `
+    const landlordObligationsHtml =
+      (analysis.landlordObligations || []).length > 0
+        ? `
       <div style="margin-bottom: 24px;">
         <h3 style="color: #111827;">🏠 Landlord Obligations</h3>
         <ul style="margin: 0; padding-left: 20px; color: #374151;">
           ${analysis.landlordObligations.map((o: string) => `<li style="margin: 4px 0;">${o}</li>`).join('')}
         </ul>
       </div>
-    ` : '';
+    `
+        : '';
 
     // Termination clauses section
-    const terminationHtml = (analysis.terminationClauses || []).length > 0 ? `
+    const terminationHtml =
+      (analysis.terminationClauses || []).length > 0
+        ? `
       <div style="margin-bottom: 24px;">
         <h3 style="color: #111827;">🚪 Termination & Early Exit</h3>
         <div style="background: #fef2f2; padding: 16px; border-radius: 8px;">
@@ -404,10 +541,13 @@ export class EmailService {
           </ul>
         </div>
       </div>
-    ` : '';
+    `
+        : '';
 
     // Recommendations section
-    const recommendationsHtml = (analysis.recommendations || []).length > 0 ? `
+    const recommendationsHtml =
+      (analysis.recommendations || []).length > 0
+        ? `
       <div style="margin-bottom: 24px;">
         <h3 style="color: #111827;">💡 Recommendations</h3>
         <div style="background: #eff6ff; padding: 16px; border-radius: 8px; border-left: 4px solid #2563eb;">
@@ -416,7 +556,8 @@ export class EmailService {
           </ul>
         </div>
       </div>
-    ` : '';
+    `
+        : '';
 
     return `
       <!DOCTYPE html>
@@ -437,21 +578,25 @@ export class EmailService {
               ${ratingLabel}
             </span>
           </div>
-          
+
           <div style="margin-bottom: 24px;">
             <h3 style="color: #111827;">Summary</h3>
             <p style="color: #374151;">${analysis.summary}</p>
           </div>
-          
-          ${(analysis.redFlags || []).length > 0 ? `
+
+          ${
+            (analysis.redFlags || []).length > 0
+              ? `
           <div style="margin-bottom: 24px;">
             <h3 style="color: #dc2626;">⚠️ Red Flags & Concerns</h3>
             <ul style="margin: 0; padding-left: 20px; list-style: none;">
               ${redFlagsHtml}
             </ul>
           </div>
-          ` : '<div style="background: #f0fdf4; padding: 16px; border-radius: 8px; border-left: 4px solid #059669; margin-bottom: 24px;"><p style="color: #059669; margin: 0;">✓ No major red flags detected</p></div>'}
-          
+          `
+              : '<div style="background: #f0fdf4; padding: 16px; border-radius: 8px; border-left: 4px solid #059669; margin-bottom: 24px;"><p style="color: #059669; margin: 0;">No red flags were identified in the analyzed excerpt; this does not establish that the lease is risk-free.</p></div>'
+          }
+
           <div style="margin-bottom: 24px;">
             <h3 style="color: #111827;">📋 Key Terms</h3>
             <div style="background: #f9fafb; padding: 16px; border-radius: 8px;">
@@ -474,7 +619,7 @@ export class EmailService {
           ${landlordObligationsHtml}
           ${terminationHtml}
           ${recommendationsHtml}
-          
+
           <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb; text-align: center; color: #6b7280; font-size: 14px;">
             <p>Analysis powered by LeaseIQ</p>
             <p style="margin-top: 8px;">This analysis is for informational purposes only and does not constitute legal advice.</p>
@@ -485,59 +630,79 @@ export class EmailService {
   }
 
   private static generateCombinedAnalysisEmail(analysis: any): string {
+    analysis = emailText(analysis);
     const { lease, floorPlan } = analysis;
 
     // Floor plan section
-    const floorPlanSection = floorPlan ? `
+    const floorPlanSection = floorPlan
+      ? `
       <div style="margin-bottom: 24px;">
         <h3 style="color: #111827;">🏠 Floor Plan Analysis</h3>
         <div style="background: #f9fafb; padding: 16px; border-radius: 8px;">
-          <p style="margin: 4px 0;"><strong>Layout:</strong> ${floorPlan.layout.bedrooms} Bed, ${floorPlan.layout.bathrooms} Bath${floorPlan.layout.estimatedSquareFeet ? `, ~${floorPlan.layout.estimatedSquareFeet} sqft` : ''}</p>
-          <p style="margin: 4px 0;"><strong>Space Efficiency:</strong> ${floorPlan.spaceEfficiency}</p>
+          <p style="margin: 4px 0;"><strong>Layout:</strong> ${floorPlan.layout.bedrooms ?? 'Unknown'} Bed, ${floorPlan.layout.bathrooms ?? 'Unknown'} Bath${floorPlan.layout.estimatedSquareFeet ? `, ~${floorPlan.layout.estimatedSquareFeet} sqft` : ''}</p>
+          <p style="margin: 4px 0;"><strong>Space Efficiency:</strong> ${floorPlan.spaceEfficiency ?? 'Unknown'}</p>
           <p style="margin: 8px 0 4px 0;"><strong>Summary:</strong></p>
           <p style="color: #374151; margin: 4px 0;">${floorPlan.summary}</p>
         </div>
 
-        ${floorPlan.features.length > 0 ? `
+        ${
+          floorPlan.features.length > 0
+            ? `
         <div style="margin-top: 12px;">
           <p style="margin: 4px 0;"><strong>Features:</strong></p>
           <ul style="margin: 4px 0; padding-left: 20px; color: #374151;">
             ${floorPlan.features.map((f: string) => `<li>${f}</li>`).join('')}
           </ul>
         </div>
-        ` : ''}
+        `
+            : ''
+        }
 
-        ${floorPlan.pros.length > 0 ? `
+        ${
+          floorPlan.pros.length > 0
+            ? `
         <div style="margin-top: 12px; background: #f0fdf4; padding: 12px; border-radius: 6px; border-left: 4px solid #059669;">
           <p style="margin: 0 0 4px 0; color: #059669;"><strong>✓ Advantages:</strong></p>
           <ul style="margin: 4px 0; padding-left: 20px; color: #065f46;">
             ${floorPlan.pros.map((p: string) => `<li>${p}</li>`).join('')}
           </ul>
         </div>
-        ` : ''}
+        `
+            : ''
+        }
 
-        ${floorPlan.cons.length > 0 ? `
+        ${
+          floorPlan.cons.length > 0
+            ? `
         <div style="margin-top: 12px; background: #fef2f2; padding: 12px; border-radius: 6px; border-left: 4px solid #dc2626;">
           <p style="margin: 0 0 4px 0; color: #dc2626;"><strong>⚠ Concerns:</strong></p>
           <ul style="margin: 4px 0; padding-left: 20px; color: #991b1b;">
             ${floorPlan.cons.map((c: string) => `<li>${c}</li>`).join('')}
           </ul>
         </div>
-        ` : ''}
+        `
+            : ''
+        }
 
-        ${floorPlan.recommendations.length > 0 ? `
+        ${
+          floorPlan.recommendations.length > 0
+            ? `
         <div style="margin-top: 12px; background: #eff6ff; padding: 12px; border-radius: 6px; border-left: 4px solid #2563eb;">
           <p style="margin: 0 0 4px 0; color: #2563eb;"><strong>💡 Recommendations:</strong></p>
           <ul style="margin: 4px 0; padding-left: 20px; color: #1e40af;">
             ${floorPlan.recommendations.map((r: string) => `<li>${r}</li>`).join('')}
           </ul>
         </div>
-        ` : ''}
+        `
+            : ''
+        }
       </div>
-    ` : '';
+    `
+      : '';
 
     // Lease section
-    const leaseSection = lease ? `
+    const leaseSection = lease
+      ? `
       <div style="margin-bottom: 24px;">
         <h3 style="color: #111827;">📄 Lease Analysis</h3>
         <div style="background: #f9fafb; padding: 16px; border-radius: 8px;">
@@ -556,30 +721,41 @@ export class EmailService {
           </div>
         </div>
 
-        ${lease.redFlags.length > 0 ? `
+        ${
+          lease.redFlags.length > 0
+            ? `
         <div style="margin-top: 12px; background: #fef2f2; padding: 12px; border-radius: 6px; border-left: 4px solid #dc2626;">
           <p style="margin: 0 0 4px 0; color: #dc2626;"><strong>⚠️ Red Flags:</strong></p>
           <ul style="margin: 4px 0; padding-left: 20px; color: #991b1b;">
-            ${lease.redFlags.map((flag: any) => {
-              if (typeof flag === 'string') {
-                return `<li>${flag}</li>`;
-              }
-              return `<li><strong>${flag.title}:</strong> ${flag.description}</li>`;
-            }).join('')}
+            ${lease.redFlags
+              .map((flag: any) => {
+                if (typeof flag === 'string') {
+                  return `<li>${flag}</li>`;
+                }
+                return `<li><strong>${flag.title}:</strong> ${flag.description}</li>`;
+              })
+              .join('')}
           </ul>
         </div>
-        ` : '<div style="background: #f0fdf4; padding: 12px; border-radius: 6px; border-left: 4px solid #059669; margin-top: 12px;"><p style="color: #059669; margin: 0;">✓ No major red flags detected</p></div>'}
+        `
+            : '<div style="background: #f0fdf4; padding: 12px; border-radius: 6px; border-left: 4px solid #059669; margin-top: 12px;"><p style="color: #059669; margin: 0;">No red flags were identified in the analyzed excerpt; this does not establish that the lease is risk-free.</p></div>'
+        }
 
-        ${lease.recommendations.length > 0 ? `
+        ${
+          lease.recommendations.length > 0
+            ? `
         <div style="margin-top: 12px; background: #eff6ff; padding: 12px; border-radius: 6px; border-left: 4px solid #2563eb;">
           <p style="margin: 0 0 4px 0; color: #2563eb;"><strong>💡 Recommendations:</strong></p>
           <ul style="margin: 4px 0; padding-left: 20px; color: #1e40af;">
             ${lease.recommendations.map((r: string) => `<li>${r}</li>`).join('')}
           </ul>
         </div>
-        ` : ''}
+        `
+            : ''
+        }
       </div>
-    ` : '';
+    `
+      : '';
 
     return `
       <!DOCTYPE html>
@@ -607,10 +783,15 @@ export class EmailService {
   }
 
   private static generateFloorPlanEmail(analysis: any): string {
-    const efficiencyColor = 
-      analysis.spaceEfficiency === 'Excellent' ? '#059669' :
-      analysis.spaceEfficiency === 'Good' ? '#2563eb' :
-      analysis.spaceEfficiency === 'Fair' ? '#f59e0b' : '#dc2626';
+    analysis = emailText(analysis);
+    const efficiencyColor =
+      analysis.spaceEfficiency === 'Excellent'
+        ? '#059669'
+        : analysis.spaceEfficiency === 'Good'
+          ? '#2563eb'
+          : analysis.spaceEfficiency === 'Fair'
+            ? '#f59e0b'
+            : '#dc2626';
 
     return `
       <!DOCTYPE html>
@@ -628,29 +809,33 @@ export class EmailService {
           <!-- Layout Overview -->
           <div style="background: #f9fafb; padding: 24px; border-radius: 12px; margin-bottom: 24px; text-align: center;">
             <div style="display: inline-block; margin: 0 16px;">
-              <div style="font-size: 32px; font-weight: bold; color: #2563eb;">${analysis.layout.bedrooms}</div>
+              <div style="font-size: 32px; font-weight: bold; color: #2563eb;">${analysis.layout.bedrooms ?? 'Unknown'}</div>
               <div style="font-size: 14px; color: #6b7280;">Bedrooms</div>
             </div>
             <div style="display: inline-block; margin: 0 16px;">
-              <div style="font-size: 32px; font-weight: bold; color: #2563eb;">${analysis.layout.bathrooms}</div>
+              <div style="font-size: 32px; font-weight: bold; color: #2563eb;">${analysis.layout.bathrooms ?? 'Unknown'}</div>
               <div style="font-size: 14px; color: #6b7280;">Bathrooms</div>
             </div>
             <div style="display: inline-block; margin: 0 16px;">
-              <div style="font-size: 32px; font-weight: bold; color: #2563eb;">${analysis.layout.totalRooms}</div>
+              <div style="font-size: 32px; font-weight: bold; color: #2563eb;">${analysis.layout.totalRooms ?? 'Unknown'}</div>
               <div style="font-size: 14px; color: #6b7280;">Total Rooms</div>
             </div>
-            ${analysis.layout.estimatedSquareFeet ? `
+            ${
+              analysis.layout.estimatedSquareFeet
+                ? `
             <div style="display: inline-block; margin: 0 16px;">
               <div style="font-size: 32px; font-weight: bold; color: #2563eb;">${analysis.layout.estimatedSquareFeet}</div>
               <div style="font-size: 14px; color: #6b7280;">Est. Sq Ft</div>
             </div>
-            ` : ''}
+            `
+                : ''
+            }
           </div>
 
           <!-- Space Efficiency -->
           <div style="text-align: center; margin-bottom: 24px;">
             <span style="display: inline-block; padding: 8px 24px; background: ${efficiencyColor}15; color: ${efficiencyColor}; font-weight: 600; border-radius: 20px; border: 2px solid ${efficiencyColor};">
-              Space Efficiency: ${analysis.spaceEfficiency}
+              Space Efficiency: ${analysis.spaceEfficiency ?? 'Unknown'}
             </span>
           </div>
 
@@ -661,7 +846,9 @@ export class EmailService {
           </div>
 
           <!-- Features -->
-          ${analysis.features.length > 0 ? `
+          ${
+            analysis.features.length > 0
+              ? `
           <div style="margin-bottom: 24px;">
             <h3 style="color: #111827;">✨ Features</h3>
             <div style="background: #f9fafb; padding: 16px; border-radius: 8px;">
@@ -670,10 +857,14 @@ export class EmailService {
               </ul>
             </div>
           </div>
-          ` : ''}
+          `
+              : ''
+          }
 
           <!-- Pros -->
-          ${analysis.pros.length > 0 ? `
+          ${
+            analysis.pros.length > 0
+              ? `
           <div style="margin-bottom: 24px;">
             <h3 style="color: #059669;">✓ Advantages</h3>
             <div style="background: #f0fdf4; padding: 16px; border-radius: 8px; border-left: 4px solid #059669;">
@@ -682,10 +873,14 @@ export class EmailService {
               </ul>
             </div>
           </div>
-          ` : ''}
+          `
+              : ''
+          }
 
           <!-- Cons -->
-          ${analysis.cons.length > 0 ? `
+          ${
+            analysis.cons.length > 0
+              ? `
           <div style="margin-bottom: 24px;">
             <h3 style="color: #dc2626;">⚠ Concerns</h3>
             <div style="background: #fef2f2; padding: 16px; border-radius: 8px; border-left: 4px solid #dc2626;">
@@ -694,10 +889,14 @@ export class EmailService {
               </ul>
             </div>
           </div>
-          ` : ''}
+          `
+              : ''
+          }
 
           <!-- Recommendations -->
-          ${analysis.recommendations.length > 0 ? `
+          ${
+            analysis.recommendations.length > 0
+              ? `
           <div style="margin-bottom: 24px;">
             <h3 style="color: #111827;">💡 Recommendations</h3>
             <div style="background: #eff6ff; padding: 16px; border-radius: 8px; border-left: 4px solid #2563eb;">
@@ -706,7 +905,9 @@ export class EmailService {
               </ul>
             </div>
           </div>
-          ` : ''}
+          `
+              : ''
+          }
 
           <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb; text-align: center; color: #6b7280; font-size: 14px;">
             <p>Analysis powered by LeaseIQ</p>

@@ -4,24 +4,24 @@
   "description": "LeaseIQ rental platform database layer",
   "main": "dist/server.js",
   "engines": {
-    "node": ">=18.0.0 <23.0.0"
+    "node": ">=24.0.0 <25.0.0"
   },
   "scripts": {
     "build": "tsc && echo 'Build completed successfully'",
     "prebuild": "echo 'Starting TypeScript compilation...'",
     "test": "vitest --run",
     "test:watch": "vitest",
-    "test:connection": "tsx test-connection.ts",
+    "test:connection": "tsx tests/test-connection.ts",
     "test:resend": "tsx tests/test-resend-email.ts",
     "test:reducto": "tsx tests/test-reducto-pdf.ts",
     "test:workflow": "tsx tests/quick-test.ts",
     "test:workflow-full": "tsx tests/quick-test.ts",
     "test:combined": "tsx tests/test-combined-analysis.ts",
-    "dev": "tsx src/server.ts",
-    "start": "node scripts/start-production.js",
+    "dev": "node scripts/dev.cjs",
+    "start": "node dist/server.js",
     "start:backend": "tsx src/server.ts",
     "start:frontend": "cd frontend && npm run dev",
-    "start:fullstack": "node scripts/start-production.js",
+    "start:fullstack": "node scripts/dev.cjs",
     "server": "node dist/server.js",
     "alerts": "tsx src/jobs/alert-cron.ts",
     "scraping": "tsx src/jobs/scraping-cron.ts",
@@ -31,6 +31,9 @@
     "audit:listings": "tsx scripts/audit-listings.ts",
     "repair:listings": "tsx scripts/repair-listings.ts",
     "verify:listings": "tsx scripts/verify-listings.ts",
+    "dev:api": "tsx src/server.ts",
+    "test:e2e": "playwright test",
+    "test:dev": "node scripts/check-dev-lifecycle.cjs",
     "validate:listing-flow": "tsx scripts/validate-listing-flow.ts"
   },
   "keywords": [
@@ -41,8 +44,6 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@googlemaps/google-maps-services-js": "^3.4.2",
-    "@mendable/firecrawl-js": "^0.0.36",
     "@supabase/supabase-js": "^2.93.3",
     "@types/multer": "^2.0.0",
     "bottleneck": "^2.19.5",
@@ -51,26 +52,28 @@
     "express": "^5.2.1",
     "express-rate-limit": "^8.2.1",
     "google-auth-library": "^10.5.0",
+    "ipaddr.js": "^2.5.0",
     "jsonwebtoken": "^9.0.3",
+    "mongodb": "^6.21.0",
     "mongoose": "^8.0.0",
     "multer": "^2.0.2",
     "node-cron": "^4.2.1",
-    "openai": "^6.17.0",
-    "resend": "^6.9.1",
-    "uuid": "^13.0.0"
+    "openai": "^6.17.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/express-rate-limit": "^5.1.3",
     "@types/jsonwebtoken": "^9.0.10",
-    "@types/node": "^20.10.0",
+    "@types/node": "^24.19.2",
     "@types/node-cron": "^3.0.11",
-    "@types/uuid": "^10.0.0",
     "fast-check": "^4.5.3",
-    "mongodb-memory-server": "^9.1.0",
+    "mongodb-memory-server": "^11.3.0",
+    "prettier": "^3.9.10",
     "tsx": "^4.7.0",
     "typescript": "^5.3.0",
-    "vitest": "^1.0.0"
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
   }
 }

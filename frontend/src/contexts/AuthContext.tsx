@@ -20,7 +20,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || ''
+import { API_URL, apiFetch, api } from '@/lib/api'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -33,15 +33,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const storedUser = localStorage.getItem('leaseiq_user')
 
     if (storedToken && storedUser) {
-      setToken(storedToken)
-      setUser(JSON.parse(storedUser))
+      try {
+        setToken(storedToken)
+        setUser(JSON.parse(storedUser))
+      } catch {
+        localStorage.removeItem('leaseiq_user')
+        localStorage.removeItem('leaseiq_token')
+      }
     }
     setIsLoading(false)
+    const expired = () => {
+      setUser(null)
+      setToken(null)
+      localStorage.removeItem('leaseiq_token')
+      localStorage.removeItem('leaseiq_user')
+      api.invalidateSavedListingsCache()
+    }
+    window.addEventListener('leaseiq-session-expired', expired)
+    return () => window.removeEventListener('leaseiq-session-expired', expired)
   }, [])
 
   const login = async (credential: string) => {
     try {
-      const response = await fetch(`${API_URL}/api/auth/google`, {
+      const response = await apiFetch(`${API_URL}/api/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ credential }),
@@ -53,6 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const data = await response.json()
 
+      api.invalidateSavedListingsCache()
       setToken(data.token)
       setUser(data.user)
 
@@ -66,7 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginWithCode = async (code: string) => {
     try {
-      const response = await fetch(`${API_URL}/api/auth/google/code`, {
+      const response = await apiFetch(`${API_URL}/api/auth/google/code`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code }),
@@ -75,9 +90,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
         console.error('Authentication failed:', errorData)
-        
+
         // Show more detailed error to user
-        throw new Error(errorData.error || 'Sign-in failed. Please try again.')
+        const errorMessage = errorData.error || 'Sign-in failed. Please try again.'
+        throw new Error(`Authentication failed: ${errorMessage}`)
       }
 
       const data = await response.json()
@@ -94,6 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const logout = () => {
+    api.invalidateSavedListingsCache()
     setToken(null)
     setUser(null)
     localStorage.removeItem('leaseiq_token')

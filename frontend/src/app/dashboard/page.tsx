@@ -5,14 +5,25 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Navigation from '@/components/Navigation'
 import Footer from '@/components/Footer'
-import { useShortlist } from '@/contexts/ShortlistContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { api, UserPreferences, SavedSearch } from '@/lib/api'
+import { useShortlist } from '@/contexts/ShortlistContext'
 import { rentLabel } from '@/lib/listing-rent'
 import ApplicationTracker from '@/components/dashboard/ApplicationTracker'
-import { 
-  Heart, Bell, Settings, Trash2, Send, Plus, X, ClipboardList,
-  DollarSign, Bed, Bath, PawPrint, MapPin 
+import {
+  Heart,
+  Bell,
+  Settings,
+  Trash2,
+  Send,
+  Plus,
+  X,
+  ClipboardList,
+  DollarSign,
+  Bed,
+  Bath,
+  PawPrint,
+  MapPin,
 } from 'lucide-react'
 
 type TabType = 'tracker' | 'saved' | 'alerts' | 'preferences'
@@ -20,7 +31,11 @@ type TabType = 'tracker' | 'saved' | 'alerts' | 'preferences'
 export default function DashboardPage() {
   const router = useRouter()
   const { retry: reloadShortlist } = useShortlist()
+  const [sendingAlert, setSendingAlert] = useState<string | null>(null)
   const { user, isLoading: authLoading } = useAuth()
+  const [loadError, setLoadError] = useState('')
+  const [alertNotice, setAlertNotice] = useState('')
+  const [notifications, setNotifications] = useState<any[]>([])
   const [activeTab, setActiveTab] = useState<TabType>('saved')
   const [savedListings, setSavedListings] = useState<any[]>([])
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([])
@@ -28,9 +43,6 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [showNewSearchModal, setShowNewSearchModal] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
-  const [sendingAlert, setSendingAlert] = useState<string | null>(null)
   const [preferencesLoaded, setPreferencesLoaded] = useState(false)
 
   // Redirect if not logged in
@@ -40,37 +52,36 @@ export default function DashboardPage() {
     }
   }, [user, authLoading, router])
 
-  // Fetch on tab entry so each view reflects the account, including another device's changes.
   useEffect(() => {
-    if (user) loadData()
+    if (user) void loadData()
   }, [user, activeTab])
-
   const switchTab = (tab: TabType) => {
-    if (tab === activeTab) return
-    setError(null)
-    setNotice(null)
-    setIsLoading(true)
-    setActiveTab(tab)
+    if (tab !== activeTab) {
+      setLoadError('')
+      setAlertNotice('')
+      setIsLoading(true)
+      setActiveTab(tab)
+    }
   }
 
   const loadData = async () => {
     setIsLoading(true)
-    setError(null)
     try {
+      setLoadError('')
       if (activeTab === 'saved' || activeTab === 'tracker') {
         const listings = await api.getSavedListings()
         setSavedListings(listings)
       } else if (activeTab === 'alerts') {
         const searches = await api.getSavedSearches()
         setSavedSearches(searches)
+        setNotifications(await api.getNotifications())
       } else if (activeTab === 'preferences') {
         const prefs = await api.getPreferences()
         setPreferences(prefs)
         setPreferencesLoaded(true)
       }
     } catch (error) {
-      console.error('Failed to load data:', error)
-      setError(error instanceof Error ? error.message : 'Something went wrong. Please retry.')
+      setLoadError((error as Error).message)
     }
     setIsLoading(false)
   }
@@ -79,20 +90,18 @@ export default function DashboardPage() {
     try {
       await api.unsaveListing(listingId)
       reloadShortlist()
-      setSavedListings(prev => prev.filter(l => l._id !== listingId))
+      setSavedListings((prev) => prev.filter((l) => l._id !== listingId))
     } catch (error) {
-      console.error('Failed to unsave listing:', error)
-      setError(error instanceof Error ? error.message : 'Something went wrong. Please retry.')
+      setLoadError(`Listing was not removed: ${(error as Error).message}. Retry removing it.`)
     }
   }
 
   const handleDeleteSearch = async (searchId: string) => {
     try {
       await api.deleteSavedSearch(searchId)
-      setSavedSearches(prev => prev.filter(s => s._id !== searchId))
+      setSavedSearches((prev) => prev.filter((s) => s._id !== searchId))
     } catch (error) {
-      console.error('Failed to delete search:', error)
-      setError(error instanceof Error ? error.message : 'Something went wrong. Please retry.')
+      setLoadError(`Search was not deleted: ${(error as Error).message}. Retry deleting it.`)
     }
   }
 
@@ -101,25 +110,27 @@ export default function DashboardPage() {
       const updated = await api.updateSavedSearch(search._id!, {
         alertsEnabled: !search.alertsEnabled,
       })
-      setSavedSearches(prev => prev.map(s => s._id === search._id ? updated : s))
+      setSavedSearches((prev) => prev.map((s) => (s._id === search._id ? updated : s)))
     } catch (error) {
-      console.error('Failed to toggle alerts:', error)
-      setError(error instanceof Error ? error.message : 'Something went wrong. Please retry.')
+      setLoadError(`Alert preference was not saved: ${(error as Error).message}. Retry the change.`)
     }
   }
 
   const handleTestAlert = async (searchId: string) => {
-    setError(null)
-    setNotice(null)
+    if (sendingAlert) return
     setSendingAlert(searchId)
     try {
-      await api.testSavedSearchAlert(searchId)
-      setNotice('Test email sent. Check your inbox.')
+      const result = await api.testSavedSearchAlert(searchId)
+      setAlertNotice(
+        result.error || result.message || 'Search checked. Your delivery preferences apply.',
+      )
+      setNotifications(await api.getNotifications())
     } catch (error) {
       console.error('Failed to send test alert:', error)
-      setError(error instanceof Error ? error.message : 'Something went wrong. Please retry.')
-
-    } finally { setSendingAlert(null) }
+      setAlertNotice((error as Error).message)
+    } finally {
+      setSendingAlert(null)
+    }
   }
 
   const handleSavePreferences = async () => {
@@ -130,7 +141,6 @@ export default function DashboardPage() {
       alert('Preferences saved!')
     } catch (error) {
       console.error('Failed to save preferences:', error)
-      setError(error instanceof Error ? error.message : 'Something went wrong. Please retry.')
       alert('Failed to save preferences')
     }
     setIsSaving(false)
@@ -147,7 +157,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
-      
+
       <main className="pt-28 pb-20 px-6 lg:px-8">
         <div className="max-w-6xl mx-auto">
           {/* Header */}
@@ -160,13 +170,71 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          {error && <div role="alert" className="mb-6 rounded-2xl border border-red-200 bg-red-50 text-red-900 p-4">{error} <button className="underline ml-3" onClick={loadData}>Reload data</button></div>}
-          {notice && <p role="status" className="mb-6 rounded-2xl border border-border p-4">{notice}</p>}
+          {loadError && (
+            <div role="alert" className="mb-5 rounded-xl bg-amber-50 p-4">
+              {loadError}{' '}
+              <button onClick={loadData} className="underline">
+                Retry loading
+              </button>
+            </div>
+          )}
+          {alertNotice && (
+            <p role="status" className="mb-5 rounded-xl bg-primary/10 p-4">
+              {alertNotice}
+            </p>
+          )}
+          {activeTab === 'alerts' && !!notifications.length && (
+            <section
+              aria-label="In-app notifications"
+              className="mb-6 rounded-2xl border border-border bg-card p-5"
+            >
+              <h2 className="font-serif text-2xl">Notifications</h2>
+              <ul className="mt-3 space-y-4">
+                {notifications.map((n) => (
+                  <li key={n._id}>
+                    <p className="font-semibold">
+                      {n.payload?.name} · {n.listingIds.length} new source observations
+                    </p>
+                    <p className="text-xs">
+                      {new Date(n.sentAt).toLocaleString()} · Confirm current availability with the
+                      source.
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-3">
+                      {n.listingIds.map((id: string, i: number) => (
+                        <Link
+                          className="text-sm text-primary underline"
+                          href={`/listing/${id}`}
+                          key={id}
+                        >
+                          View listing {i + 1}
+                        </Link>
+                      ))}
+                      {!n.readAt && (
+                        <button
+                          className="text-sm underline"
+                          onClick={async () => {
+                            try {
+                              await api.readNotification(n._id)
+                              setNotifications(await api.getNotifications())
+                            } catch (e) {
+                              setAlertNotice((e as Error).message)
+                            }
+                          }}
+                        >
+                          Mark read
+                        </button>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
           {/* Tabs */}
-          <div className="flex gap-4 mb-8 overflow-x-auto border-b border-border">
+          <div className="flex flex-wrap gap-4 mb-8 border-b border-border">
             <button
               onClick={() => switchTab('tracker')}
-              className={`flex shrink-0 items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
+              className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
                 activeTab === 'tracker'
                   ? 'border-primary text-primary'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -177,7 +245,7 @@ export default function DashboardPage() {
             </button>
             <button
               onClick={() => switchTab('saved')}
-              className={`flex shrink-0 items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
+              className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
                 activeTab === 'saved'
                   ? 'border-primary text-primary'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -188,7 +256,7 @@ export default function DashboardPage() {
             </button>
             <button
               onClick={() => switchTab('alerts')}
-              className={`flex shrink-0 items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
+              className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
                 activeTab === 'alerts'
                   ? 'border-primary text-primary'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -199,7 +267,7 @@ export default function DashboardPage() {
             </button>
             <button
               onClick={() => switchTab('preferences')}
-              className={`flex shrink-0 items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
+              className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
                 activeTab === 'preferences'
                   ? 'border-primary text-primary'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -217,7 +285,14 @@ export default function DashboardPage() {
             <>
               {/* Apartment Tracker Tab */}
               {activeTab === 'tracker' && (
-                <ApplicationTracker userId={user.id} listings={savedListings} onStatusUpdated={(id, status) => setSavedListings(rows => rows.map(row => row._id === id ? { ...row, status } : row))} />
+                <ApplicationTracker
+                  key={user.id}
+                  userId={user.id}
+                  listings={savedListings}
+                  onStatusSaved={(id, status) =>
+                    setSavedListings((old) => old.map((l) => (l._id === id ? { ...l, status } : l)))
+                  }
+                />
               )}
 
               {/* Saved Listings Tab */}
@@ -255,15 +330,12 @@ export default function DashboardPage() {
                           <div className="p-4">
                             <div className="flex justify-between items-start">
                               <div>
-                                <p className="font-semibold text-lg">
-                                  {rentLabel(listing)}{listing.price?.amount != null || listing.buildingRent?.status === 'range' ? ` / ${listing.price?.period === 'weekly' ? 'week' : listing.price?.period === 'daily' ? 'day' : 'mo'}` : ''}
-                                </p>
+                                <p className="font-semibold text-lg">{rentLabel(listing)}</p>
                                 <p className="text-sm text-muted-foreground">
                                   {listing.address?.street}
                                 </p>
                                 <p className="text-sm text-muted-foreground">
-                                  {listing.listingScope === 'building' ? 'Building pricing · confirm a unit' : `${listing.bedrooms === 0 ? 'Studio' : listing.bedrooms == null ? 'Beds unknown' : `${listing.bedrooms} bed`} · ${listing.bathrooms == null ? 'Baths unknown' : `${listing.bathrooms} bath`}`}
-                                  <span className="mt-2 block text-xs text-accent">Source-reported · verify availability</span>
+                                  {listing.bedrooms ?? '?'} bed • {listing.bathrooms ?? '?'} bath
                                 </p>
                               </div>
                               <button
@@ -327,11 +399,12 @@ export default function DashboardPage() {
                                     {search.criteria.minBedrooms}+ beds
                                   </span>
                                 )}
-                                {search.criteria.neighborhoods && search.criteria.neighborhoods.length > 0 && (
-                                  <span className="text-xs bg-muted px-2 py-1 rounded">
-                                    {search.criteria.neighborhoods.join(', ')}
-                                  </span>
-                                )}
+                                {search.criteria.neighborhoods &&
+                                  search.criteria.neighborhoods.length > 0 && (
+                                    <span className="text-xs bg-muted px-2 py-1 rounded">
+                                      {search.criteria.neighborhoods.join(', ')}
+                                    </span>
+                                  )}
                                 {search.criteria.requiresDogsAllowed && (
                                   <span className="text-xs bg-muted px-2 py-1 rounded">
                                     Dogs OK
@@ -354,10 +427,10 @@ export default function DashboardPage() {
                                 {search.alertsEnabled ? 'Active' : 'Paused'}
                               </button>
                               <button
+                                disabled={sendingAlert !== null}
                                 onClick={() => handleTestAlert(search._id!)}
                                 className="p-2 text-primary hover:bg-primary/10 rounded-full transition-colors"
-                                title="Send test alert"
-                          disabled={sendingAlert !== null}
+                                title="Check for due alerts"
                               >
                                 <Send size={18} />
                               </button>
@@ -397,7 +470,12 @@ export default function DashboardPage() {
                           placeholder="Min"
                           min="0"
                           value={preferences.minPrice ?? ''}
-                          onChange={(e) => setPreferences(p => ({ ...p, minPrice: e.target.value ? Number(e.target.value) : undefined }))}
+                          onChange={(e) =>
+                            setPreferences((p) => ({
+                              ...p,
+                              minPrice: e.target.value ? Number(e.target.value) : undefined,
+                            }))
+                          }
                           className="flex-1 px-3 py-2 border border-border rounded-lg bg-background"
                         />
                         <input
@@ -405,7 +483,12 @@ export default function DashboardPage() {
                           placeholder="Max"
                           min="0"
                           value={preferences.maxPrice ?? ''}
-                          onChange={(e) => setPreferences(p => ({ ...p, maxPrice: e.target.value ? Number(e.target.value) : undefined }))}
+                          onChange={(e) =>
+                            setPreferences((p) => ({
+                              ...p,
+                              maxPrice: e.target.value ? Number(e.target.value) : undefined,
+                            }))
+                          }
                           className="flex-1 px-3 py-2 border border-border rounded-lg bg-background"
                         />
                       </div>
@@ -422,7 +505,12 @@ export default function DashboardPage() {
                         placeholder="Minimum bedrooms"
                         min="0"
                         value={preferences.minBedrooms ?? ''}
-                        onChange={(e) => setPreferences(p => ({ ...p, minBedrooms: e.target.value ? Number(e.target.value) : undefined }))}
+                        onChange={(e) =>
+                          setPreferences((p) => ({
+                            ...p,
+                            minBedrooms: e.target.value ? Number(e.target.value) : undefined,
+                          }))
+                        }
                         className="w-full px-3 py-2 border border-border rounded-lg bg-background"
                       />
                     </div>
@@ -439,7 +527,12 @@ export default function DashboardPage() {
                         min="0"
                         step="0.5"
                         value={preferences.minBathrooms ?? ''}
-                        onChange={(e) => setPreferences(p => ({ ...p, minBathrooms: e.target.value ? Number(e.target.value) : undefined }))}
+                        onChange={(e) =>
+                          setPreferences((p) => ({
+                            ...p,
+                            minBathrooms: e.target.value ? Number(e.target.value) : undefined,
+                          }))
+                        }
                         className="w-full px-3 py-2 border border-border rounded-lg bg-background"
                       />
                     </div>
@@ -451,22 +544,35 @@ export default function DashboardPage() {
                         Neighborhoods
                       </label>
                       <div className="space-y-2 max-h-48 overflow-y-auto border border-border rounded-lg p-3 bg-background">
-                        {['Manhattan', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island', 'Williamsburg', 'Park Slope', 'Astoria', 'Long Island City'].map((neighborhood) => (
-                          <label key={neighborhood} className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 p-2 rounded transition-colors">
+                        {[
+                          'Manhattan',
+                          'Brooklyn',
+                          'Queens',
+                          'Bronx',
+                          'Staten Island',
+                          'Williamsburg',
+                          'Park Slope',
+                          'Astoria',
+                          'Long Island City',
+                        ].map((neighborhood) => (
+                          <label
+                            key={neighborhood}
+                            className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 p-2 rounded transition-colors"
+                          >
                             <input
                               type="checkbox"
                               checked={preferences.neighborhoods?.includes(neighborhood) || false}
                               onChange={(e) => {
                                 const current = preferences.neighborhoods || []
                                 if (e.target.checked) {
-                                  setPreferences(p => ({ 
-                                    ...p, 
-                                    neighborhoods: [...current, neighborhood] 
+                                  setPreferences((p) => ({
+                                    ...p,
+                                    neighborhoods: [...current, neighborhood],
                                   }))
                                 } else {
-                                  setPreferences(p => ({ 
-                                    ...p, 
-                                    neighborhoods: current.filter(n => n !== neighborhood) 
+                                  setPreferences((p) => ({
+                                    ...p,
+                                    neighborhoods: current.filter((n) => n !== neighborhood),
                                   }))
                                 }
                               }}
@@ -478,7 +584,8 @@ export default function DashboardPage() {
                       </div>
                       {preferences.neighborhoods && preferences.neighborhoods.length > 0 && (
                         <p className="text-xs text-muted-foreground mt-2">
-                          {preferences.neighborhoods.length} neighborhood{preferences.neighborhoods.length !== 1 ? 's' : ''} selected
+                          {preferences.neighborhoods.length} neighborhood
+                          {preferences.neighborhoods.length !== 1 ? 's' : ''} selected
                         </p>
                       )}
                     </div>
@@ -494,7 +601,12 @@ export default function DashboardPage() {
                           <input
                             type="checkbox"
                             checked={preferences.requiresDogsAllowed || false}
-                            onChange={(e) => setPreferences(p => ({ ...p, requiresDogsAllowed: e.target.checked }))}
+                            onChange={(e) =>
+                              setPreferences((p) => ({
+                                ...p,
+                                requiresDogsAllowed: e.target.checked,
+                              }))
+                            }
                             className="rounded"
                           />
                           Dogs allowed
@@ -503,7 +615,12 @@ export default function DashboardPage() {
                           <input
                             type="checkbox"
                             checked={preferences.requiresCatsAllowed || false}
-                            onChange={(e) => setPreferences(p => ({ ...p, requiresCatsAllowed: e.target.checked }))}
+                            onChange={(e) =>
+                              setPreferences((p) => ({
+                                ...p,
+                                requiresCatsAllowed: e.target.checked,
+                              }))
+                            }
                             className="rounded"
                           />
                           Cats allowed
@@ -517,7 +634,9 @@ export default function DashboardPage() {
                         <input
                           type="checkbox"
                           checked={preferences.noFeeOnly || false}
-                          onChange={(e) => setPreferences(p => ({ ...p, noFeeOnly: e.target.checked }))}
+                          onChange={(e) =>
+                            setPreferences((p) => ({ ...p, noFeeOnly: e.target.checked }))
+                          }
                           className="rounded"
                         />
                         No broker fee only
@@ -544,7 +663,7 @@ export default function DashboardPage() {
         <NewSearchModal
           onClose={() => setShowNewSearchModal(false)}
           onCreated={(search) => {
-            setSavedSearches(prev => [search, ...prev])
+            setSavedSearches((prev) => [search, ...prev])
             setShowNewSearchModal(false)
           }}
         />
@@ -555,26 +674,25 @@ export default function DashboardPage() {
   )
 }
 
-function NewSearchModal({ 
-  onClose, 
-  onCreated 
-}: { 
+function NewSearchModal({
+  onClose,
+  onCreated,
+}: {
   onClose: () => void
-  onCreated: (search: SavedSearch) => void 
+  onCreated: (search: SavedSearch) => void
 }) {
   const [name, setName] = useState('')
   const [criteria, setCriteria] = useState<UserPreferences>({})
+  const [alertMethod, setAlertMethod] = useState<'email' | 'in-app' | 'both'>('email')
   const [alertFrequency, setAlertFrequency] = useState<'immediate' | 'daily' | 'weekly'>('daily')
   const [isCreating, setIsCreating] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   const handleCreate = async () => {
     if (!name.trim()) {
-      setError('Please enter a name for this alert')
+      alert('Please enter a name for this alert')
       return
     }
 
-    setError(null)
     setIsCreating(true)
     try {
       const search = await api.createSavedSearch({
@@ -582,32 +700,30 @@ function NewSearchModal({
         criteria,
         alertsEnabled: true,
         alertFrequency,
-        alertMethod: 'email',
+        alertMethod,
       })
       onCreated(search)
     } catch (error) {
       console.error('Failed to create search:', error)
-      setError(error instanceof Error ? error.message : 'Something went wrong. Please retry.')
-
+      alert('Failed to create alert')
     }
     setIsCreating(false)
   }
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div role="dialog" aria-modal="true" aria-label="Create Search Alert" className="bg-background rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-background rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center p-4 border-b border-border">
           <h2 className="text-xl font-semibold">Create Search Alert</h2>
-          <button aria-label="Close alert form" onClick={onClose} className="p-2 hover:bg-muted rounded-full">
+          <button onClick={onClose} className="p-2 hover:bg-muted rounded-full">
             <X size={20} />
           </button>
         </div>
 
         <div className="p-4 space-y-4">
-          {error && <p role="alert" className="text-red-700">{error}</p>}
           <div>
-            <label htmlFor="alert-name" className="text-sm font-medium mb-1 block">Alert Name</label>
-            <input id="alert-name"
+            <label className="text-sm font-medium mb-1 block">Alert Name</label>
+            <input
               type="text"
               placeholder="e.g., 2BR in Brooklyn under $3k"
               value={name}
@@ -618,22 +734,32 @@ function NewSearchModal({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label htmlFor="alert-price" className="text-sm font-medium mb-1 block">Max Price</label>
-              <input id="alert-price"
+              <label className="text-sm font-medium mb-1 block">Max Price</label>
+              <input
                 type="number"
                 placeholder="e.g., 3000"
                 value={criteria.maxPrice || ''}
-                onChange={(e) => setCriteria(c => ({ ...c, maxPrice: e.target.value ? Number(e.target.value) : null }))}
+                onChange={(e) =>
+                  setCriteria((c) => ({
+                    ...c,
+                    maxPrice: e.target.value ? Number(e.target.value) : null,
+                  }))
+                }
                 className="w-full px-3 py-2 border border-border rounded-lg bg-background"
               />
             </div>
             <div>
-              <label htmlFor="alert-beds" className="text-sm font-medium mb-1 block">Min Bedrooms</label>
-              <input id="alert-beds"
+              <label className="text-sm font-medium mb-1 block">Min Bedrooms</label>
+              <input
                 type="number"
                 placeholder="e.g., 2"
                 value={criteria.minBedrooms || ''}
-                onChange={(e) => setCriteria(c => ({ ...c, minBedrooms: e.target.value ? Number(e.target.value) : null }))}
+                onChange={(e) =>
+                  setCriteria((c) => ({
+                    ...c,
+                    minBedrooms: e.target.value ? Number(e.target.value) : null,
+                  }))
+                }
                 className="w-full px-3 py-2 border border-border rounded-lg bg-background"
               />
             </div>
@@ -642,22 +768,35 @@ function NewSearchModal({
           <div>
             <label className="text-sm font-medium mb-1 block">Neighborhoods</label>
             <div className="space-y-2 max-h-48 overflow-y-auto border border-border rounded-lg p-3 bg-background">
-              {['Manhattan', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island', 'Williamsburg', 'Park Slope', 'Astoria', 'Long Island City'].map((neighborhood) => (
-                <label key={neighborhood} className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 p-2 rounded transition-colors">
+              {[
+                'Manhattan',
+                'Brooklyn',
+                'Queens',
+                'Bronx',
+                'Staten Island',
+                'Williamsburg',
+                'Park Slope',
+                'Astoria',
+                'Long Island City',
+              ].map((neighborhood) => (
+                <label
+                  key={neighborhood}
+                  className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 p-2 rounded transition-colors"
+                >
                   <input
                     type="checkbox"
                     checked={criteria.neighborhoods?.includes(neighborhood) || false}
                     onChange={(e) => {
                       const current = criteria.neighborhoods || []
                       if (e.target.checked) {
-                        setCriteria(c => ({ 
-                          ...c, 
-                          neighborhoods: [...current, neighborhood] 
+                        setCriteria((c) => ({
+                          ...c,
+                          neighborhoods: [...current, neighborhood],
                         }))
                       } else {
-                        setCriteria(c => ({ 
-                          ...c, 
-                          neighborhoods: current.filter(n => n !== neighborhood) 
+                        setCriteria((c) => ({
+                          ...c,
+                          neighborhoods: current.filter((n) => n !== neighborhood),
                         }))
                       }
                     }}
@@ -679,7 +818,9 @@ function NewSearchModal({
               <input
                 type="checkbox"
                 checked={criteria.requiresDogsAllowed || false}
-                onChange={(e) => setCriteria(c => ({ ...c, requiresDogsAllowed: e.target.checked }))}
+                onChange={(e) =>
+                  setCriteria((c) => ({ ...c, requiresDogsAllowed: e.target.checked }))
+                }
               />
               Dogs OK
             </label>
@@ -687,20 +828,33 @@ function NewSearchModal({
               <input
                 type="checkbox"
                 checked={criteria.noFeeOnly || false}
-                onChange={(e) => setCriteria(c => ({ ...c, noFeeOnly: e.target.checked }))}
+                onChange={(e) => setCriteria((c) => ({ ...c, noFeeOnly: e.target.checked }))}
               />
               No Fee
             </label>
           </div>
 
           <div>
-            <label htmlFor="alert-frequency" className="text-sm font-medium mb-1 block">Alert Frequency</label>
-            <select id="alert-frequency"
+            <label htmlFor="delivery-method" className="text-sm font-medium mb-1 block">
+              Delivery method
+            </label>
+            <select
+              id="delivery-method"
+              value={alertMethod}
+              onChange={(e) => setAlertMethod(e.target.value as 'email' | 'in-app' | 'both')}
+              className="field mb-4"
+            >
+              <option value="email">Email</option>
+              <option value="in-app">In-app notifications</option>
+              <option value="both">Email and in-app</option>
+            </select>
+            <label className="text-sm font-medium mb-1 block">Alert Frequency</label>
+            <select
               value={alertFrequency}
               onChange={(e) => setAlertFrequency(e.target.value as any)}
               className="w-full px-3 py-2 border border-border rounded-lg bg-background"
             >
-              <option value="immediate">At the next scheduled check</option>
+              <option value="immediate">Immediate (as soon as found)</option>
               <option value="daily">Daily digest</option>
               <option value="weekly">Weekly digest</option>
             </select>

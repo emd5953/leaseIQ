@@ -6,6 +6,10 @@ services:
     buildCommand: chmod +x scripts/render-build.sh && ./scripts/render-build.sh
     startCommand: node dist/server.js
     envVars:
+      - key: NODE_VERSION
+        value: 24
+      - key: JWT_SECRET
+        sync: false
       - key: NODE_ENV
         value: production
       - key: NPM_CONFIG_PRODUCTION
@@ -18,26 +22,39 @@ services:
         sync: false
       - key: RESEND_API_KEY
         sync: false
-      - key: RESEND_FROM_EMAIL
-        sync: false
       - key: REDUCTO_API_KEY
         sync: false
       - key: OPENROUTER_API_KEY
         sync: false
       - key: GOOGLE_GEOCODING_API_KEY
         sync: false
+      - key: GOOGLE_OAUTH_CLIENT_ID
+        sync: false
+      - key: GOOGLE_OAUTH_CLIENT_SECRET
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: INTERNAL_JOB_TOKEN
+        sync: false
+      - key: RESEND_FROM_EMAIL
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
     healthCheckPath: /health
     autoDeploy: true
 
-  # Alert Cron Job (runs every 10 minutes, 3 minutes after scraping)
-  # Sends alerts within 3-5 minutes of new listings appearing
+  # Alert worker every 15 minutes, offset from scraping. Delivery obeys each search's preferences.
   - type: cron
     name: leaseiq-alerts
     env: node
-    buildCommand: npm install --production=false && npm run build
+    buildCommand: npm ci --include=dev && npm run build
     startCommand: node dist/jobs/alert-cron.js
-    schedule: "3,13,23,33,43,53 * * * *"
+    schedule: "3,18,33,48 * * * *"
     envVars:
+      - key: NODE_VERSION
+        value: 24
+      - key: JWT_SECRET
+        sync: false
       - key: NODE_ENV
         value: production
       - key: NPM_CONFIG_PRODUCTION
@@ -48,17 +65,23 @@ services:
         sync: false
       - key: RESEND_FROM_EMAIL
         sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
 
-  # Scraping Cron Job - Every 10 minutes (you have the credits!)
-  # 144 runs per day = 4,320 credits/month (fits in your current plan)
-  # Each source scraped 11 times daily, max listing age: 2-3 hours
+  # Scraping every 15 minutes. Source access, freshness and provider budgets must be monitored.
   - type: cron
     name: leaseiq-scraping
     env: node
-    buildCommand: npm install --production=false && npm run build
+    buildCommand: npm ci --include=dev && npm run build
     startCommand: node dist/jobs/scraping-cron.js
-    schedule: "*/10 * * * *"
+    schedule: "*/15 * * * *"
     envVars:
+      - key: NODE_VERSION
+        value: 24
+      - key: JWT_SECRET
+        sync: false
       - key: NODE_ENV
         value: production
       - key: NPM_CONFIG_PRODUCTION

@@ -1,43 +1,49 @@
-import { SavedSearch } from '../../models/savedSearch.model';
-import { Types } from 'mongoose';
-import { Router, Response } from 'express';
+import { Router } from 'express';
 import { AlertService } from '../../services/alert.service';
-import { requireAuth, AuthRequest } from '../middleware/auth';
-
+import { requireAuth, requireInternalJob, AuthRequest } from '../middleware/auth';
+import { validateObjectId } from '../middleware/validation';
+import { SavedSearch } from '../../models';
+import { AlertDelivery } from '../../models/alertDelivery.model';
+import mongoose from 'mongoose';
 const router = Router();
-
-// Require authentication for all alert endpoints
+router.post('/process', requireInternalJob, async (_req, res) => {
+  if (mongoose.connection.readyState !== 1)
+    return res.status(503).json({ error: 'Alert storage unavailable' });
+  const result = await AlertService.processAlerts();
+  res.status(result.errors ? 502 : 200).json(result);
+});
 router.use(requireAuth);
-
-/**
- * POST /api/alerts/process
- * Process all alerts (typically called by cron job)
- */
-router.post('/process', (_req: AuthRequest, res: Response) => {
-  res.status(403).json({ error: 'Scheduled alerts can only be run by the server job.' });
+router.use((_req, res, next) => {
+  if (mongoose.connection.readyState !== 1)
+    return res.status(503).json({ error: 'Alert storage unavailable' });
+  next();
 });
-
-/**
- * POST /api/alerts/send/:savedSearchId
- * Send immediate alert for a specific saved search
- */
-router.post('/send/:savedSearchId', async (req: AuthRequest, res: Response) => {
-  try {
-    const savedSearchId = Array.isArray(req.params.savedSearchId) 
-      ? req.params.savedSearchId[0] 
-      : req.params.savedSearchId;
-    if (!Types.ObjectId.isValid(savedSearchId)) return res.status(400).json({ error: 'Invalid saved search ID' });
-    if (!await SavedSearch.exists({ _id: savedSearchId, userId: req.userId })) return res.status(404).json({ error: 'Saved search not found' });
-    const result = await AlertService.sendImmediateAlert(savedSearchId);
-    if (result.success) {
-      res.json({ message: 'Alert sent successfully' });
-    } else {
-      res.status(400).json({ error: result.error });
-    }
-  } catch (error) {
-    console.error('Send alert error:', error);
-    res.status(500).json({ error: 'Failed to send alert' });
-  }
+router.post(
+  '/send/:savedSearchId',
+  validateObjectId('savedSearchId'),
+  async (req: AuthRequest, res) => {
+    const id = String(req.params.savedSearchId);
+    if (!(await SavedSearch.exists({ _id: id, userId: req.userId })))
+      return res.status(404).json({ error: 'Saved search not found' });
+    const result = await AlertService.sendImmediateAlert(id, req.userId!);
+    res.status(result.success ? 200 : 502).json(result);
+  },
+);
+router.get('/notifications', async (req: AuthRequest, res) => {
+  const items = await AlertDelivery.find({ userId: req.userId, method: 'in-app', status: 'sent' })
+    .sort({ sentAt: -1 })
+    .limit(100)
+    .select('_id listingIds payload.name sentAt readAt')
+    .lean();
+  res.set('Cache-Control', 'no-store').json(items);
 });
-
+router.patch('/notifications/:id/read', validateObjectId(), async (req: AuthRequest, res) => {
+  const item = await AlertDelivery.findOneAndUpdate(
+    { _id: req.params.id, userId: req.userId, method: 'in-app', status: 'sent' },
+    { readAt: new Date() },
+    { new: true },
+  );
+  if (!item) return res.status(404).json({ error: 'Notification not found' });
+  res.json({ success: true });
+});
 export default router;

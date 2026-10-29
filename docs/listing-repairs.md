@@ -4,6 +4,12 @@
 database selected by the private `MONGODB_URI` configuration. Do not use production
 credentials when running tests.
 
+Current audit status (October 29, 2026): no development `MONGODB_URI` was available.
+The fresh read-only audit and repair preview both stopped before connecting; no
+current counts or per-record repair plan could be obtained, and no changes were
+applied. The October 22 report is historical. Use Node 24.x and configure the
+intended development database before rerunning the preview.
+
 The repair preserves listing IDs, saved-listing interactions, and alert history.
 It does not guess which apartment owns a building-level source ID. Shared source
 associations move into `sourceConflicts`, including their original observation
@@ -48,6 +54,36 @@ ambiguous records represent one apartment. Resolve conflicts only after obtainin
 exact unit evidence, or establish one explicitly labeled building record from
 matching building evidence. Restore backups only after checking that no newer source
 updates would be overwritten.
+
+## Backup and rollback procedure
+
+1. Confirm the target database with its operator, stop ingestion/alert writers for
+   the maintenance window, and take a database-level backup or provider snapshot.
+   Rehearse restoration into a separate development database first. Transactions
+   require a replica set (Atlas or a local replica set), not a standalone server.
+2. Keep the repair's `listings.before.ejson`, reference backups, `plan.ejson` and
+   `result.json` in a new private folder outside the repository. On Windows use a
+   folder with account-restricted ACLs; Unix permission bits alone do not set ACLs.
+   The scripts refuse to overwrite backup files and check repository containment
+   with platform-aware paths. Do not run `--apply` without a reviewed preview.
+3. For rollback, read the Extended JSON with `mongoose.mongo.BSON.EJSON.parse` to
+   preserve ObjectIds, dates and numeric types. Select **only IDs listed in the
+   recorded plan**, and compare their current documents with the applied changes
+   and completion time. Produce a reviewable diff against their before snapshots.
+   If a source import or user operation changed a record since the repair, resolve
+   it manually; do not blindly replace it with the older backup.
+4. With writers paused and the rollback diff approved, restore only those listing
+   documents by their original `_id` inside a transaction. Abort on any mismatch
+   or missing record. Do not drop collections or overwrite unrelated records.
+   Repair scripts do not change saved-listing interactions or alert references;
+   their backups are evidence for integrity checks, not instructions to overwrite
+   user activity. A database-wide restore belongs in a separate environment unless
+   the operator has explicitly chosen a full recovery.
+5. Repeat the read-only audit, verify listing IDs/source keys/unknown-price states
+   and saved/alert references, and check representative search/detail/tracker
+   flows before resuming workers. Retain both before and after evidence privately.
+
+No repair or rollback was executed during the October 29 work.
 
 ## Verify building sources and resolve identities
 
