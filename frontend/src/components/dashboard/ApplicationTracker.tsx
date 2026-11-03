@@ -157,11 +157,11 @@ export default function ApplicationTracker({
     return (
       <div className="rounded-3xl border border-border bg-card p-10 text-center">
         <Search size={28} className="mx-auto text-primary" strokeWidth={1.6} />
-        <h2 className="mt-4 text-2xl font-serif font-semibold text-foreground">
+        <h2 className="mt-4 text-2xl font-heading font-semibold text-foreground">
           Your apartment plan starts with a shortlist.
         </h2>
-        <p className="mx-auto mt-2 max-w-md text-foreground/60">
-          Save a StreetEasy listing and use this space to move it from first look to move-in.
+        <p className="mx-auto mt-2 max-w-md text-muted-foreground">
+          Save a rental listing and use this space to move it from first look to move-in.
         </p>
         <Link
           href="/search"
@@ -177,14 +177,16 @@ export default function ApplicationTracker({
     <div>
       <div className="mb-8 flex flex-col justify-between gap-3 md:flex-row md:items-end">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Your move</p>
-          <h2 className="mt-2 text-3xl font-serif font-semibold text-foreground">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+            Your move
+          </p>
+          <h2 className="mt-2 text-3xl font-heading font-semibold text-foreground">
             Keep every apartment in view.
           </h2>
         </div>
-        <p className="max-w-sm text-sm leading-relaxed text-foreground/55 md:text-right">
-          Statuses sync to your account. Failed changes stay visible and can be retried; the last
-          confirmed server status is shown.
+        <p className="max-w-sm text-sm leading-relaxed text-muted-foreground md:text-right">
+          Statuses sync to your account. Failed changes stay visible and can be retried; the
+          last confirmed server status is shown.
         </p>
       </div>
 
@@ -197,11 +199,11 @@ export default function ApplicationTracker({
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="font-semibold text-foreground">{stage.label}</h3>
-                <p className="mt-1 text-xs leading-relaxed text-foreground/50">
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                   {stage.description}
                 </p>
               </div>
-              <span className="rounded-full bg-card px-2 py-1 text-xs font-semibold text-foreground/50">
+              <span className="rounded-full bg-card px-2 py-1 text-xs font-semibold text-muted-foreground">
                 {stage.listings.length}
               </span>
             </div>
@@ -212,13 +214,18 @@ export default function ApplicationTracker({
                   className="overflow-hidden rounded-xl border border-border bg-card"
                 >
                   {listing.images?.[0] && (
-                    <img src={listing.images[0]} alt="" className="h-24 w-full object-cover" />
+                    <img
+                      src={listing.images[0]}
+                      alt=""
+                      loading="lazy"
+                      className="h-24 w-full object-cover"
+                    />
                   )}
                   <div className="p-3">
                     <p className="line-clamp-1 text-sm font-semibold text-foreground">
                       {listingStreet(listing)}
                     </p>
-                    <p className="mt-1 text-xs text-foreground/55">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       {rentLabel(listing as any)} · {listing.bedrooms ?? '?'} bed ·{' '}
                       {listing.bathrooms ?? '?'} bath
                     </p>
@@ -252,7 +259,7 @@ export default function ApplicationTracker({
                     </p>
                   )}
                   {errors[listing._id] && (
-                    <div role="alert" className="p-3 text-xs text-red-800">
+                    <div role="alert" className="p-3 text-xs text-danger">
                       <p>{errors[listing._id]}</p>
                       <button
                         disabled={saving[listing._id]}
@@ -266,7 +273,7 @@ export default function ApplicationTracker({
                 </article>
               ))}
               {stage.listings.length === 0 && (
-                <p className="pt-5 text-xs text-foreground/35">Nothing here yet.</p>
+                <p className="pt-5 text-xs text-muted-foreground">Nothing here yet.</p>
               )}
             </div>
           </section>

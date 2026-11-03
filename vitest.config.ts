@@ -1,6 +1,7 @@
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  oxc: { jsx: { runtime: 'classic' } },
   test: {
     globals: true,
     exclude: ['tests/e2e/**', 'node_modules/**', 'frontend/node_modules/**', 'dist/**'],

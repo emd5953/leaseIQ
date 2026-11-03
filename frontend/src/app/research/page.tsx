@@ -1,6 +1,7 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowRight, MapPin, Search, Loader2, X, Scale } from 'lucide-react'
 import Navigation from '@/components/Navigation'
 import Footer from '@/components/Footer'
@@ -11,6 +12,31 @@ import { useResearchLibrary, identity } from '@/lib/useResearchLibrary'
 const BOROUGHS = ['Manhattan', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island']
 type Suggestion = { street: string; borough: string; buildingId: string; bin: string | null }
 export default function ResearchPage() {
+  return (
+    <Suspense
+      fallback={
+        <main id="main-content" className="min-h-screen">
+          <Navigation />
+          <p role="status" className="px-6 pt-32 text-muted-foreground">
+            Loading property research…
+          </p>
+        </main>
+      }
+    >
+      <ResearchWorkspace />
+    </Suspense>
+  )
+}
+function ResearchWorkspace() {
+  const router = useRouter()
+  const query = useSearchParams().toString()
+  const lastRequest = useRef<{
+    address: string
+    area: string
+    listingId?: string
+    confirmedId?: string | null
+  } | null>(null)
+
   const { user } = useAuth()
   const library = useResearchLibrary(user?.id)
   const report = library.current?.report
@@ -86,6 +112,7 @@ export default function ResearchPage() {
       )
       return
     }
+    lastRequest.current = { address, area, listingId, confirmedId }
     controller.current?.abort()
     const request = new AbortController()
     controller.current = request
@@ -118,6 +145,12 @@ export default function ResearchPage() {
         90000,
       )
       if (request.signal.aborted) return
+      if (!data.research || data.research.version !== 2)
+        throw new Error('The report was incomplete. Please retry the research request.')
+      if (listingId && data.research.query && BOROUGHS.includes(data.research.query.borough)) {
+        setStreet(data.research.query.street)
+        setBorough(data.research.query.borough)
+      }
       await library.remember(data.research, data.receipt)
       requestAnimationFrame(() => {
         resultRef.current?.focus()
@@ -138,35 +171,63 @@ export default function ResearchPage() {
     if (!report) return
     const area = BOROUGHS.find((b) => report.address.endsWith(', ' + b + ', NY'))
     if (!area) {
-      library.setNotice('Enter the saved report address and borough above to run a fresh lookup.')
+      library.setNotice(
+        'Enter the saved report address and borough above to run a fresh lookup.',
+      )
       return
     }
     const address = report.address.slice(0, -(', ' + area + ', NY').length)
     void run(address, area, undefined, report.match.buildingId || null)
   }
+  function submit() {
+    if (candidate && !confirmed) {
+      setError(
+        'Confirm the selected HPD building, or clear the suggestion to research the typed address.',
+      )
+      return
+    }
+    const params = new URLSearchParams({ address: street.trim(), borough })
+    if (candidate && confirmed) params.set('confirmedBuildingId', candidate.buildingId)
+    if (params.toString() === query)
+      void run(
+        street.trim(),
+        borough,
+        undefined,
+        candidate && confirmed ? candidate.buildingId : null,
+      )
+    else router.push(`/research?${params}`, { scroll: false })
+  }
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search),
-      address = params.get('address'),
-      area = params.get('borough') || 'Manhattan',
-      id = params.get('listingId')
-    if (address) {
-      setStreet(address)
-      setBorough(BOROUGHS.includes(area) ? area : 'Manhattan')
-      void run(address, BOROUGHS.includes(area) ? area : 'Manhattan')
-    } else if (id && /^[a-f\d]{24}$/i.test(id)) void run('', '', id)
+    const params = new URLSearchParams(query)
+    const address = params.get('address')
+    const area = params.get('borough') || 'Manhattan'
+    const listingId = params.get('listingId')
+    const confirmedId = params.get('confirmedBuildingId')
+    setStreet(address || '')
+    setBorough(BOROUGHS.includes(area) ? area : 'Manhattan')
+    setCandidate(null)
+    setConfirmed(false)
+    if (listingId && /^[a-f\d]{24}$/i.test(listingId)) void run('', '', listingId, null)
+    else if (address)
+      void run(address, BOROUGHS.includes(area) ? area : 'Manhattan', undefined, confirmedId)
+    else {
+      setLoading(false)
+      setError('')
+      lastRequest.current = null
+    }
     return () => controller.current?.abort()
-  }, [])
+    // Draft edits do not run research; submitted URLs and browser history do.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query])
   return (
-    <main className="min-h-screen">
+    <main id="main-content" className="min-h-screen">
       <Navigation />
       <div className="mx-auto max-w-7xl px-5 pb-20 pt-32 sm:px-8">
         <div className="print:hidden">
-          <div className="mb-10 flex flex-col justify-between gap-5 md:flex-row md:items-end">
+          <div className="workspace-header flex flex-col justify-between gap-5 md:flex-row md:items-end">
             <div>
-              <p className="eyebrow text-primary">NYC rental research</p>
-              <h1 className="mt-4 font-serif text-4xl leading-tight md:text-6xl">
-                A better look <span className="italic">before the lease.</span>
-              </h1>
+              <p className="eyebrow text-primary">02 / Property research</p>
+              <h1 className="page-title mt-4">Look beyond the address.</h1>
               <p className="mt-5 max-w-2xl text-lg leading-relaxed text-foreground/70">
                 Understand the building, the neighborhood, and who manages it. Start with an
                 address. Follow the evidence.
@@ -182,7 +243,7 @@ export default function ResearchPage() {
           <form
             onSubmit={(e) => {
               e.preventDefault()
-              void run()
+              submit()
             }}
             className="rounded-3xl border border-border bg-card p-5 shadow-soft-md md:p-7"
           >
@@ -286,9 +347,13 @@ export default function ResearchPage() {
               <button
                 disabled={loading}
                 type="submit"
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 font-semibold text-white disabled:opacity-60"
+                className="btn btn-primary min-h-12 disabled:opacity-60"
               >
-                {loading ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}{' '}
+                {loading ? (
+                  <Loader2 size={18} className="motion-safe:animate-spin" />
+                ) : (
+                  <Search size={18} />
+                )}{' '}
                 {loading ? 'Researching…' : 'Research property'}
               </button>
             </div>
@@ -308,7 +373,7 @@ export default function ResearchPage() {
               </p>
             )}
             {candidate && (
-              <div className="mt-4 rounded-xl bg-amber-50 p-4">
+              <div className="mt-4 rounded-xl bg-warning/10 text-warning p-4">
                 <label className="flex gap-3 text-sm">
                   <input
                     type="checkbox"
@@ -331,8 +396,8 @@ export default function ResearchPage() {
               </div>
             )}
             <p className="mt-4 text-xs text-foreground/65">
-              Public records · All five boroughs · No account needed · HPD coverage is incomplete.
-              An unknown match never attaches another building’s records.
+              Public records · All five boroughs · No account needed · HPD coverage is
+              incomplete. An unknown match never attaches another building’s records.
             </p>
           </form>
           {loading && (
@@ -342,9 +407,20 @@ export default function ResearchPage() {
             </div>
           )}
           {error && (
-            <div role="alert" className="my-6 rounded-2xl border border-accent/20 bg-accent/5 p-5">
+            <div
+              role="alert"
+              className="my-6 rounded-2xl border border-danger/25 bg-danger/10 text-danger p-5"
+            >
               <p>{error}</p>
-              <button onClick={() => run()} className="mt-3 underline">
+              <button
+                onClick={() => {
+                  const prior = lastRequest.current
+                  if (prior)
+                    void run(prior.address, prior.area, prior.listingId, prior.confirmedId)
+                  else submit()
+                }}
+                className="mt-3 underline"
+              >
                 Retry research
               </button>
             </div>
@@ -359,7 +435,7 @@ export default function ResearchPage() {
             className="mt-6 rounded-2xl border border-border bg-card p-5"
           >
             <div className="flex flex-wrap justify-between gap-3">
-              <h2 className="font-serif text-xl">
+              <h2 className="font-heading text-xl">
                 {user ? 'Your account research' : 'Browser research history'}
               </h2>
               {user && (
@@ -410,14 +486,14 @@ export default function ResearchPage() {
           {report && (
             <>
               {report.match.status !== 'matched' && (
-                <aside role="status" className="mb-5 rounded-xl bg-amber-50 p-5">
+                <aside role="status" className="mb-5 rounded-xl bg-warning/10 text-warning p-5">
                   <h2 className="font-semibold">
                     Confirm the address before relying on building records
                   </h2>
                   <p className="mt-2">{report.match.explanation}</p>
                   <p className="mt-2">
-                    Try the street spelling used by HPD, check the borough, or verify an alternate
-                    entrance in{' '}
+                    Try the street spelling used by HPD, check the borough, or verify an
+                    alternate entrance in{' '}
                     <a
                       href="https://hpdonline.nyc.gov/hpdonline/building/search"
                       target="_blank"
@@ -431,7 +507,7 @@ export default function ResearchPage() {
                 </aside>
               )}
               {report.sources.some((s) => s.status === 'unavailable') && (
-                <aside role="status" className="mb-5 rounded-xl bg-amber-50 p-5">
+                <aside role="status" className="mb-5 rounded-xl bg-warning/10 text-warning p-5">
                   Partial source coverage:{' '}
                   {report.sources
                     .filter((s) => s.status === 'unavailable')
@@ -452,15 +528,15 @@ export default function ResearchPage() {
                 className="mt-5 rounded-2xl border border-border bg-card p-5 print:hidden"
                 aria-label="Share report snapshot"
               >
-                <h2 className="font-serif text-xl">Share this snapshot</h2>
+                <h2 className="font-heading text-xl">Share this snapshot</h2>
                 <p className="mt-2 text-sm">
                   Captured {new Date(report.generatedAt).toLocaleString()} ·{' '}
                   {Math.max(
                     0,
                     Math.floor((Date.now() - Date.parse(report.generatedAt)) / 86400000),
                   )}{' '}
-                  days old. This snapshot does not update when sources change. Anyone with a share
-                  link can read its public-record evidence until you revoke access.
+                  days old. This snapshot does not update when sources change. Anyone with a
+                  share link can read its public-record evidence until you revoke access.
                 </p>
                 {user ? (
                   <div className="mt-4 flex flex-wrap gap-4">
@@ -509,7 +585,7 @@ export default function ResearchPage() {
             aria-label="Property comparison"
           >
             <div className="flex flex-wrap justify-between gap-4">
-              <h2 className="flex items-center gap-3 font-serif text-2xl">
+              <h2 className="flex items-center gap-3 font-heading text-2xl">
                 <Scale size={22} />
                 Your comparison
               </h2>
@@ -522,10 +598,15 @@ export default function ResearchPage() {
               </button>
             </div>
             <p className="mt-3 text-sm text-foreground/70">
-              Up to three properties, {user ? 'synced to your account' : 'saved in this browser'}.
-              Compare source dates and building size; raw counts alone do not rank rental quality.
+              Up to three properties,{' '}
+              {user ? 'synced to your account' : 'saved in this browser'}. Compare source dates
+              and building size; raw counts alone do not rank rental quality.
             </p>
-            <div className="mt-6 overflow-x-auto" tabIndex={0} aria-label="Scrollable comparison">
+            <div
+              className="mt-6 overflow-x-auto"
+              tabIndex={0}
+              aria-label="Scrollable comparison"
+            >
               <table className="w-full text-left text-sm">
                 <caption className="sr-only">
                   Comparison of public records for saved properties
@@ -540,7 +621,9 @@ export default function ResearchPage() {
                           <button
                             disabled={library.busy}
                             onClick={() =>
-                              library.updateComparison(library.comparison.filter((_, j) => j !== i))
+                              library.updateComparison(
+                                library.comparison.filter((_, j) => j !== i),
+                              )
                             }
                             aria-label={`Remove ${item.report.address}`}
                           >
@@ -576,9 +659,11 @@ export default function ResearchPage() {
                               ? r.match.status.replace('_', ' ')
                               : label === 'Violation dataset updated'
                                 ? displayDate(
-                                    r.sources.find((s) => s.id === 'violations')?.datasetUpdatedAt,
+                                    r.sources.find((s) => s.id === 'violations')
+                                      ?.datasetUpdatedAt,
                                   )
-                                : (r.metrics.find((m) => m.label === label)?.value ?? 'Unknown')}
+                                : (r.metrics.find((m) => m.label === label)?.value ??
+                                  'Unknown')}
                         </td>
                       ))}
                     </tr>

@@ -7,6 +7,7 @@ import { useParams } from 'next/navigation'
 import Navigation from '@/components/Navigation'
 import Footer from '@/components/Footer'
 import ListingDetail from '@/components/listing/ListingDetail'
+import { searchReturnPath } from '@/lib/search-navigation'
 
 export default function ListingPage() {
   const params = useParams()
@@ -14,9 +15,11 @@ export default function ListingPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [retry, setRetry] = useState(0)
+  const [returnTo, setReturnTo] = useState('/search')
 
   useEffect(() => {
     let current = true
+    setReturnTo(searchReturnPath(new URLSearchParams(window.location.search).get('returnTo')))
     setLoading(true); setError(''); setListing(null)
     api.getListingById(String(params.id)).then(data => { if (current) setListing(data) })
       .catch(error => { if (current) setError(error.message) })
@@ -25,7 +28,7 @@ export default function ListingPage() {
   }, [params.id, retry])
 
   return (
-    <main className="min-h-screen">
+    <main id="main-content" className="min-h-screen">
       <Navigation />
       <div className="pt-32 pb-16">
         {loading ? (
@@ -37,13 +40,13 @@ export default function ListingPage() {
             </div>
           </div>
         ) : listing ? (
-          <ListingDetail listing={listing} />
+          <ListingDetail listing={listing} returnTo={returnTo} />
         ) : (
           <div className="max-w-7xl mx-auto px-6 lg:px-8 text-center py-16">
-            <h1 className="text-3xl font-serif font-bold text-foreground mb-4">
+            <h1 className="text-3xl font-heading font-bold text-foreground mb-4">
               Property unavailable
             </h1>
-            <p role="alert" className="text-foreground/70">{error || 'We could not load this property. Please try again.'}</p><button onClick={() => setRetry(v => v + 1)} className="mt-5 mr-5 rounded-full bg-primary px-5 py-3 text-sm text-white">Retry listing</button><Link href="/research" className="mt-5 inline-block text-primary underline">Research a street address instead</Link>
+            <p role="alert" className="text-foreground/70">{error || 'We could not load this property. Please try again.'}</p><button onClick={() => setRetry(v => v + 1)} className="mt-5 mr-5 rounded-full bg-primary px-5 py-3 text-sm text-primary-foreground">Retry listing</button><Link href="/research" className="mt-5 inline-block text-primary underline">Research a street address instead</Link>
           </div>
         )}
       </div>
