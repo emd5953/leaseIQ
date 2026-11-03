@@ -52,10 +52,7 @@ export default function LeaseAnalyzerPage() {
       setError('Sign in before uploading documents.')
       return
     }
-    const allowed = [
-      'application/pdf',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    ]
+    const allowed = ['application/pdf']
     if (!allowed.includes(file.type)) {
       setError('Please upload a PDF file')
       return
