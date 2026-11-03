@@ -1,38 +1,23 @@
 import type { Config } from 'tailwindcss'
-
+const color = (name: string) => `rgb(var(--${name}) / <alpha-value>)`
 const config: Config = {
-  content: [
-    './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
-    './src/components/**/*.{js,ts,jsx,tsx,mdx}',
-    './src/app/**/*.{js,ts,jsx,tsx,mdx}',
-  ],
-  theme: {
-    extend: {
-      colors: {
-        background: '#F9F8F4',
-        foreground: '#243B34',
-        primary: '#386552',
-        secondary: '#DCCFC2',
-        border: '#E6E2DA',
-        accent: '#A34F37',
-        card: '#FFFFFF',
-        'card-alt': '#F2F0EB',
-      },
-      fontFamily: {
-        serif: ['var(--font-playfair)', 'Georgia', 'serif'],
-        sans: ['var(--font-source)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-      },
-      borderRadius: {
-        'arch': '200px 200px 0 0',
-      },
-      boxShadow: {
-        'soft': '0 4px 6px -1px rgba(45, 58, 49, 0.05)',
-        'soft-md': '0 10px 15px -3px rgba(45, 58, 49, 0.05)',
-        'soft-lg': '0 20px 40px -10px rgba(45, 58, 49, 0.05)',
-        'soft-xl': '0 25px 50px -12px rgba(45, 58, 49, 0.15)',
-      },
+  content: ['./src/**/*.{js,ts,jsx,tsx,mdx}'],
+  theme: { extend: {
+    colors: {
+      background: color('canvas'), foreground: color('ink'), primary: color('olive'),
+      'primary-hover': color('olive-hover'), 'primary-foreground': color('canvas'),
+      secondary: color('surface-2'), card: color('surface'), 'card-alt': color('surface-2'),
+      muted: color('surface-2'), 'muted-foreground': color('muted'), border: 'rgb(var(--ink) / 0.12)',
+      accent: color('olive'), warning: color('warning'), danger: color('danger'), success: color('success'), info: color('info'),
     },
-  },
-  plugins: [],
+    fontFamily: {
+      serif: ['var(--font-instrument)', 'Georgia', 'serif'],
+      heading: ['var(--font-heading)', 'Arial', 'sans-serif'],
+      sans: ['var(--font-inter)', 'Arial', 'sans-serif'],
+      mono: ['var(--font-mono)', 'monospace'],
+    },
+    borderRadius: { lg: 'var(--radius-control)', xl: 'var(--radius-surface)', '2xl': 'var(--radius-surface)', '3xl': 'var(--radius-media)' },
+    boxShadow: { soft: '0 8px 30px #0002', 'soft-md': '0 12px 40px #0003', 'soft-lg': '0 16px 50px #0005', 'soft-xl': '0 24px 70px #0007' },
+  } }, plugins: [],
 }
 export default config

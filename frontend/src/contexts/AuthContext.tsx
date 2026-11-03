@@ -29,24 +29,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Load user from localStorage on mount
   useEffect(() => {
-    const storedToken = localStorage.getItem('leaseiq_token')
-    const storedUser = localStorage.getItem('leaseiq_user')
-
-    if (storedToken && storedUser) {
-      try {
+    try {
+      const storedToken = localStorage.getItem('leaseiq_token')
+      const storedUser = localStorage.getItem('leaseiq_user')
+      const parsed = storedUser ? JSON.parse(storedUser) : null
+      if (
+        storedToken &&
+        parsed &&
+        typeof parsed.id === 'string' &&
+        typeof parsed.email === 'string'
+      ) {
         setToken(storedToken)
-        setUser(JSON.parse(storedUser))
-      } catch {
+        setUser(parsed)
+      }
+    } catch {
+      try {
         localStorage.removeItem('leaseiq_user')
         localStorage.removeItem('leaseiq_token')
+      } catch {
+        /* Storage may be unavailable. */
       }
     }
     setIsLoading(false)
     const expired = () => {
       setUser(null)
       setToken(null)
-      localStorage.removeItem('leaseiq_token')
-      localStorage.removeItem('leaseiq_user')
+      try {
+        localStorage.removeItem('leaseiq_token')
+        localStorage.removeItem('leaseiq_user')
+      } catch {
+        /* Session state is already cleared. */
+      }
       api.invalidateSavedListingsCache()
     }
     window.addEventListener('leaseiq-session-expired', expired)
@@ -98,6 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const data = await response.json()
 
+      api.invalidateSavedListingsCache()
       setToken(data.token)
       setUser(data.user)
 
@@ -113,8 +127,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     api.invalidateSavedListingsCache()
     setToken(null)
     setUser(null)
-    localStorage.removeItem('leaseiq_token')
-    localStorage.removeItem('leaseiq_user')
+    try {
+      localStorage.removeItem('leaseiq_token')
+      localStorage.removeItem('leaseiq_user')
+    } catch {
+      /* Session state is already cleared. */
+    }
   }
 
   return (

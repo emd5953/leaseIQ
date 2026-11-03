@@ -88,6 +88,7 @@ export class ResearchService {
       version: 2,
       generatedAt,
       address: `${input.street.trim()}, ${input.borough}, NY`,
+      query: { street: input.street.trim(), borough: input.borough },
       summary: '',
       match: { status: 'not_found', explanation: '' },
       metrics: [],

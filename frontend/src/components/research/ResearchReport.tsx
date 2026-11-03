@@ -1,4 +1,5 @@
 'use client'
+import { useEffect, useRef } from 'react'
 import {
   ArrowUpRight,
   Building2,
@@ -32,18 +33,43 @@ export default function ResearchReport({
   onCompare?: () => void
   added: boolean
 }) {
+  const ref = useRef<HTMLElement>(null)
+  useEffect(() => {
+    let closed: HTMLDetailsElement[] = []
+    const before = () => {
+      closed = Array.from(ref.current?.querySelectorAll('details:not([open])') || [])
+      closed.forEach((el) => {
+        el.open = true
+      })
+    }
+    const after = () => {
+      closed.forEach((el) => {
+        el.open = false
+      })
+      closed = []
+    }
+    window.addEventListener('beforeprint', before)
+    window.addEventListener('afterprint', after)
+    return () => {
+      window.removeEventListener('beforeprint', before)
+      window.removeEventListener('afterprint', after)
+      after()
+    }
+  }, [])
   return (
-    <article className="report space-y-7" aria-label="Property research report">
+    <article ref={ref} className="report space-y-7" aria-label="Property research report">
       <header className="rounded-3xl bg-foreground p-7 text-background md:p-10">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <p className="eyebrow text-background/70">Your property brief</p>
-          <span className="rounded-full border border-white/25 px-3 py-1 text-xs">
+          <span className="rounded-full border border-background/25 px-3 py-1 text-xs">
             {report.match.status === 'matched' ? 'Building matched' : 'Match needs attention'}
           </span>
         </div>
-        <h2 className="mt-5 font-serif text-3xl leading-tight md:text-4xl">{report.address}</h2>
+        <h2 className="mt-5 font-heading text-3xl leading-tight md:text-4xl">
+          {report.address}
+        </h2>
         <p className="mt-4 max-w-3xl leading-relaxed text-background/85">{report.summary}</p>
-        <div className="mt-7 flex flex-wrap items-center justify-between gap-4 border-t border-white/20 pt-5">
+        <div className="mt-7 flex flex-wrap items-center justify-between gap-4 border-t border-background/20 pt-5">
           <p className="text-sm text-background/65">
             Report generated {displayDate(report.generatedAt)} · NYC public records
           </p>
@@ -59,7 +85,7 @@ export default function ResearchReport({
             )}
             <button
               onClick={() => window.print()}
-              className="inline-flex items-center gap-2 rounded-full border border-white/30 px-4 py-2 text-sm"
+              className="inline-flex items-center gap-2 rounded-full border border-background/30 px-4 py-2 text-sm"
             >
               <Printer size={15} />
               Print / save PDF
@@ -70,7 +96,8 @@ export default function ResearchReport({
 
       <details className="rounded-2xl border border-border bg-card p-5">
         <summary className="cursor-pointer text-sm font-semibold">
-          Address match & scope {report.match.buildingId ? `· HPD ${report.match.buildingId}` : ''}
+          Address match & scope{' '}
+          {report.match.buildingId ? `· HPD ${report.match.buildingId}` : ''}
         </summary>
         <p className="mt-3 text-sm leading-relaxed text-foreground/75">
           {report.match.explanation}
@@ -87,10 +114,10 @@ export default function ResearchReport({
           {report.metrics.map((metric) => (
             <div key={metric.label} className="rounded-2xl border border-border bg-card p-6">
               <p className="text-sm font-medium text-foreground/75">{metric.label}</p>
-              <p className="my-3 font-serif text-4xl tabular-nums">
+              <p className="my-3 font-heading text-4xl tabular-nums">
                 {metric.value === null ? 'Unknown' : metric.value.toLocaleString()}
               </p>
-              <p className="text-xs leading-relaxed text-foreground/65">{metric.detail}</p>
+              <p className="text-xs leading-relaxed text-muted-foreground">{metric.detail}</p>
               <a
                 href={`#source-${metric.sourceIds[0]}`}
                 className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-primary"
@@ -110,7 +137,7 @@ export default function ResearchReport({
           <strong className="text-foreground">Analysis</strong> · what to consider
         </span>
         <span>
-          <strong className="text-accent">Not verified</strong> · what is still missing
+          <strong className="text-warning">Not verified</strong> · what is still missing
         </span>
       </div>
       <nav aria-label="Report sections" className="flex flex-wrap gap-2 print:hidden">
@@ -143,7 +170,7 @@ export default function ResearchReport({
             key={section.id}
             className="scroll-mt-28 rounded-3xl border border-border bg-card p-6 md:p-8"
           >
-            <h3 className="flex items-center gap-3 font-serif text-2xl">
+            <h3 className="flex items-center gap-3 font-heading text-2xl">
               <span className="rounded-xl bg-primary/10 p-3 text-primary">
                 <Icon size={21} strokeWidth={1.6} />
               </span>
@@ -177,7 +204,7 @@ export default function ResearchReport({
                     ))}
                   </dl>
                 ) : (
-                  <p className="mt-3 text-sm leading-relaxed text-foreground/65">
+                  <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
                     No verified facts are available in this section yet.
                   </p>
                 )}
@@ -193,12 +220,12 @@ export default function ResearchReport({
                 )}
               </div>
               <div className="space-y-5">
-                <div className="rounded-2xl bg-amber-50/70 p-5">
-                  <h4 className="flex items-center gap-2 text-sm font-semibold text-amber-900">
+                <div className="rounded-2xl bg-warning/10 p-5">
+                  <h4 className="flex items-center gap-2 text-sm font-semibold text-warning">
                     <HelpCircle size={16} />
                     Not verified
                   </h4>
-                  <ul className="mt-3 space-y-2 text-sm leading-relaxed text-amber-950/75">
+                  <ul className="mt-3 space-y-2 text-sm leading-relaxed text-warning">
                     {section.unknowns.map((text) => (
                       <li key={text}>{text}</li>
                     ))}
@@ -226,10 +253,11 @@ export default function ResearchReport({
 
       {!!report.violations.length && (
         <section className="rounded-3xl border border-border bg-card p-6 md:p-8">
-          <h3 className="font-serif text-2xl">Recent violation records</h3>
-          <p className="mt-2 text-sm leading-relaxed text-foreground/65">
-            Latest {report.violations.length} records retrieved, ordered by issue date. Counts above
-            cover all available dates. Records can concern other apartments or common areas.
+          <h3 className="font-heading text-2xl">Recent violation records</h3>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+            Latest {report.violations.length} records retrieved, ordered by issue date. Counts
+            above cover all available dates. Records can concern other apartments or common
+            areas.
           </p>
           <div className="mt-5 divide-y divide-border">
             {report.violations.map((v) => (
@@ -239,12 +267,14 @@ export default function ResearchReport({
                     Class {v.class}
                   </span>
                   <span className="mr-3 font-semibold">{v.status}</span>
-                  <span className="text-foreground/65">
+                  <span className="text-muted-foreground">
                     Issued {displayDate(v.issuedAt)} · #{v.id}
                   </span>
                 </summary>
-                <p className="mt-3 text-sm leading-relaxed text-foreground/80">{v.description}</p>
-                <p className="mt-2 text-xs text-foreground/65">
+                <p className="mt-3 text-sm leading-relaxed text-foreground/80">
+                  {v.description}
+                </p>
+                <p className="mt-2 text-xs text-muted-foreground">
                   Status date: {displayDate(v.statusAt)} ·{' '}
                   {v.apartment ? `Apartment ${v.apartment}` : 'Apartment not specified'} ·{' '}
                   <a href="#report-sources" className="underline">
@@ -261,13 +291,13 @@ export default function ResearchReport({
         id="report-sources"
         className="scroll-mt-28 rounded-3xl border border-border bg-card p-6 md:p-8"
       >
-        <h3 className="flex items-center gap-3 font-serif text-2xl">
+        <h3 className="flex items-center gap-3 font-heading text-2xl">
           <FileText size={22} />
           Evidence & source dates
         </h3>
         <p className="mt-3 text-sm text-foreground/70">
-          A recent lookup can return older data. “Dataset updated” is the publisher’s timestamp for
-          the whole dataset, not an inspection date.
+          A recent lookup can return older data. “Dataset updated” is the publisher’s timestamp
+          for the whole dataset, not an inspection date.
         </p>
         <div className="mt-6 divide-y divide-border">
           {report.sources.map((source) => (
@@ -286,12 +316,12 @@ export default function ResearchReport({
                   {source.name} <ArrowUpRight size={14} className="inline" />
                 </a>
                 <span
-                  className={`rounded-full px-3 py-1 text-xs ${source.status === 'available' ? 'bg-primary/10 text-primary' : 'bg-amber-50 text-amber-900'}`}
+                  className={`rounded-full px-3 py-1 text-xs ${source.status === 'available' ? 'bg-primary/10 text-primary' : 'bg-warning/10 text-warning'}`}
                 >
                   {source.status.replace('_', ' ')}
                 </span>
               </div>
-              <p className="mt-2 text-xs text-foreground/65">
+              <p className="mt-2 text-xs text-muted-foreground">
                 {source.status === 'not_checked'
                   ? 'Not retrieved'
                   : `Retrieved ${displayDate(source.retrievedAt)}`}{' '}
@@ -319,7 +349,7 @@ export default function ResearchReport({
               </a>
             ))}
           </div>
-          <p className="mt-4 text-xs text-foreground/60">
+          <p className="mt-4 text-xs text-muted-foreground">
             These are follow-up resources, not evidence retrieved for this report.
           </p>
         </div>

@@ -1,0 +1,47 @@
+{
+  "verifiedOn": "2026-11-03",
+  "usage": "Decorative marketing media only. Interior photographs are illustrative and are not photographs of live LeaseIQ listings. No endorsement is implied.",
+  "assets": [
+    {
+      "files": ["nyc-street.mp4", "nyc-poster.jpg"],
+      "title": "Manhattan Street and Cars",
+      "author": "FOCA Stock (individual photographer not specified on source page)",
+      "source": "https://www.focastock.com/video/manhattan-street-and-cars",
+      "originalVideo": "https://cdn.focastock.com/videos/P1080002.mp4",
+      "originalPoster": "https://cdn.focastock.com/videos/P1080002_poster.jpg",
+      "license": "CC0 1.0",
+      "licenseUrl": "https://www.focastock.com/license",
+      "processing": "14-second silent H.264, 1600x900, 24fps, fast-start; matching 1920x1080 JPEG poster optimized at quality 82."
+    },
+    {
+      "files": ["brooklyn-street.jpg"],
+      "title": "Sunset Over Brooklyn Street and Buildings",
+      "author": "FOCA Stock (individual photographer not specified on source page)",
+      "source": "https://www.focastock.com/photo/sunset-over-brooklyn-street-and-buildings",
+      "original": "https://cdn.focastock.com/photos/P107017820220817.jpg",
+      "license": "CC0 1.0",
+      "licenseUrl": "https://www.focastock.com/license",
+      "processing": "Optimized 1200x900 JPEG."
+    },
+    {
+      "files": ["apartment-living.jpg"],
+      "title": "Living Room of a Flat in an Apartment Building",
+      "author": "RDNE Stock project",
+      "source": "https://www.pexels.com/photo/living-room-of-a-flat-in-an-apartment-building-8489374/",
+      "original": "https://images.pexels.com/photos/8489374/pexels-photo-8489374.jpeg",
+      "license": "Pexels License",
+      "licenseUrl": "https://www.pexels.com/license/",
+      "processing": "Pexels image CDN, 1200-pixel width. Location not asserted; illustrative interior only."
+    },
+    {
+      "files": ["apartment-light.jpg"],
+      "title": "Stylish living room in light apartment",
+      "author": "Max Vakhtbovych",
+      "source": "https://www.pexels.com/photo/stylish-living-room-in-light-apartment-5998120/",
+      "original": "https://images.pexels.com/photos/5998120/pexels-photo-5998120.jpeg",
+      "license": "Pexels License",
+      "licenseUrl": "https://www.pexels.com/license/",
+      "processing": "Pexels image CDN, 1200-pixel width. Location not asserted; illustrative interior only."
+    }
+  ]
+}

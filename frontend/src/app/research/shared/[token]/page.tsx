@@ -15,17 +15,17 @@ export default function SharedReportPage() {
       .catch((e) => setError(e.message))
   }, [token])
   return (
-    <main className="min-h-screen">
+    <main id="main-content" className="min-h-screen">
       <Navigation />
       <div className="mx-auto max-w-5xl px-5 pb-20 pt-32">
         {error ? (
-          <p role="alert" className="rounded-xl bg-amber-50 p-5">
+          <p role="alert" className="rounded-xl bg-warning/10 text-warning p-5">
             {error}
           </p>
         ) : snapshot ? (
           <>
             <div className="mb-6 rounded-2xl border border-border bg-card p-5">
-              <h1 className="font-serif text-3xl">Shared research snapshot</h1>
+              <h1 className="font-heading text-3xl">Shared research snapshot</h1>
               <p className="mt-3">
                 Captured {new Date(snapshot.report.generatedAt).toLocaleString()} ·{' '}
                 {Math.max(

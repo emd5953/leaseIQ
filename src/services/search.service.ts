@@ -131,8 +131,15 @@ export class SearchService {
     });
     if (filters.petsAllowed) additionalFilters.$or = [{ 'petPolicy.allowed': true }, { 'petPolicy.dogsAllowed': true }, { 'petPolicy.catsAllowed': true }];
     if (filters.q?.trim()) {
-      const escaped = filters.q.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      additionalFilters.$and = [...(additionalFilters.$and || []), { $or: ['address.street', 'address.city', 'address.neighborhood'].map(field => ({ [field]: { $regex: escaped, $options: 'i' } })) }];
+      const text = filters.q.trim().replace(/\s+/g, ' ');
+      const borough = ['Manhattan', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island'].find(name => name.toLowerCase() === text.toLowerCase());
+      const escaped = text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      // Exact borough searches use the same aliases as the borough filters.
+      // A street such as Manhattan Avenue still uses ordinary text matching.
+      const textConditions = borough
+        ? buildListingQuery({ neighborhoods: [borough] }).$and || []
+        : [{ $or: ['address.street', 'address.city', 'address.neighborhood'].map(field => ({ [field]: { $regex: escaped, $options: 'i' } })) }];
+      additionalFilters.$and = [...(additionalFilters.$and || []), ...textConditions];
     }
     Object.assign(query, additionalFilters);
 

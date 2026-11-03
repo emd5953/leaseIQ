@@ -95,6 +95,7 @@ describe('Evidence-backed rental reports', () => {
     expect(client.query.mock.calls[0][1].$where).toContain(
       "housenumber='230' AND streetname='WEST 55 STREET'",
     );
+    expect(report.query).toEqual(address);
     expect(report.match).toMatchObject({
       buildingId: '34133',
       bbl: '1010267502',
@@ -180,6 +181,7 @@ describe('Evidence-backed rental reports', () => {
         { ...address, confirmedBuildingId: '34133' },
         client,
       );
+      expect(report.query).toEqual(address);
       expect(report.match.status).toBe('not_found');
       expect(report.metrics).toEqual([]);
       expect(client.query).toHaveBeenCalledTimes(1);

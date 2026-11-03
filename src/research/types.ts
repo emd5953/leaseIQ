@@ -26,6 +26,7 @@ export interface ResearchResult {
   version: 2;
   generatedAt: string;
   address: string;
+  query?: { street: string; borough: string };
   summary: string;
   match: {
     status: 'matched' | 'not_found' | 'ambiguous' | 'unavailable';
