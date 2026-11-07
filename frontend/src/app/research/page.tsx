@@ -226,7 +226,7 @@ function ResearchWorkspace() {
         <div className="print:hidden">
           <div className="workspace-header flex flex-col justify-between gap-5 md:flex-row md:items-end">
             <div>
-              <p className="eyebrow text-primary">02 / Property research</p>
+              <p className="eyebrow text-primary">Property research</p>
               <h1 className="page-title mt-4">Look beyond the address.</h1>
               <p className="mt-5 max-w-2xl text-lg leading-relaxed text-foreground/70">
                 Understand the building, the neighborhood, and who manages it. Start with an

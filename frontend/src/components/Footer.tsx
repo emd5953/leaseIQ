@@ -1,4 +1,46 @@
 import Link from 'next/link'
+import BrandMark from './BrandMark'
 export default function Footer() {
-  return <footer className="border-t border-border bg-background px-6 py-10 lg:px-12"><div className="mx-auto flex max-w-7xl flex-col justify-between gap-8 sm:flex-row"><div><Link href="/" className="wordmark text-2xl">LeaseIQ.</Link><p className="mt-3 text-sm text-muted-foreground">A more informed move.</p><p className="mt-4 font-mono text-[10px] text-muted-foreground">NEW YORK CITY · FIVE BOROUGHS</p></div><div className="flex flex-wrap content-start gap-x-8 gap-y-4 text-xs text-muted-foreground">{[['/search','Rentals'],['/research','Research'],['/lease-analyzer','Lease analyzer'],['/how-it-works','How it works'],['/styleguide','Design system']].map(([href,label]) => <Link key={href} href={href} className="hover:text-foreground">{label}</Link>)}<p className="w-full sm:text-right">Public records have limits. Better questions start here.</p></div></div></footer>
+  return (
+    <footer className="site-footer">
+      <div className="footer-top">
+        <div>
+          <Link href="/" className="brand-lockup">
+            <BrandMark />
+            <span className="wordmark">
+              Lease<span className="brand-iq">IQ</span>
+            </span>
+          </Link>
+          <p>
+            Your next address.
+            <br />A better-informed you.
+          </p>
+        </div>
+        <div className="footer-links">
+          {[
+            ['/search', 'Find a rental'],
+            ['/research', 'Check a building'],
+            ['/shortlist', 'Your shortlist'],
+            ['/lease-analyzer', 'Read the fine print'],
+            ['/dashboard', 'Your workspace'],
+            ['/how-it-works', 'How it works'],
+          ].map(([href, label]) => (
+            <Link key={href} href={href}>
+              {label}
+            </Link>
+          ))}
+        </div>
+      </div>
+      <div className="footer-bottom">
+        <span>BUILT FOR NEW YORK’S RENTERS</span>
+        <p>Public records have limits. Better questions start here.</p>
+        <div>
+          <Link href="/styleguide">Design system</Link>
+          <a href="/media/credits.json" target="_blank" rel="noreferrer">
+            Film & photography
+          </a>
+        </div>
+      </div>
+    </footer>
+  )
 }

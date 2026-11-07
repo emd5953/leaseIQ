@@ -104,7 +104,7 @@ export default function SearchPage() {
       <div className="mx-auto max-w-7xl px-5 pb-32 pt-28 sm:px-8 md:pt-32">
         <header className="workspace-header flex flex-wrap items-end justify-between gap-5">
           <div>
-            <p className="eyebrow text-primary">01 / The rental search</p>
+            <p className="eyebrow text-primary">The rental search</p>
             <h1 className="mt-3 page-title">Find your next place.</h1>
             <p className="mt-4 text-muted-foreground">
               A place to love. The evidence to choose.

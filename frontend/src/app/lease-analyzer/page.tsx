@@ -193,7 +193,7 @@ export default function LeaseAnalyzerPage() {
         <div className="max-w-5xl mx-auto">
           {/* Header */}
           <div className="workspace-header">
-            <p className="eyebrow mb-4 text-primary">04 / Document analysis</p>
+            <p className="eyebrow mb-4 text-primary">Document analysis</p>
             <h1 className="page-title mb-4">Read between the lines.</h1>
             <p className="text-lg text-foreground/70 max-w-2xl">
               Bring the lease. Add a floor plan if you have one. Review key terms, priorities,
