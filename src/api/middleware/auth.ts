@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../../config';
+import { timingSafeEqual } from 'node:crypto';
 
 export interface AuthRequest extends Request {
   userId?: string;
@@ -10,6 +11,50 @@ export interface AuthRequest extends Request {
 export interface JwtPayload {
   userId: string;
   email: string;
+}
+
+function verifyToken(token: string): JwtPayload {
+  const decoded = jwt.verify(token, config.jwt.secret, { algorithms: ['HS256'] });
+  if (
+    typeof decoded === 'string' ||
+    typeof decoded.userId !== 'string' ||
+    !/^[a-f\d]{24}$/i.test(decoded.userId) ||
+    typeof decoded.email !== 'string' ||
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(decoded.email)
+  )
+    throw new Error('Invalid session');
+  return decoded as JwtPayload;
+}
+
+/** Job credentials are separate from user sessions and never sent to the frontend. */
+export function requireInternalJob(req: Request, res: Response, next: NextFunction) {
+  const expected = process.env.INTERNAL_JOB_TOKEN;
+  const supplied = req.headers.authorization?.replace(/^Bearer /, '');
+  if (
+    !expected ||
+    expected.length < 32 ||
+    !supplied ||
+    Buffer.byteLength(expected) !== Buffer.byteLength(supplied) ||
+    !timingSafeEqual(Buffer.from(expected), Buffer.from(supplied))
+  ) {
+    return res.status(403).json({ error: 'Internal job authorization required' });
+  }
+  next();
+}
+
+export function requireOwnRecipient(req: AuthRequest, res: Response, next: NextFunction) {
+  const email = req.body?.email;
+  if (
+    email !== undefined &&
+    email !== '' &&
+    (typeof email !== 'string' || email.toLowerCase() !== req.userEmail?.toLowerCase())
+  ) {
+    return res
+      .status(403)
+      .json({ error: 'Reports can only be emailed to your signed-in address.' });
+  }
+  if (email) req.body.email = req.userEmail;
+  next();
 }
 
 /**
@@ -25,7 +70,7 @@ export function requireAuth(req: AuthRequest, res: Response, next: NextFunction)
   const token = authHeader.split(' ')[1];
 
   try {
-    const decoded = jwt.verify(token, config.jwt.secret) as JwtPayload;
+    const decoded = verifyToken(token);
     req.userId = decoded.userId;
     req.userEmail = decoded.email;
     next();
@@ -43,7 +88,7 @@ export function optionalAuth(req: AuthRequest, res: Response, next: NextFunction
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.split(' ')[1];
     try {
-      const decoded = jwt.verify(token, config.jwt.secret) as JwtPayload;
+      const decoded = verifyToken(token);
       req.userId = decoded.userId;
       req.userEmail = decoded.email;
     } catch {
@@ -58,9 +103,7 @@ export function optionalAuth(req: AuthRequest, res: Response, next: NextFunction
  * Generate JWT token for a user
  */
 export function generateToken(userId: string, email: string): string {
-  return jwt.sign(
-    { userId, email }, 
-    config.jwt.secret, 
-    { expiresIn: config.jwt.expiresIn as jwt.SignOptions['expiresIn'] }
-  );
+  return jwt.sign({ userId, email }, config.jwt.secret, {
+    expiresIn: config.jwt.expiresIn as jwt.SignOptions['expiresIn'],
+  });
 }

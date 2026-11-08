@@ -1,10 +1,22 @@
 import dotenv from 'dotenv';
+import { randomBytes } from 'node:crypto';
 
-dotenv.config();
+if (process.env.NODE_ENV !== 'test') dotenv.config();
+
+export function jwtSecret(env: NodeJS.ProcessEnv): string {
+  const secret = env.JWT_SECRET?.trim();
+  if (
+    env.NODE_ENV === 'production' &&
+    (!secret || secret.length < 32 || /change|example|secret-change/i.test(secret))
+  ) {
+    throw new Error('Production requires JWT_SECRET with at least 32 random characters.');
+  }
+  return secret || randomBytes(48).toString('hex');
+}
 
 export const config = {
   mongodb: {
-    uri: process.env.MONGODB_URI || 'mongodb://localhost:27017/leaseiq',
+    uri: process.env.MONGODB_URI || '',
   },
   resend: {
     apiKey: process.env.RESEND_API_KEY || '',
@@ -28,7 +40,7 @@ export const config = {
     oauthClientSecret: process.env.GOOGLE_OAUTH_CLIENT_SECRET || '',
   },
   jwt: {
-    secret: process.env.JWT_SECRET || 'leaseiq-jwt-secret-change-in-production',
+    secret: jwtSecret(process.env),
     expiresIn: '7d',
   },
   server: {

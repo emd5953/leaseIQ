@@ -1,201 +1,43 @@
 'use client'
-
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Menu, X, User, LogOut } from 'lucide-react'
+import { Menu, ArrowUpRight, LogOut } from 'lucide-react'
 import { useGoogleLogin } from '@react-oauth/google'
 import { useAuth } from '@/contexts/AuthContext'
-
-const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
-
+import Dialog from './ui/Dialog'
+const links = [['/search', 'Rentals'], ['/research', 'Property research'], ['/lease-analyzer', 'Lease analyzer'], ['/shortlist', 'Shortlist'], ['/dashboard', 'Dashboard']]
+function GoogleSignIn({ onError }: { onError: (message: string) => void }) {
+  const { loginWithCode } = useAuth()
+  const [busy, setBusy] = useState(false)
+  const login = useGoogleLogin({ flow: 'auth-code', onSuccess: async ({ code }) => {
+    setBusy(true)
+    try { await loginWithCode(code) } catch (e) { onError(e instanceof Error ? e.message : 'Sign-in failed. Please retry.') } finally { setBusy(false) }
+  }, onError: () => onError('Google sign-in failed. Please try again.') })
+  return <button onClick={() => login()} disabled={busy} className="nav-action">{busy ? 'Signing in…' : 'Sign in'}<ArrowUpRight size={14} /></button>
+}
 export default function Navigation() {
   const pathname = usePathname()
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [isSigningIn, setIsSigningIn] = useState(false)
-  const { user, isLoading, loginWithCode, logout } = useAuth()
-
-  // Only initialize Google login if client ID is available
-  const googleLogin = GOOGLE_CLIENT_ID ? useGoogleLogin({
-    flow: 'auth-code',
-    onSuccess: async (response) => {
-      setIsSigningIn(true)
-      try {
-        await loginWithCode(response.code)
-        // Close mobile menu if open
-        setMobileMenuOpen(false)
-      } catch (error) {
-        console.error('Login failed:', error)
-        alert(error instanceof Error ? error.message : 'Sign-in failed. Please try again.')
-      } finally {
-        setIsSigningIn(false)
-      }
-    },
-    onError: (error) => {
-      console.error('Google login failed:', error)
-      alert('Google authentication failed. Please try again.')
-      setIsSigningIn(false)
-    },
-  }) : null
-
-  return (
-    <nav className="fixed top-0 left-0 right-0 z-40 bg-background/80 backdrop-blur-sm border-b border-border">
-      <div className="max-w-7xl mx-auto px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 group">
-            <span className="text-2xl font-serif font-bold text-foreground group-hover:text-primary transition-colors duration-300">
-              <span className="italic">LeaseI</span>Q
-            </span>
-          </Link>
-
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-5 text-sm">
-            <Link
-              href="/search" aria-current={pathname === '/search' ? 'page' : undefined}
-              className="text-foreground hover:text-primary transition-colors duration-300"
-            >
-              Rentals
-            </Link>
-            <Link
-              href="/how-it-works" aria-current={pathname === '/how-it-works' ? 'page' : undefined}
-              className="text-foreground hover:text-primary transition-colors duration-300"
-            >
-              How it works
-            </Link>
-            <Link
-              href="/research" aria-current={pathname === '/research' ? 'page' : undefined}
-              className="text-foreground hover:text-primary transition-colors duration-300"
-            >
-              Property research
-            </Link>
-            <Link
-              href="/lease-analyzer" aria-current={pathname === '/lease-analyzer' ? 'page' : undefined}
-              className="text-foreground hover:text-primary transition-colors duration-300"
-            >
-              Lease Analyzer
-            </Link>
-
-            <Link href="/shortlist" aria-current={pathname === "/shortlist" ? "page" : undefined} className="text-primary">Shortlist</Link>
-            {/* Auth Section */}
-            {!isLoading && (
-              <>
-                {user ? (
-                  <div className="flex items-center gap-4">
-                    <Link
-                      href="/dashboard" aria-current={pathname === '/dashboard' ? 'page' : undefined}
-                      className="flex items-center gap-2 text-foreground hover:text-primary transition-colors duration-300"
-                    >
-                      <User size={18} />
-                      <span>Dashboard</span>
-                    </Link>
-                    <button
-                      onClick={logout}
-                      className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors duration-300"
-                      title="Sign out"
-                    >
-                      <LogOut size={18} />
-                    </button>
-                  </div>
-                ) : googleLogin ? (
-                  <button
-                    onClick={() => googleLogin()}
-                    disabled={isSigningIn}
-                    className="px-5 py-2.5 bg-foreground text-background rounded-full text-sm tracking-wide hover:bg-foreground/90 transition-all duration-300 disabled:opacity-50"
-                  >
-                    {isSigningIn ? 'Signing in...' : 'Sign In'}
-                  </button>
-                ) : null}
-              </>
-            )}
-          </div>
-
-          {/* Mobile Menu Button */}
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden p-2 text-foreground hover:text-primary transition-colors duration-300"
-            aria-label="Toggle menu" aria-expanded={mobileMenuOpen}
-          >
-            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
-        </div>
-      </div>
-
-      {/* Mobile Menu */}
-      {mobileMenuOpen && (
-        <div className="md:hidden bg-background border-t border-border">
-          <div className="px-6 py-6 space-y-4">
-            <Link
-              href="/search" aria-current={pathname === '/search' ? 'page' : undefined}
-              className="block text-lg text-foreground hover:text-primary transition-colors duration-300"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Search
-            </Link>
-            <Link
-              href="/how-it-works" aria-current={pathname === '/how-it-works' ? 'page' : undefined}
-              className="block text-lg text-foreground hover:text-primary transition-colors duration-300"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              How it works
-            </Link>
-            <Link
-              href="/research" aria-current={pathname === '/research' ? 'page' : undefined}
-              className="block text-lg text-foreground hover:text-primary transition-colors duration-300"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Property research
-            </Link>
-            <Link
-              href="/lease-analyzer" aria-current={pathname === '/lease-analyzer' ? 'page' : undefined}
-              className="block text-lg text-foreground hover:text-primary transition-colors duration-300"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Lease Analyzer
-            </Link>
-
-            <Link href="/shortlist" onClick={() => setMobileMenuOpen(false)} className="block text-lg text-primary">Shortlist</Link>
-            {/* Mobile Auth */}
-            {!isLoading && (
-              <div className="pt-4 border-t border-border">
-                {user ? (
-                  <div className="space-y-4">
-                    <Link
-                      href="/dashboard" aria-current={pathname === '/dashboard' ? 'page' : undefined}
-                      className="flex items-center gap-2 text-lg text-foreground hover:text-primary transition-colors duration-300"
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      <User size={20} />
-                      Dashboard
-                    </Link>
-                    <button
-                      onClick={() => {
-                        logout()
-                        setMobileMenuOpen(false)
-                      }}
-                      className="flex items-center gap-2 text-lg text-muted-foreground hover:text-foreground transition-colors duration-300"
-                    >
-                      <LogOut size={20} />
-                      Sign Out
-                    </button>
-                  </div>
-                ) : googleLogin ? (
-                  <button
-                    onClick={() => {
-                      googleLogin()
-                      setMobileMenuOpen(false)
-                    }}
-                    disabled={isSigningIn}
-                    className="w-full px-6 py-3 bg-foreground text-background rounded-full text-sm tracking-wide hover:bg-foreground/90 transition-all duration-300 disabled:opacity-50"
-                  >
-                    {isSigningIn ? 'Signing in...' : 'Sign In with Google'}
-                  </button>
-                ) : null}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </nav>
-  )
+  const home = pathname === '/'
+  const [open, setOpen] = useState(false)
+  const [light, setLight] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
+  const [error, setError] = useState('')
+  const { user, isLoading, logout } = useAuth()
+  useEffect(() => { setOpen(false) }, [pathname])
+  useEffect(() => {
+    if (!home) return
+    const update = () => { const moved = window.scrollY > 40; setScrolled(moved); const closing = document.getElementById('closing'); setLight(moved && !!closing && closing.getBoundingClientRect().top <= 72) }
+    const layoutObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(update) : null
+    layoutObserver?.observe(document.body)
+    update(); window.addEventListener('scroll', update, { passive: true }); window.addEventListener('resize', update)
+    return () => { layoutObserver?.disconnect(); window.removeEventListener('scroll', update); window.removeEventListener('resize', update) }
+  }, [home])
+  const auth = isLoading ? <span className="eyebrow text-muted-foreground">Loading account</span> : user ? <button onClick={logout} className="nav-action" aria-label="Sign out"><LogOut size={15} /><span>Sign out</span></button> : process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ? <GoogleSignIn onError={setError} /> : <button className="nav-action" onClick={() => setError('Sign-in is unavailable in this environment. You can still browse rentals, research addresses, and save a shortlist in this browser.')}>Sign in<ArrowUpRight size={14} /></button>
+  return <><a href="#page-content" className="skip-link">Skip to content</a><nav aria-label="Main navigation" className={`site-nav ${home ? 'nav-home' : ''} ${light ? 'nav-light' : ''} ${scrolled ? 'nav-scrolled' : ''}`}>
+    <div className="nav-inner"><Link href="/" aria-label="LeaseIQ home" className="wordmark text-[29px]">LeaseIQ<span className="ml-1 text-primary">.</span></Link>
+      <div className="hidden items-center gap-6 xl:gap-8 lg:flex">{links.map(([href,label]) => <Link key={href} href={href} aria-current={pathname === href ? 'page' : undefined} className="nav-link">{label}</Link>)}{auth}</div>
+      <button aria-label="Open navigation" aria-expanded={open} onClick={() => setOpen(true)} className="flex h-11 w-11 items-center justify-center rounded-full border border-current/20 lg:hidden"><Menu size={20} /></button>
+    </div>
+  </nav>{open && <Dialog title="Explore LeaseIQ" onClose={() => setOpen(false)}><div className="flex flex-col">{[...links, ['/how-it-works', 'How it works']].map(([href,label]) => <Link key={href} href={href} onClick={() => setOpen(false)} aria-current={pathname === href ? 'page' : undefined} className="flex min-h-14 items-center justify-between border-b border-border text-lg">{label}<ArrowUpRight size={17} /></Link>)}<div className="mt-6">{auth}</div></div></Dialog>}{error && <Dialog title="Account access" onClose={() => setError('')}><p role="status" className="text-muted-foreground">{error}</p><button className="btn btn-primary mt-6" onClick={() => setError('')}>Continue exploring</button></Dialog>}<span id="page-content" tabIndex={-1} className="sr-only" /></>
 }

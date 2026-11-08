@@ -4,13 +4,18 @@ import { config } from '../config';
 
 async function runAlertJob() {
   console.log(`[${new Date().toISOString()}] Running alert job...`);
-  
+
   // Set a timeout to prevent hanging (2 minutes max)
-  const timeout = setTimeout(() => {
-    console.error(`[${new Date().toISOString()}] Alert job timed out after 2 minutes - forcing exit`);
-    process.exit(1);
-  }, 2 * 60 * 1000); // 2 minutes
-  
+  const timeout = setTimeout(
+    () => {
+      console.error(
+        `[${new Date().toISOString()}] Alert job timed out after 2 minutes - forcing exit`,
+      );
+      process.exit(1);
+    },
+    2 * 60 * 1000,
+  ); // 2 minutes
+
   try {
     console.log(`[${new Date().toISOString()}] Starting AlertService.processAlerts()...`);
     const result = await AlertService.processAlerts();
@@ -33,9 +38,8 @@ async function startAlertCron() {
     if (!config.resend.apiKey) {
       console.warn('⚠️  RESEND_API_KEY not set - email alerts will not work');
     }
-    
+
     console.log('Environment check passed');
-    console.log('MongoDB URI:', config.mongodb.uri.substring(0, 20) + '...');
 
     // Connect to MongoDB
     console.log('Connecting to MongoDB...');
@@ -47,9 +51,11 @@ async function startAlertCron() {
 
     // Run the alert job once (Render cron jobs run once per trigger)
     console.log('Running alert job...');
-    await runAlertJob();
+    const result = await runAlertJob();
+    if (result.errors)
+      throw new Error(`${result.errors} alert deliveries failed; inspect delivery history.`);
     console.log('✓ Alert job completed');
-    
+
     // Close connection and exit
     await mongoose.connection.close();
     console.log('✓ MongoDB connection closed');

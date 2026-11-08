@@ -1,5 +1,7 @@
 # Production vs Development Configuration
 
+Historical design notes. For current Node 24 setup, authentication, service availability, jobs and validation, use [the October 29 operations guide](IMPLEMENTATION_2026-10-29.md). Commands and examples below may describe superseded behavior.
+
 ## Overview
 
 LeaseIQ uses environment-aware configuration to provide a better development experience while maintaining strict controls in production.

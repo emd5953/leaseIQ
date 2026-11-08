@@ -17,7 +17,7 @@ This frontend embodies a **Botanical/Organic** aesthetic—soft, sophisticated, 
 
 ## Tech Stack
 
-- **Framework**: Next.js 14 (App Router)
+- **Framework**: Next.js 15 (App Router)
 - **Styling**: Tailwind CSS
 - **Icons**: Lucide React
 - **Fonts**: Google Fonts (Playfair Display, Source Sans 3)
@@ -27,14 +27,14 @@ This frontend embodies a **Botanical/Organic** aesthetic—soft, sophisticated, 
 
 ### Prerequisites
 
-- Node.js 18+ installed
+- Node.js 24.x installed
 - Backend API running on `http://localhost:3001`
 
 ### Installation
 
 ```bash
 cd frontend
-npm install
+npm ci
 ```
 
 ### Development
@@ -93,7 +93,7 @@ Browse and filter apartment listings with advanced search filters.
 Detailed view of a single listing with image gallery, amenities, and research CTA.
 
 ### Research (`/research`)
-Research tool for getting landlord reviews, building violations, and insights.
+Attributed HPD/PLUTO/MTA evidence with explicit building confirmation, account or browser history, comparisons, and revocable report snapshots. No tenant reviews or safety scores are invented.
 
 ### Lease Analyzer (`/lease-analyzer`)
 AI-powered lease analysis tool to identify red flags and explain terms.
@@ -106,13 +106,17 @@ Detailed explanation of the platform's features and process.
 
 ## API Integration
 
-The frontend connects to the backend API at `http://localhost:3001`. API routes are proxied through Next.js:
+The shared client in `src/lib/api.ts` attaches authentication and handles expired sessions. Requests default to same-origin `/api`, rewritten by Next.js to the server configured with `API_INTERNAL_URL`. The root development launcher sets this automatically. Copy `.env.example` to `.env.local` for the Google client ID or a separately hosted API. See the [current setup and contracts](../docs/IMPLEMENTATION_2026-10-29.md).
+
+Main endpoints:
 
 - `GET /api/search` - Search listings
 - `GET /api/search/recent` - Get recent listings
 - `GET /api/search/:id` - Get listing by ID
 - `POST /api/research/:listingId` - Research a listing
-- `POST /api/lease/analyze` - Analyze lease text
+- `POST /api/property/analyze` - Authenticated lease PDF and/or floor-plan image analysis
+- `/api/research-library` - Private history/comparisons and explicitly shared snapshots
+- `/api/user/saved-listings` - Saved listings and server-persisted tracker status
 
 ## Design System
 

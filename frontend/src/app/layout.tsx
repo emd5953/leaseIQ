@@ -1,21 +1,13 @@
 import type { Metadata } from 'next'
-import { Playfair_Display, Source_Sans_3 } from 'next/font/google'
+import { Instrument_Serif, Inter_Tight, Inter, JetBrains_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/react'
 import './globals.css'
 import { Providers } from './providers'
 
-const playfair = Playfair_Display({
-  subsets: ['latin'],
-  variable: '--font-playfair',
-  weight: ['400', '600', '700'],
-  style: ['normal', 'italic'],
-})
-
-const sourceSans = Source_Sans_3({
-  subsets: ['latin'],
-  variable: '--font-source',
-  weight: ['400', '500', '600'],
-})
+const instrument = Instrument_Serif({ subsets: ['latin'], variable: '--font-instrument', weight: '400', style: ['normal', 'italic'], display: 'swap' })
+const heading = Inter_Tight({ subsets: ['latin'], variable: '--font-heading', weight: ['500', '600'], display: 'swap' })
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' })
+const mono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono', weight: ['400', '500'], display: 'swap' })
 
 export const metadata: Metadata = {
   title: 'LeaseIQ — Know more before the lease',
@@ -28,16 +20,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={`${playfair.variable} ${sourceSans.variable}`}>
+    <html lang="en" data-scroll-behavior="smooth" className={`${instrument.variable} ${heading.variable} ${inter.variable} ${mono.variable}`}>
       <body className="font-sans bg-background text-foreground antialiased">
-        {/* Paper grain texture overlay */}
-        <div
-          className="pointer-events-none fixed inset-0 z-50 opacity-[0.015]"
-          style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
-            backgroundRepeat: 'repeat',
-          }}
-        />
         <Providers>
           {children}
         </Providers>

@@ -1,13 +1,14 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || ''
+export const API_URL = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '')
 
 async function readResponse(response: Response, fallback: string) {
   const result = await response.json().catch(() => null)
-  if (!response.ok || result == null) throw new Error(typeof result?.error === 'string' ? result.error : fallback)
+  if (!response.ok || result == null)
+    throw new Error(typeof result?.error === 'string' ? result.error : fallback)
   return result
 }
 
 // Helper to get auth headers
-function getAuthHeaders(): HeadersInit {
+export function getAuthHeaders(): HeadersInit {
   const token = typeof window !== 'undefined' ? localStorage.getItem('leaseiq_token') : null
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
@@ -78,11 +79,22 @@ export const api = {
     }
     if (email) form.append('email', email)
     form.append('sendEmail', email ? 'true' : 'false')
-    const response = await fetch(`${API_URL}${endpoint}`, { method: 'POST', headers, body: form })
-    if (response.status === 401) throw new Error('Your session expired. Sign in again to analyze your documents.')
-    const data = await readResponse(response, 'Document analysis is temporarily unavailable. Please retry.')
-    if (!data.analysis || data.success === false) throw new Error(data.error || 'Analysis returned incomplete results. Please retry.')
-    const analysis = data.analysis.lease ? { ...data.analysis.lease, floorPlan: data.analysis.floorPlan } : data.analysis
+    const response = await apiFetch(
+      `${API_URL}${endpoint}`,
+      { method: 'POST', headers, body: form },
+      180000,
+    )
+    if (response.status === 401)
+      throw new Error('Your session expired. Sign in again to analyze your documents.')
+    const data = await readResponse(
+      response,
+      'Document analysis is temporarily unavailable. Please retry.',
+    )
+    if (!data.analysis || data.success === false)
+      throw new Error(data.error || 'Analysis returned incomplete results. Please retry.')
+    const analysis = data.analysis.lease
+      ? { ...data.analysis.lease, floorPlan: data.analysis.floorPlan }
+      : data.analysis
     return { ...data, analysis }
   },
 
@@ -94,7 +106,10 @@ export const api = {
   async getSavedListingIds(): Promise<Set<string>> {
     // Return cached data if fresh
     const now = Date.now()
-    if (this._savedListingsCache && (now - this._savedListingsCacheTime) < this._savedListingsCacheDuration) {
+    if (
+      this._savedListingsCache &&
+      now - this._savedListingsCacheTime < this._savedListingsCacheDuration
+    ) {
       return this._savedListingsCache
     }
 
@@ -114,9 +129,13 @@ export const api = {
     this._savedListingsCacheTime = 0
   },
 
-  async searchListings(filters: SearchFilters = {}, options: SearchOptions = {}, signal?: AbortSignal) {
+  async searchListings(
+    filters: SearchFilters = {},
+    options: SearchOptions = {},
+    signal?: AbortSignal,
+  ) {
     const params = new URLSearchParams()
-    
+
     Object.entries({ ...filters, ...options }).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
         if (Array.isArray(value)) {
@@ -130,70 +149,64 @@ export const api = {
     // Add cache-busting timestamp to ensure fresh data
     params.append('_t', Date.now().toString())
 
-    const response = await fetch(`${API_URL}/api/search?${params}`, { signal })
-    const result = await readResponse(response, 'Listing search is temporarily unavailable. Please retry.')
-    if (!Array.isArray(result.listings)) throw new Error('Listing search returned incomplete results. Please retry.')
+    const response = await apiFetch(`${API_URL}/api/search?${params}`, { signal })
+    const result = await readResponse(
+      response,
+      'Listing search is temporarily unavailable. Please retry.',
+    )
+    if (!Array.isArray(result.listings))
+      throw new Error('Listing search returned incomplete results. Please retry.')
     return result
   },
 
   async getRecentListings(limit: number = 20) {
-    const response = await fetch(`${API_URL}/api/search/recent?limit=${limit}`)
+    const response = await apiFetch(`${API_URL}/api/search/recent?limit=${limit}`)
     if (!response.ok) throw new Error('Failed to fetch recent listings')
     return response.json()
   },
 
   async getListingById(id: string) {
-    const response = await fetch(`${API_URL}/api/search/${id}`)
+    const response = await apiFetch(`${API_URL}/api/search/${id}`)
     return readResponse(response, 'This listing is temporarily unavailable. Please retry.')
   },
 
   async researchAddress(street: string, borough: string, signal?: AbortSignal) {
-    const response = await fetch(`${API_URL}/api/research/address`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ street, borough }), signal,
+    const response = await apiFetch(`${API_URL}/api/research/address`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ street, borough }),
+      signal,
     })
     return readResponse(response, 'Property research is temporarily unavailable. Please retry.')
   },
 
   async researchListing(listingId: string, email?: string, signal?: AbortSignal) {
-    const response = await fetch(`${API_URL}/api/research/${listingId}`, {
-      method: 'POST', signal,
+    const response = await apiFetch(`${API_URL}/api/research/${listingId}`, {
+      method: 'POST',
+      signal,
       headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       body: JSON.stringify({ email }),
     })
     return readResponse(response, 'Property research is temporarily unavailable. Please retry.')
   },
 
-  async analyzeLease(leaseText: string, email?: string) {
-    const response = await fetch(`${API_URL}/api/lease/analyze`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ leaseText, email }),
-    })
-    if (!response.ok) throw new Error('Lease analysis failed')
-    return response.json()
+  async analyzeDocuments(form: FormData, signal?: AbortSignal) {
+    return apiJson('/api/property/analyze', { method: 'POST', body: form, signal }, 180000)
   },
-
-  async processAlerts() {
-    const response = await fetch(`${API_URL}/api/alerts/process`, {
-      method: 'POST',
-    })
-    if (!response.ok) throw new Error('Failed to process alerts')
-    return response.json()
+  async analysisStatus() {
+    return apiJson('/api/property/status')
   },
-
-  async sendImmediateAlert(savedSearchId: string) {
-    const response = await fetch(`${API_URL}/api/alerts/send/${savedSearchId}`, {
-      method: 'POST',
-    })
-    if (!response.ok) throw new Error('Failed to send alert')
-    return response.json()
+  async getNotifications() {
+    return apiJson('/api/alerts/notifications')
+  },
+  async readNotification(id: string) {
+    return apiJson(`/api/alerts/notifications/${id}/read`, { method: 'PATCH' })
   },
 
   // ============ USER ENDPOINTS ============
 
   async getPreferences(): Promise<UserPreferences> {
-    const response = await fetch(`${API_URL}/api/user/preferences`, {
+    const response = await apiFetch(`${API_URL}/api/user/preferences`, {
       headers: { ...getAuthHeaders() },
     })
     if (!response.ok) throw new Error('Failed to get preferences')
@@ -201,7 +214,7 @@ export const api = {
   },
 
   async updatePreferences(preferences: UserPreferences): Promise<UserPreferences> {
-    const response = await fetch(`${API_URL}/api/user/preferences`, {
+    const response = await apiFetch(`${API_URL}/api/user/preferences`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       body: JSON.stringify(preferences),
@@ -211,7 +224,7 @@ export const api = {
   },
 
   async getSavedListings() {
-    const response = await fetch(`${API_URL}/api/user/saved-listings`, {
+    const response = await apiFetch(`${API_URL}/api/user/saved-listings`, {
       headers: { ...getAuthHeaders() },
     })
     if (!response.ok) throw new Error('Failed to get saved listings')
@@ -219,7 +232,7 @@ export const api = {
   },
 
   async saveListing(listingId: string, notes?: string) {
-    const response = await fetch(`${API_URL}/api/user/saved-listings/${listingId}`, {
+    const response = await apiFetch(`${API_URL}/api/user/saved-listings/${listingId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       body: JSON.stringify({ notes }),
@@ -229,8 +242,11 @@ export const api = {
     return response.json()
   },
 
-  async updateSavedListingStatus(listingId: string, status: 'interested' | 'touring' | 'applied' | 'lease' | 'moved') {
-    const response = await fetch(`${API_URL}/api/user/saved-listings/${listingId}`, {
+  async updateSavedListingStatus(
+    listingId: string,
+    status: 'interested' | 'touring' | 'applied' | 'lease' | 'moved',
+  ) {
+    const response = await apiFetch(`${API_URL}/api/user/saved-listings/${listingId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       body: JSON.stringify({ status }),
@@ -240,7 +256,7 @@ export const api = {
   },
 
   async unsaveListing(listingId: string) {
-    const response = await fetch(`${API_URL}/api/user/saved-listings/${listingId}`, {
+    const response = await apiFetch(`${API_URL}/api/user/saved-listings/${listingId}`, {
       method: 'DELETE',
       headers: { ...getAuthHeaders() },
     })
@@ -256,7 +272,7 @@ export const api = {
   },
 
   async getSavedSearches(): Promise<SavedSearch[]> {
-    const response = await fetch(`${API_URL}/api/user/saved-searches`, {
+    const response = await apiFetch(`${API_URL}/api/user/saved-searches`, {
       headers: { ...getAuthHeaders() },
     })
     if (!response.ok) throw new Error('Failed to get saved searches')
@@ -264,7 +280,7 @@ export const api = {
   },
 
   async createSavedSearch(search: SavedSearch): Promise<SavedSearch> {
-    const response = await fetch(`${API_URL}/api/user/saved-searches`, {
+    const response = await apiFetch(`${API_URL}/api/user/saved-searches`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       body: JSON.stringify(search),
@@ -274,7 +290,7 @@ export const api = {
   },
 
   async updateSavedSearch(id: string, search: Partial<SavedSearch>): Promise<SavedSearch> {
-    const response = await fetch(`${API_URL}/api/user/saved-searches/${id}`, {
+    const response = await apiFetch(`${API_URL}/api/user/saved-searches/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       body: JSON.stringify(search),
@@ -284,7 +300,7 @@ export const api = {
   },
 
   async deleteSavedSearch(id: string) {
-    const response = await fetch(`${API_URL}/api/user/saved-searches/${id}`, {
+    const response = await apiFetch(`${API_URL}/api/user/saved-searches/${id}`, {
       method: 'DELETE',
       headers: { ...getAuthHeaders() },
     })
@@ -293,12 +309,58 @@ export const api = {
   },
 
   async testSavedSearchAlert(id: string) {
-    const response = await fetch(`${API_URL}/api/user/saved-searches/${id}/test-alert`, {
+    const response = await apiFetch(`${API_URL}/api/user/saved-searches/${id}/test-alert`, {
       method: 'POST',
       headers: { ...getAuthHeaders() },
     })
-    const result = await readResponse(response, 'Failed to send test alert. Please retry.')
-    if (!result.success) throw new Error(result.error || 'The test email was not sent.')
+    const result = await readResponse(response, 'Failed to check alerts. Please retry.')
+    if (!result.success) throw new Error(result.error || 'Alert delivery could not be confirmed.')
     return result
   },
+}
+
+export async function apiFetch(url: string, init: RequestInit = {}, timeoutMs = 30000) {
+  const controller = new AbortController()
+  const abort = () => controller.abort()
+  if (init.signal?.aborted) controller.abort()
+  init.signal?.addEventListener('abort', abort, { once: true })
+  const timer = setTimeout(abort, timeoutMs)
+  try {
+    const response = await fetch(url, { ...init, signal: controller.signal })
+    // Buffer within the deadline, so a stalled response body cannot bypass the timeout.
+    const body = await response.arrayBuffer()
+    if (response.status === 401 && typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('leaseiq-session-expired'))
+      throw new Error('Your session expired. Sign in again to continue.')
+    }
+    return new Response(body.byteLength ? body : null, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+    })
+  } catch (error) {
+    if (controller.signal.aborted && !init.signal?.aborted)
+      throw new Error('The request timed out. Please retry.')
+    throw error
+  } finally {
+    clearTimeout(timer)
+    init.signal?.removeEventListener('abort', abort)
+  }
+}
+export async function apiJson(path: string, init: RequestInit = {}, timeoutMs = 30000) {
+  const response = await apiFetch(
+    API_URL + path,
+    {
+      ...init,
+      headers: {
+        ...(init.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
+        ...getAuthHeaders(),
+        ...init.headers,
+      },
+    },
+    timeoutMs,
+  )
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(data.error || 'Request failed. Please retry.')
+  return data
 }

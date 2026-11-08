@@ -25,6 +25,22 @@ describe('Ingestion to MongoDB to search', () => {
   beforeAll(async () => { mongo = await MongoMemoryServer.create(); await mongoose.connect(mongo.getUri()); await Listing.init(); });
   afterAll(async () => { await mongoose.disconnect(); await mongo.stop(); });
   beforeEach(async () => { await Listing.deleteMany({}); });
+  it('treats an exact borough query like its filter without confusing street names', async () => {
+    for (const [id, address] of [
+      ['borough-new-york', '101 East 10th Street #1, New York, NY 10003'],
+      ['borough-manhattan', '102 East 10th Street #1, Manhattan, NY 10003'],
+      ['borough-street', '103 Manhattan Avenue #1, Brooklyn, NY 11222'],
+    ]) await storage.insertListing(await normalized(id, { address }), null);
+    const text = await SearchService.search({ q: '  mAnHaTtAn  ' }, { limit: 17 });
+    const filtered = await SearchService.search({ neighborhoods: ['Manhattan'] }, { limit: 17 });
+    expect(text.total).toBe(2);
+    expect(text.listings.map(l => String(l._id)).sort()).toEqual(filtered.listings.map(l => String(l._id)).sort());
+    const street = await SearchService.search({ q: 'Manhattan Avenue' }, { limit: 17 });
+    expect(street.total).toBe(1);
+    expect(street.listings[0].addressDetails.city).toBe('Brooklyn');
+    const conflicting = await SearchService.search({ q: 'Manhattan', neighborhoods: ['Brooklyn'] }, { limit: 17 });
+    expect(conflicting.total).toBe(0);
+  });
   it('shares one schema and retains unit, floor plan, area, and building details through the API', async () => {
     expect(ListingModel).toBe(Listing);
     const data = await normalized();

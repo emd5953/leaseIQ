@@ -34,7 +34,7 @@ export class ReductoService {
 
   constructor(apiKey?: string) {
     this.apiKey = apiKey || config.reducto.apiKey;
-    
+
     if (!this.apiKey) {
       throw new Error('Reducto API key is required');
     }
@@ -67,18 +67,20 @@ export class ReductoService {
   private async parseFromBuffer(buffer: Buffer, fileName?: string): Promise<ReductoParseResult> {
     // First upload the file
     const boundary = `----WebKitFormBoundary${Date.now()}`;
-    const name = fileName || 'document.pdf';
-    
+    const name = (fileName || 'document.pdf').replace(/[^a-zA-Z0-9._-]/g, '_');
+
     // Build multipart form data for upload
     const parts: Buffer[] = [];
-    parts.push(Buffer.from(
-      `--${boundary}\r\n` +
-      `Content-Disposition: form-data; name="file"; filename="${name}"\r\n` +
-      `Content-Type: application/pdf\r\n\r\n`
-    ));
+    parts.push(
+      Buffer.from(
+        `--${boundary}\r\n` +
+          `Content-Disposition: form-data; name="file"; filename="${name}"\r\n` +
+          `Content-Type: application/pdf\r\n\r\n`,
+      ),
+    );
     parts.push(buffer);
     parts.push(Buffer.from(`\r\n--${boundary}--\r\n`));
-    
+
     const payload = Buffer.concat(parts);
 
     // Upload file first
@@ -132,7 +134,7 @@ export class ReductoService {
     // Handle the new API response format
     const result = response.result || response;
     const chunks = result.chunks || [];
-    
+
     // Extract text content from chunks
     const text = chunks.map((chunk: any) => chunk.content || chunk.text || '').join('\n\n');
     const markdown = result.markdown || text;
@@ -160,48 +162,32 @@ export class ReductoService {
   private makeRequest(
     endpoint: string,
     data: Buffer | string,
-    additionalHeaders: Record<string, string> = {}
+    additionalHeaders: Record<string, string> = {},
   ): Promise<any> {
-    return new Promise((resolve, reject) => {
-      const url = new URL(this.apiUrl + endpoint);
-      const payload = typeof data === 'string' ? Buffer.from(data) : data;
-
-      const options = {
-        hostname: url.hostname,
-        port: 443,
-        path: url.pathname,
+    return (async () => {
+      const response = await fetch(this.apiUrl + endpoint, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
-          'Content-Length': payload.length,
-          ...additionalHeaders,
-        },
-        timeout: 120000, // 2 minutes for large PDFs
-      };
-
-      const req = https.request(options, (res) => {
-        let body = '';
-        res.on('data', (chunk) => body += chunk);
-        res.on('end', () => {
-          try {
-            const result = JSON.parse(body);
-            resolve(result);
-          } catch (e) {
-            // If not JSON, return as text
-            resolve({ text: body });
-          }
-        });
+        signal: AbortSignal.timeout(45000),
+        headers: { Authorization: `Bearer ${this.apiKey}`, ...additionalHeaders },
+        body: data as any,
       });
-
-      req.on('error', reject);
-      req.on('timeout', () => {
-        req.destroy();
-        reject(new Error('Request timeout'));
-      });
-
-      req.write(payload);
-      req.end();
-    });
+      if (!response.ok || !response.body) throw new Error('Document extraction service failed.');
+      const reader = response.body.getReader();
+      let size = 0;
+      const chunks: Buffer[] = [];
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          size += value.length;
+          if (size > 8 * 1024 * 1024) throw new Error('Extracted document exceeds size limit.');
+          chunks.push(Buffer.from(value));
+        }
+      } finally {
+        await reader.cancel();
+      }
+      return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    })();
   }
 
   /**
@@ -216,12 +202,12 @@ export class ReductoService {
    */
   async parseLeasePDF(options: ReductoParseOptions): Promise<ReductoParseResult> {
     const result = await this.parsePDF(options);
-    
+
     if (result.success && result.text) {
       // Clean up common lease document artifacts
       result.text = this.cleanLeaseText(result.text);
     }
-    
+
     return result;
   }
 
