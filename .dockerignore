@@ -1,0 +1,11 @@
+.git
+**/node_modules
+**/.next
+dist
+coverage
+.env*
+**/.env*
+**/.vercel
+**/*.log
+**/*.tsbuildinfo
+.DS_Store

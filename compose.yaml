@@ -1,0 +1,58 @@
+name: leaseiq-local
+services:
+  mongo:
+    image: mongo:7.0
+    volumes:
+      - local-data:/data/db
+    networks: [isolated]
+    healthcheck:
+      test: [CMD, mongosh, --quiet, --eval, "quit(db.adminCommand('ping').ok ? 0 : 1)"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.local
+      target: backend
+    environment:
+      LOCAL_QA: "true"
+      NODE_ENV: development
+      MONGODB_URI: mongodb://mongo:27017/leaseiq_local
+      JWT_SECRET: local-qa-only-not-a-production-secret
+      FRONTEND_URL: http://localhost:3100
+      PORT: "3001"
+    networks: [isolated]
+    depends_on:
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://localhost:3001/health').then(r=>r.json()).then(r=>process.exit(r.database==='connected'?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.local
+      target: frontend
+    ports: ["127.0.0.1:3100:3000"]
+    networks: [isolated, browser]
+    depends_on:
+      api:
+        condition: service_healthy
+  tests:
+    profiles: [test]
+    build:
+      context: .
+      dockerfile: Dockerfile.local
+      target: tests
+    environment:
+      NODE_ENV: test
+    networks: [isolated]
+volumes:
+  local-data:
+networks:
+  browser:
+  isolated:
+    internal: true
