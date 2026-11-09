@@ -192,7 +192,7 @@ export default function DashboardPage() {
         <div className="max-w-6xl mx-auto">
           {/* Header */}
           <div className="workspace-header">
-            <p className="eyebrow mb-4 text-primary">Your workspace</p>
+            <p className="eyebrow mb-4 text-primary">05 / Your workspace</p>
             <h1 className="page-title">
               Welcome back, {user.displayName || user.email.split('@')[0]}
             </h1>

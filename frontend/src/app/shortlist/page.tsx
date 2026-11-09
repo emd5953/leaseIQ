@@ -42,7 +42,7 @@ export default function ShortlistPage() {
     ['Availability', l => l.isActive === false ? 'Marked inactive' : 'Confirm with source'],
   ]
   return <main id="main-content" className="min-h-screen"><Navigation /><div className="mx-auto max-w-7xl px-5 pb-20 pt-32 sm:px-8">
-    <header className="workspace-header"><p className="eyebrow text-primary">Your shortlist</p><h1 className="mt-3 page-title">Worth a second look.</h1><p className="mt-4 text-muted-foreground">{user ? 'Saved to your account.' : 'Saved in this browser. No account needed.'} Compare up to three rentals.</p></header>
+    <header className="workspace-header"><p className="eyebrow text-primary">03 / Your shortlist</p><h1 className="mt-3 page-title">Worth a second look.</h1><p className="mt-4 text-muted-foreground">{user ? 'Saved to your account.' : 'Saved in this browser. No account needed.'} Compare up to three rentals.</p></header>
     {notice && <div role="status" className="mb-5 rounded-xl bg-warning/10 p-4 text-sm text-warning">{notice}{!ready && <button onClick={retry} className="ml-3 underline">Retry</button>}</div>}
     {!!failed.length && <div role="alert" className="mb-5 rounded-xl border border-accent/20 bg-card p-5 text-sm">{failed.length} saved rental{failed.length === 1 ? '' : 's'} could not load. Your selections are kept.<button onClick={() => setRefresh(refresh + 1)} className="ml-3 text-primary underline">Retry</button></div>}
     {loading || !ready ? <div role="status" className="grid gap-5 md:grid-cols-3">{[0, 1, 2].map(n => <div key={n} className="h-80 animate-pulse rounded-2xl bg-card-alt" />)}<span className="sr-only">Loading your shortlist</span></div> : <>
